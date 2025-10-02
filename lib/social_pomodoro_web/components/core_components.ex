@@ -597,6 +597,52 @@ defmodule SocialPomodoroWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a feedback modal.
+
+  ## Examples
+
+      <.feedback_modal id="feedback-modal">
+        <:trigger>
+          <button>Give Feedback</button>
+        </:trigger>
+      </.feedback_modal>
+  """
+  attr :id, :string, required: true
+  slot :trigger, required: true
+
+  def feedback_modal(assigns) do
+    ~H"""
+    <%= render_slot(@trigger) %>
+    <.modal id={@id}>
+      <div class="space-y-6">
+        <h2 class="text-2xl font-semibold text-gray-900">What do you think?</h2>
+        
+        <.simple_form for={%{}} as={:feedback} action="/api/feedback" method="post">
+          <.input
+            type="textarea"
+            name="message"
+            label="Your feedback"
+            placeholder="Tell us what you think..."
+            required
+          />
+          
+          <.input
+            type="email"
+            name="email"
+            label="Email (optional)"
+            placeholder="your@email.com"
+          />
+          
+          <:actions>
+            <.button type="submit" class="w-full">Send Feedback</.button>
+          </:actions>
+        </.simple_form>
+      </div>
+    </.modal>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
