@@ -55,16 +55,16 @@ defmodule SocialPomodoro.Discord.Webhook do
   end
 
   defp send_webhook(url, payload) do
-    headers = [{"Content-Type", "application/json"}]
+    headers = [{~c"Content-Type", ~c"application/json"}]
     body = Jason.encode!(payload)
 
-    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", body}, [], []) do
+    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", String.to_charlist(body)}, [], []) do
       {:ok, {{_, status_code, _}, _headers, _body}} when status_code in 200..299 ->
         Logger.info("Feedback sent to Discord successfully")
         {:ok, :sent}
 
-      {:ok, {{_, status_code, _}, _headers, body}} ->
-        Logger.error("Failed to send feedback to Discord. Status: #{status_code}, Body: #{body}")
+      {:ok, {{_, status_code, _}, _headers, response_body}} ->
+        Logger.error("Failed to send feedback to Discord. Status: #{status_code}, Body: #{response_body}")
         {:error, :request_failed}
 
       {:error, reason} ->
