@@ -106,43 +106,44 @@ defmodule SocialPomodoroWeb.LobbyLive do
     ~H"""
     <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-8">
       <div class="max-w-7xl mx-auto">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <!-- Left Column: About & Create -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <!-- Left Column: Explanation -->
+          <div class="bg-white rounded-2xl shadow-sm p-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">Social Pomodoro</h1>
+            <div class="text-gray-600 space-y-3">
+              <p>Focus with strangers around the world.</p>
+              <p>
+                Join a room or create your own, set a timer, and work alongside others in real-time.
+              </p>
+              <p>React with emojis to share your progress and energy.</p>
+              <p>After each session, take a 5-minute break together.</p>
+              <p>Keep going or return to the lobby when you're done.</p>
+            </div>
+          </div>
+          
+    <!-- Right Column: Username & Create Room -->
           <div class="space-y-8">
-            <!-- About Section -->
-            <div class="bg-white rounded-2xl shadow-sm p-8">
-              <h1 class="text-3xl font-bold text-gray-900 mb-4">Social Pomodoro</h1>
-              <div class="text-gray-600 space-y-3">
-                <p>Focus with strangers around the world.</p>
-                <p>
-                  Join a room or create your own, set a timer, and work alongside others in real-time.
-                </p>
-                <p>React with emojis to share your progress and energy.</p>
-                <p>After each session, take a 5-minute break together.</p>
-                <p>Keep going or return to the lobby when you're done.</p>
-              </div>
-              
     <!-- Username Editor -->
-              <div class="mt-6 pt-6 border-t border-gray-200">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Your username: <span class="font-bold text-gray-900">{@username}</span>
-                </label>
-                <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
-                  <input
-                    type="text"
-                    value={@edit_username}
-                    name="username"
-                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="Enter username"
-                  />
-                  <button
-                    type="submit"
-                    class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Update
-                  </button>
-                </form>
-              </div>
+            <div class="bg-white rounded-2xl shadow-sm p-8">
+              <h2 class="text-2xl font-semibold text-gray-900 mb-4">Your Username</h2>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Current username: <span class="font-bold text-gray-900">{@username}</span>
+              </label>
+              <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
+                <input
+                  type="text"
+                  value={@edit_username}
+                  name="username"
+                  class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Enter username"
+                />
+                <button
+                  type="submit"
+                  class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Update
+                </button>
+              </form>
             </div>
             
     <!-- Create Room Section -->
@@ -206,80 +207,80 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </button>
             </div>
           </div>
-          
-    <!-- Right Column: Room List -->
-          <div class="bg-white rounded-2xl shadow-sm p-8">
-            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Open Rooms</h2>
+        </div>
+        
+    <!-- Full Width: Open Rooms -->
+        <div class="bg-white rounded-2xl shadow-sm p-8">
+          <h2 class="text-2xl font-semibold text-gray-900 mb-6">Open Rooms</h2>
 
-            <div class="space-y-4">
-              <%= if Enum.empty?(@rooms) do %>
-                <div class="text-center py-12 text-gray-500">
-                  <p class="text-lg">No rooms available</p>
-                  <p class="text-sm mt-2">Create one to get started!</p>
-                </div>
-              <% else %>
-                <%= for room <- @rooms do %>
-                  <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
-                    if room.room_id == @my_room_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
-                    <div class="flex items-center justify-between">
-                      <div class="flex-1">
-                        <!-- Participant Avatars -->
-                        <div class="flex items-center gap-2 mb-2">
-                          <%= for participant <- room.participants do %>
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold text-sm">
-                              {String.first(participant.username) |> String.upcase()}
-                            </div>
-                          <% end %>
-                        </div>
-                        
-    <!-- Room Info -->
-                        <div class="text-sm text-gray-600">
-                          {length(room.participants)} {if length(room.participants) == 1,
-                            do: "person",
-                            else: "people"} · {room.duration_minutes} min
-                          <%= if room.status != :waiting do %>
-                            · {format_time_remaining(room.seconds_remaining)} remaining
-                          <% end %>
-                        </div>
-                      </div>
-                      
-    <!-- Action Button -->
-                      <div class="ml-4">
-                        <%= if room.status == :waiting do %>
-                          <%= if room.room_id == @my_room_id do %>
-                            <button
-                              phx-click="start_my_room"
-                              class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              Start
-                            </button>
-                          <% else %>
-                            <button
-                              phx-click="join_room"
-                              phx-value-room-id={room.room_id}
-                              class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                            >
-                              Join
-                            </button>
-                          <% end %>
-                        <% else %>
-                          <div class="flex items-center gap-2 text-gray-400">
-                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path
-                                fill-rule="evenodd"
-                                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                                clip-rule="evenodd"
-                              />
-                            </svg>
-                            <span class="text-sm font-medium">In Progress</span>
+          <div class="space-y-4">
+            <%= if Enum.empty?(@rooms) do %>
+              <div class="text-center py-12 text-gray-500">
+                <p class="text-lg">No rooms available</p>
+                <p class="text-sm mt-2">Create one to get started!</p>
+              </div>
+            <% else %>
+              <%= for room <- @rooms do %>
+                <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
+                  if room.room_id == @my_room_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <!-- Participant Avatars -->
+                      <div class="flex items-center gap-2 mb-2">
+                        <%= for participant <- room.participants do %>
+                          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold text-sm">
+                            {String.first(participant.username) |> String.upcase()}
                           </div>
                         <% end %>
                       </div>
+                      
+    <!-- Room Info -->
+                      <div class="text-sm text-gray-600">
+                        {length(room.participants)} {if length(room.participants) == 1,
+                          do: "person",
+                          else: "people"} · {room.duration_minutes} min
+                        <%= if room.status != :waiting do %>
+                          · {format_time_remaining(room.seconds_remaining)} remaining
+                        <% end %>
+                      </div>
+                    </div>
+                    
+    <!-- Action Button -->
+                    <div class="ml-4">
+                      <%= if room.status == :waiting do %>
+                        <%= if room.room_id == @my_room_id do %>
+                          <button
+                            phx-click="start_my_room"
+                            class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            Start
+                          </button>
+                        <% else %>
+                          <button
+                            phx-click="join_room"
+                            phx-value-room-id={room.room_id}
+                            class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                          >
+                            Join
+                          </button>
+                        <% end %>
+                      <% else %>
+                        <div class="flex items-center gap-2 text-gray-400">
+                          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fill-rule="evenodd"
+                              d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                              clip-rule="evenodd"
+                            />
+                          </svg>
+                          <span class="text-sm font-medium">In Progress</span>
+                        </div>
+                      <% end %>
                     </div>
                   </div>
-                <% end %>
+                </div>
               <% end %>
-            </div>
+            <% end %>
           </div>
         </div>
       </div>
