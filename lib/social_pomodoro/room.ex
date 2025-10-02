@@ -5,7 +5,8 @@ defmodule SocialPomodoro.Room do
   use GenServer
   require Logger
 
-  @tick_interval 1000  # 1 second
+  # 1 second
+  @tick_interval 1000
 
   defstruct [
     :room_id,
@@ -34,16 +35,16 @@ defmodule SocialPomodoro.Room do
     GenServer.call(pid, :get_state)
   end
 
-  def join(room_id, username) do
+  def join(room_id, user_id) do
     case SocialPomodoro.RoomRegistry.get_room(room_id) do
-      {:ok, pid} -> GenServer.call(pid, {:join, username})
+      {:ok, pid} -> GenServer.call(pid, {:join, user_id})
       error -> error
     end
   end
 
-  def leave(room_id, username) do
+  def leave(room_id, user_id) do
     case SocialPomodoro.RoomRegistry.get_room(room_id) do
-      {:ok, pid} -> GenServer.call(pid, {:leave, username})
+      {:ok, pid} -> GenServer.call(pid, {:leave, user_id})
       error -> error
     end
   end
@@ -55,16 +56,16 @@ defmodule SocialPomodoro.Room do
     end
   end
 
-  def add_reaction(room_id, username, emoji) do
+  def add_reaction(room_id, user_id, emoji) do
     case SocialPomodoro.RoomRegistry.get_room(room_id) do
-      {:ok, pid} -> GenServer.cast(pid, {:add_reaction, username, emoji})
+      {:ok, pid} -> GenServer.cast(pid, {:add_reaction, user_id, emoji})
       error -> error
     end
   end
 
-  def go_again(room_id, username) do
+  def go_again(room_id, user_id) do
     case SocialPomodoro.RoomRegistry.get_room(room_id) do
-      {:ok, pid} -> GenServer.call(pid, {:go_again, username})
+      {:ok, pid} -> GenServer.call(pid, {:go_again, user_id})
       error -> error
     end
   end
@@ -82,7 +83,7 @@ defmodule SocialPomodoro.Room do
       creator: creator,
       duration_minutes: duration_minutes,
       status: :waiting,
-      participants: [%{username: creator, ready_for_next: false}],
+      participants: [%{user_id: creator, ready_for_next: false}],
       timer_ref: nil,
       seconds_remaining: nil,
       reactions: [],
@@ -104,16 +105,16 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_call({:join, username}, _from, state) do
+  def handle_call({:join, user_id}, _from, state) do
     cond do
       state.status != :waiting ->
         {:reply, {:error, :session_in_progress}, state}
 
-      Enum.any?(state.participants, &(&1.username == username)) ->
+      Enum.any?(state.participants, &(&1.user_id == user_id)) ->
         {:reply, {:error, :already_joined}, state}
 
       true ->
-        new_participant = %{username: username, ready_for_next: false}
+        new_participant = %{user_id: user_id, ready_for_next: false}
         new_state = %{state | participants: [new_participant | state.participants]}
         broadcast_room_update(new_state)
         {:reply, :ok, new_state}
@@ -121,8 +122,8 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_call({:leave, username}, _from, state) do
-    new_participants = Enum.reject(state.participants, &(&1.username == username))
+  def handle_call({:leave, user_id}, _from, state) do
+    new_participants = Enum.reject(state.participants, &(&1.user_id == user_id))
 
     # If room becomes empty, terminate
     if Enum.empty?(new_participants) do
@@ -140,11 +141,12 @@ defmodule SocialPomodoro.Room do
       seconds = state.duration_minutes * 60
       timer_ref = Process.send_after(self(), :tick, @tick_interval)
 
-      new_state = %{state |
-        status: :active,
-        seconds_remaining: seconds,
-        timer_ref: timer_ref,
-        reactions: []
+      new_state = %{
+        state
+        | status: :active,
+          seconds_remaining: seconds,
+          timer_ref: timer_ref,
+          reactions: []
       }
 
       broadcast_room_update(new_state)
@@ -155,16 +157,17 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_call({:go_again, username}, _from, state) do
+  def handle_call({:go_again, user_id}, _from, state) do
     if state.status == :break do
       # Mark this user as ready for next round
-      new_participants = Enum.map(state.participants, fn p ->
-        if p.username == username do
-          %{p | ready_for_next: true}
-        else
-          p
-        end
-      end)
+      new_participants =
+        Enum.map(state.participants, fn p ->
+          if p.user_id == user_id do
+            %{p | ready_for_next: true}
+          else
+            p
+          end
+        end)
 
       # Check if all participants are ready
       all_ready = Enum.all?(new_participants, & &1.ready_for_next)
@@ -176,12 +179,13 @@ defmodule SocialPomodoro.Room do
         seconds = state.duration_minutes * 60
         timer_ref = Process.send_after(self(), :tick, @tick_interval)
 
-        final_state = %{new_state |
-          status: :active,
-          seconds_remaining: seconds,
-          timer_ref: timer_ref,
-          reactions: [],
-          participants: Enum.map(new_participants, &%{&1 | ready_for_next: false})
+        final_state = %{
+          new_state
+          | status: :active,
+            seconds_remaining: seconds,
+            timer_ref: timer_ref,
+            reactions: [],
+            participants: Enum.map(new_participants, &%{&1 | ready_for_next: false})
         }
 
         broadcast_room_update(final_state)
@@ -196,9 +200,9 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_cast({:add_reaction, username, emoji}, state) do
+  def handle_cast({:add_reaction, user_id, emoji}, state) do
     if state.status == :active do
-      reaction = %{username: username, emoji: emoji, timestamp: System.system_time(:second)}
+      reaction = %{user_id: user_id, emoji: emoji, timestamp: System.system_time(:second)}
       new_state = %{state | reactions: [reaction | state.reactions]}
       broadcast_room_update(new_state)
       {:noreply, new_state}
@@ -213,11 +217,12 @@ defmodule SocialPomodoro.Room do
     seconds = state.break_duration_minutes * 60
     timer_ref = Process.send_after(self(), :tick, @tick_interval)
 
-    new_state = %{state |
-      status: :break,
-      seconds_remaining: seconds,
-      timer_ref: timer_ref,
-      reactions: []
+    new_state = %{
+      state
+      | status: :break,
+        seconds_remaining: seconds,
+        timer_ref: timer_ref,
+        reactions: []
     }
 
     broadcast_room_update(new_state)
@@ -227,12 +232,7 @@ defmodule SocialPomodoro.Room do
   @impl true
   def handle_info(:tick, %{seconds_remaining: 0, status: :break} = state) do
     # Break complete, return to waiting
-    new_state = %{state |
-      status: :waiting,
-      seconds_remaining: nil,
-      timer_ref: nil,
-      reactions: []
-    }
+    new_state = %{state | status: :waiting, seconds_remaining: nil, timer_ref: nil, reactions: []}
 
     broadcast_room_update(new_state)
     {:noreply, new_state}
@@ -243,10 +243,7 @@ defmodule SocialPomodoro.Room do
     new_seconds = state.seconds_remaining - 1
     timer_ref = Process.send_after(self(), :tick, @tick_interval)
 
-    new_state = %{state |
-      seconds_remaining: new_seconds,
-      timer_ref: timer_ref
-    }
+    new_state = %{state | seconds_remaining: new_seconds, timer_ref: timer_ref}
 
     broadcast_room_update(new_state)
     {:noreply, new_state}
@@ -275,14 +272,33 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
+    # Add usernames to participants for display
+    participants_with_usernames =
+      Enum.map(state.participants, fn p ->
+        username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
+        Map.put(p, :username, username)
+      end)
+
+    # Add usernames to reactions for display
+    reactions_with_usernames =
+      Enum.map(state.reactions, fn r ->
+        username = SocialPomodoro.UserRegistry.get_username(r.user_id) || "Unknown User"
+        Map.put(r, :username, username)
+      end)
+
+    # Get creator username
+    creator_username = SocialPomodoro.UserRegistry.get_username(state.creator) || "Unknown User"
+
     %{
       room_id: state.room_id,
       creator: state.creator,
+      creator_username: creator_username,
       duration_minutes: state.duration_minutes,
       status: state.status,
-      participants: state.participants,
+      participants: participants_with_usernames,
       seconds_remaining: state.seconds_remaining,
-      reactions: state.reactions |> Enum.take(50) |> Enum.reverse(),  # Latest 50 reactions
+      # Latest 50 reactions
+      reactions: reactions_with_usernames |> Enum.take(50) |> Enum.reverse(),
       break_duration_minutes: state.break_duration_minutes
     }
   end

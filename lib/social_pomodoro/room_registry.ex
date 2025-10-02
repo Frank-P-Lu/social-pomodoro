@@ -13,8 +13,8 @@ defmodule SocialPomodoro.RoomRegistry do
   @doc """
   Creates a new room and returns its ID.
   """
-  def create_room(creator_username, duration_minutes) do
-    GenServer.call(__MODULE__, {:create_room, creator_username, duration_minutes})
+  def create_room(creator_user_id, duration_minutes) do
+    GenServer.call(__MODULE__, {:create_room, creator_user_id, duration_minutes})
   end
 
   @doc """
@@ -47,14 +47,15 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @impl true
-  def handle_call({:create_room, creator_username, duration_minutes}, _from, state) do
+  def handle_call({:create_room, creator_user_id, duration_minutes}, _from, state) do
     room_id = generate_room_id()
 
-    {:ok, pid} = SocialPomodoro.Room.start_link(
-      room_id: room_id,
-      creator: creator_username,
-      duration_minutes: duration_minutes
-    )
+    {:ok, pid} =
+      SocialPomodoro.Room.start_link(
+        room_id: room_id,
+        creator: creator_user_id,
+        duration_minutes: duration_minutes
+      )
 
     :ets.insert(@table_name, {room_id, pid})
     {:reply, {:ok, room_id}, state}
@@ -86,6 +87,7 @@ defmodule SocialPomodoro.RoomRegistry do
           :ets.delete(@table_name, room_id)
           {:reply, {:error, :not_found}, state}
         end
+
       [] ->
         {:reply, {:error, :not_found}, state}
     end

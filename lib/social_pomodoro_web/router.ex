@@ -8,6 +8,7 @@ defmodule SocialPomodoroWeb.Router do
     plug :put_root_layout, html: {SocialPomodoroWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug SocialPomodoroWeb.Plugs.UserSession
   end
 
   pipeline :api do
