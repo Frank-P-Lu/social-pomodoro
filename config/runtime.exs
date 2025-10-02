@@ -7,6 +7,9 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+# Configure Discord webhook URL for feedback
+config :social_pomodoro, :discord_webhook_url, System.get_env("DISCORD_WEBHOOK_URL")
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server
