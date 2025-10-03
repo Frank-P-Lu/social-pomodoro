@@ -333,5 +333,64 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       htmlB_after = render(lobbyB)
       refute htmlB_after =~ room_id
     end
+
+    test "creator leaves room with participants: room stays open and new creator is assigned" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+      connC = setup_user_conn("userC")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_id = extract_room_id(htmlA)
+
+      # User B and C join the room
+      {:ok, lobbyB, _html} = live(connB, "/")
+      lobbyB
+      |> element("button[phx-value-room-id='#{room_id}']")
+      |> render_click()
+
+      {:ok, lobbyC, _html} = live(connC, "/")
+      lobbyC
+      |> element("button[phx-value-room-id='#{room_id}']")
+      |> render_click()
+
+      # Wait for PubSub broadcasts to propagate
+      Process.sleep(100)
+
+      # Verify 3 people in room
+      htmlA = render(lobbyA)
+      assert htmlA =~ "3 people"
+
+      # User A (creator) leaves room from lobby
+      lobbyA
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait for PubSub broadcast to propagate
+      Process.sleep(100)
+
+      # Room should still exist and show "2 people" (not closed)
+      htmlB_after = render(lobbyB)
+      assert htmlB_after =~ room_id
+      assert htmlB_after =~ "2 people"
+
+      htmlC_after = render(lobbyC)
+      assert htmlC_after =~ room_id
+      assert htmlC_after =~ "2 people"
+
+      # One of User B or User C should now see the Start button (indicating they're the new creator)
+      has_start_button_B = htmlB_after =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>Start<\/button>/
+      has_start_button_C = htmlC_after =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>Start<\/button>/
+
+      # Exactly one of them should be the new creator
+      assert has_start_button_B or has_start_button_C
+      refute has_start_button_B and has_start_button_C
+    end
   end
 end
