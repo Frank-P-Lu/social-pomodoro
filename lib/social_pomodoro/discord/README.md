@@ -14,15 +14,15 @@ To enable Discord feedback notifications:
 
 2. Set the environment variable:
    ```bash
-   export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+   export DISCORD_FEEDBACK_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
    ```
 
-   For development, you can add this to your `.env` file or set it in `config/dev.exs`:
-   ```elixir
-   config :social_pomodoro, :discord_webhook_url, "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+   For development, add this to your `.env` file (copy from `.env.example`):
+   ```
+   DISCORD_FEEDBACK_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
    ```
 
-3. The webhook is configured in `config/runtime.exs` to read from the `DISCORD_WEBHOOK_URL` environment variable.
+3. The webhook is configured in `config/runtime.exs` to read from the `DISCORD_FEEDBACK_WEBHOOK_URL` environment variable.
 
 ## Usage
 
