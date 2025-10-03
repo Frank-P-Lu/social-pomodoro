@@ -47,6 +47,13 @@ defmodule SocialPomodoro.Application do
     )
 
     :telemetry.attach(
+      "pomodoro-session-restarted",
+      [:pomodoro, :session, :restarted],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
       "pomodoro-session-completed",
       [:pomodoro, :session, :completed],
       &SocialPomodoro.TelemetryHandler.handle_event/4,

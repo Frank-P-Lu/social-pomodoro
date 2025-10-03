@@ -31,19 +31,29 @@ export DISCORD_FEEDBACK_WEBHOOK_URL="https://discord.com/api/webhooks/..."
 ### 2. Session Started
 **Event:** `[:pomodoro, :session, :started]`
 
-**Emitted when:** A pomodoro session is started
+**Emitted when:** A pomodoro session is started for the first time
 
 **Metadata:**
 - `room_id` - The room identifier
-- `user_id` - The starter's user ID (typically the room creator)
+- `participant_user_ids` - List of all participant user IDs in the session
 - `participant_count` - Number of participants in the session
 - `wait_time_seconds` - Time elapsed between room creation and session start
 
-**Location:** `lib/social_pomodoro/room.ex` (in `handle_call(:start_session)` and `handle_call({:go_again, _})`)
+**Location:** `lib/social_pomodoro/room.ex` (in `handle_call(:start_session)`)
 
-**Note:** When a session is restarted after a break using "go again", the `wait_time_seconds` is 0.
+### 3. Session Restarted
+**Event:** `[:pomodoro, :session, :restarted]`
 
-### 3. Session Completed
+**Emitted when:** A pomodoro session is restarted after a break (when all participants select "go again")
+
+**Metadata:**
+- `room_id` - The room identifier
+- `participant_user_ids` - List of all participant user IDs in the session
+- `participant_count` - Number of participants in the session
+
+**Location:** `lib/social_pomodoro/room.ex` (in `handle_call({:go_again, _})`)
+
+### 4. Session Completed
 **Event:** `[:pomodoro, :session, :completed]`
 
 **Emitted when:** A pomodoro session timer completes (reaches 0)

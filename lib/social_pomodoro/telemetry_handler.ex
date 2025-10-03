@@ -19,9 +19,17 @@ defmodule SocialPomodoro.TelemetryHandler do
   def handle_event([:pomodoro, :session, :started], _measurements, metadata, _config) do
     send_analytics("Session Started", %{
       room_id: metadata[:room_id],
-      starter_user_id: metadata[:user_id],
+      participant_user_ids: metadata[:participant_user_ids],
       participant_count: metadata[:participant_count],
       wait_time_seconds: metadata[:wait_time_seconds]
+    })
+  end
+
+  def handle_event([:pomodoro, :session, :restarted], _measurements, metadata, _config) do
+    send_analytics("Session Restarted", %{
+      room_id: metadata[:room_id],
+      participant_user_ids: metadata[:participant_user_ids],
+      participant_count: metadata[:participant_count]
     })
   end
 

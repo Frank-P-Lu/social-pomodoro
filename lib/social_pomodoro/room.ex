@@ -165,12 +165,14 @@ defmodule SocialPomodoro.Room do
       }
 
       # Emit telemetry event for session start
+      participant_user_ids = Enum.map(state.participants, & &1.user_id)
+
       :telemetry.execute(
         [:pomodoro, :session, :started],
         %{count: 1},
         %{
           room_id: state.room_id,
-          user_id: state.creator,
+          participant_user_ids: participant_user_ids,
           participant_count: length(state.participants),
           wait_time_seconds: wait_time_seconds
         }
@@ -224,15 +226,16 @@ defmodule SocialPomodoro.Room do
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false})
         }
 
-        # Emit telemetry event for session start (restarted after break)
+        # Emit telemetry event for session restart (restarted after break)
+        participant_user_ids = Enum.map(new_participants, & &1.user_id)
+
         :telemetry.execute(
-          [:pomodoro, :session, :started],
+          [:pomodoro, :session, :restarted],
           %{count: 1},
           %{
             room_id: state.room_id,
-            user_id: state.creator,
-            participant_count: length(new_participants),
-            wait_time_seconds: 0
+            participant_user_ids: participant_user_ids,
+            participant_count: length(new_participants)
           }
         )
 
