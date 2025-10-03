@@ -26,12 +26,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:user_id, user_id)
       |> assign(:username, username)
       |> assign(:edit_username, username)
+      |> assign(:editing_username, false)
       |> assign(:rooms, rooms)
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
       |> assign(:my_room_id, my_room_id)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_username_edit", _params, socket) do
+    {:noreply, assign(socket, :editing_username, !socket.assigns.editing_username)}
   end
 
   @impl true
@@ -48,6 +54,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       socket
       |> assign(:username, username)
       |> assign(:edit_username, username)
+      |> assign(:editing_username, false)
       |> put_flash(:info, "Username updated!")
 
     {:noreply, socket}
@@ -192,24 +199,34 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   <label class="block text-sm font-medium text-gray-700">
                     Your username
                   </label>
-                  <span class="font-bold text-gray-900">{@username}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-900">{@username}</span>
+                    <button
+                      phx-click="toggle_username_edit"
+                      class="text-xs text-gray-500 underline hover:text-gray-700 transition-colors"
+                    >
+                      change?
+                    </button>
+                  </div>
                 </div>
               </div>
-              <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
-                <input
-                  type="text"
-                  value={@edit_username}
-                  name="username"
-                  class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Enter username"
-                />
-                <button
-                  type="submit"
-                  class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Update
-                </button>
-              </form>
+              <%= if @editing_username do %>
+                <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
+                  <input
+                    type="text"
+                    value={@edit_username}
+                    name="username"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Enter username"
+                  />
+                  <button
+                    type="submit"
+                    class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Update
+                  </button>
+                </form>
+              <% end %>
             </div>
             
     <!-- Create Room Section -->
