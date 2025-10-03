@@ -129,7 +129,17 @@ defmodule SocialPomodoro.Room do
     if Enum.empty?(new_participants) do
       {:stop, :normal, :ok, state}
     else
-      new_state = %{state | participants: new_participants}
+      # Check if the leaving user is the creator
+      new_creator =
+        if state.creator == user_id do
+          # Assign a random remaining participant as the new creator
+          random_participant = Enum.random(new_participants)
+          random_participant.user_id
+        else
+          state.creator
+        end
+
+      new_state = %{state | participants: new_participants, creator: new_creator}
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     end
