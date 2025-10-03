@@ -17,7 +17,8 @@ defmodule SocialPomodoro.Room do
     :timer_ref,
     :seconds_remaining,
     :reactions,
-    :break_duration_minutes
+    :break_duration_minutes,
+    :created_at
   ]
 
   def start_link(opts) do
@@ -87,7 +88,8 @@ defmodule SocialPomodoro.Room do
       timer_ref: nil,
       seconds_remaining: nil,
       reactions: [],
-      break_duration_minutes: 5
+      break_duration_minutes: 5,
+      created_at: System.system_time(:second)
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -151,6 +153,9 @@ defmodule SocialPomodoro.Room do
       seconds = state.duration_minutes * 60
       timer_ref = Process.send_after(self(), :tick, @tick_interval)
 
+      # Calculate wait time (time between room creation and session start)
+      wait_time_seconds = System.system_time(:second) - state.created_at
+
       new_state = %{
         state
         | status: :active,
@@ -158,6 +163,18 @@ defmodule SocialPomodoro.Room do
           timer_ref: timer_ref,
           reactions: []
       }
+
+      # Emit telemetry event for session start
+      :telemetry.execute(
+        [:pomodoro, :session, :started],
+        %{count: 1},
+        %{
+          room_id: state.room_id,
+          user_id: state.creator,
+          participant_count: length(state.participants),
+          wait_time_seconds: wait_time_seconds
+        }
+      )
 
       # Broadcast to all participants to navigate to session page
       Enum.each(state.participants, fn participant ->
@@ -207,6 +224,18 @@ defmodule SocialPomodoro.Room do
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false})
         }
 
+        # Emit telemetry event for session start (restarted after break)
+        :telemetry.execute(
+          [:pomodoro, :session, :started],
+          %{count: 1},
+          %{
+            room_id: state.room_id,
+            user_id: state.creator,
+            participant_count: length(new_participants),
+            wait_time_seconds: 0
+          }
+        )
+
         broadcast_room_update(final_state)
         {:reply, :ok, final_state}
       else
@@ -235,6 +264,17 @@ defmodule SocialPomodoro.Room do
     # Session complete, start break
     seconds = state.break_duration_minutes * 60
     timer_ref = Process.send_after(self(), :tick, @tick_interval)
+
+    # Emit telemetry event for session completion
+    :telemetry.execute(
+      [:pomodoro, :session, :completed],
+      %{count: 1},
+      %{
+        room_id: state.room_id,
+        participant_count: length(state.participants),
+        duration_minutes: state.duration_minutes
+      }
+    )
 
     new_state = %{
       state
