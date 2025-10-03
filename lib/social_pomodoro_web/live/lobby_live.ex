@@ -118,15 +118,24 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <!-- Left Column: Explanation -->
           <div class="bg-white rounded-2xl shadow-sm p-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-4">Social Pomodoro</h1>
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">Fancy a Pomodoro?</h1>
             <div class="text-gray-600 space-y-3">
               <p>Focus with strangers around the world.</p>
+              <strong>No webcam. No chat.</strong>
+
               <p>
-                Join a room or create your own, set a timer, and work alongside others in real-time.
+                Join a room or create your own. Set a timer, and work alongside others in real-time.
               </p>
-              <p>React with emojis to share your progress and energy.</p>
-              <p>After each session, take a 5-minute break together.</p>
-              <p>Keep going or return to the lobby when you're done.</p>
+
+              <p>
+                React with emojis to share your progress and energy.
+              </p>
+              <p>
+                After each session, take a 5-minute break together.
+              </p>
+              <p>
+                Keep going or return to the lobby when you're done.
+              </p>
             </div>
           </div>
           
@@ -242,7 +251,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% else %>
               <%= for room <- @rooms do %>
                 <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
-                  if room.room_id == @user_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
+                  if room.creator == @user_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
                   <div class="flex items-center justify-between">
                     <div class="flex-1">
                       <!-- Participant Avatars -->
@@ -273,6 +282,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                         <%= if room.room_id == @my_room_id do %>
                           <button
                             phx-click="start_my_room"
+                            phx-value-room-id={room.room_id}
                             class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
                           >
                             Start

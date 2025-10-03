@@ -33,17 +33,14 @@ defmodule SocialPomodoro.Discord.Webhook do
     user_info = if username, do: "**From:** #{username}\n", else: ""
 
     email_info =
-      if email do
+      if email && String.trim(email) != "" do
         "**Reply to:** #{email}"
       else
         "**Reply to:** _No email provided_"
       end
 
     content = """
-    **New Feedback Received**
-
     #{user_info}**Message:** #{message}
-
     #{email_info}
     """
 
@@ -57,13 +54,21 @@ defmodule SocialPomodoro.Discord.Webhook do
     headers = [{~c"Content-Type", ~c"application/json"}]
     body = Jason.encode!(payload)
 
-    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", String.to_charlist(body)}, [], []) do
+    case :httpc.request(
+           :post,
+           {String.to_charlist(url), headers, ~c"application/json", String.to_charlist(body)},
+           [],
+           []
+         ) do
       {:ok, {{_, status_code, _}, _headers, _body}} when status_code in 200..299 ->
         Logger.info("Feedback sent to Discord successfully")
         {:ok, :sent}
 
       {:ok, {{_, status_code, _}, _headers, response_body}} ->
-        Logger.error("Failed to send feedback to Discord. Status: #{status_code}, Body: #{response_body}")
+        Logger.error(
+          "Failed to send feedback to Discord. Status: #{status_code}, Body: #{response_body}"
+        )
+
         {:error, :request_failed}
 
       {:error, reason} ->
