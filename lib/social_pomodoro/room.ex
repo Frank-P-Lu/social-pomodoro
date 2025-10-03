@@ -245,7 +245,14 @@ defmodule SocialPomodoro.Room do
 
     new_state = %{state | seconds_remaining: new_seconds, timer_ref: timer_ref}
 
-    broadcast_room_update(new_state)
+    # Only broadcast every 5 seconds to reduce network spam
+    # Still broadcast on important moments (last 10 seconds, every minute, etc)
+    should_broadcast = rem(new_seconds, 5) == 0 || new_seconds <= 10
+
+    if should_broadcast do
+      broadcast_room_update(new_state)
+    end
+
     {:noreply, new_state}
   end
 

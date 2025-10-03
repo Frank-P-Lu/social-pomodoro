@@ -124,9 +124,11 @@ defmodule SocialPomodoroWeb.SessionLive do
       <div class="flex justify-center gap-4 mb-8">
         <%= for participant <- @room_state.participants do %>
           <div class="text-center">
-            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-bold text-xl mb-2">
-              {String.first(participant.username) |> String.upcase()}
-            </div>
+            <img
+              src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+              alt={participant.username}
+              class="w-16 h-16 rounded-full bg-white mb-2"
+            />
             <p class="text-sm text-gray-600">{participant.username}</p>
           </div>
         <% end %>
@@ -171,9 +173,11 @@ defmodule SocialPomodoroWeb.SessionLive do
     <!-- Participants -->
       <div class="flex justify-center gap-4 mb-8">
         <%= for participant <- @room_state.participants do %>
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold">
-            {String.first(participant.username) |> String.upcase()}
-          </div>
+          <img
+            src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+            alt={participant.username}
+            class="w-12 h-12 rounded-full bg-white"
+          />
         <% end %>
       </div>
       <!-- Reaction Buttons -->
@@ -251,9 +255,17 @@ defmodule SocialPomodoroWeb.SessionLive do
       <div class="flex justify-center gap-4 mb-8">
         <%= for participant <- @room_state.participants do %>
           <div class="text-center">
-            <div class={"w-16 h-16 rounded-full flex items-center justify-center text-white font-semibold text-xl mb-2 " <>
-              if participant.ready_for_next, do: "bg-gradient-to-br from-green-400 to-emerald-400", else: "bg-gradient-to-br from-gray-300 to-gray-400"}>
-              {String.first(participant.username) |> String.upcase()}
+            <div class="relative w-16 h-16 mb-2">
+              <img
+                src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+                alt={participant.username}
+                class="w-16 h-16 rounded-full bg-white"
+              />
+              <%= if participant.ready_for_next do %>
+                <div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                  <span class="text-white text-xs">✓</span>
+                </div>
+              <% end %>
             </div>
             <%= if participant.ready_for_next do %>
               <p class="text-xs text-green-600 font-semibold">Ready!</p>

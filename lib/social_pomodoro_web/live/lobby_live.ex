@@ -65,8 +65,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
-  def handle_event("start_my_room", _params, socket) do
-    room_id = socket.assigns.my_room_id
+  def handle_event("start_my_room", %{"room-id" => room_id}, socket) do
     {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
   end
 
@@ -130,15 +129,24 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <p>Keep going or return to the lobby when you're done.</p>
             </div>
           </div>
-
-          <!-- Right Column: Username & Create Room -->
+          
+    <!-- Right Column: Username & Create Room -->
           <div class="space-y-8">
-    <!-- Username Editor -->
-            <div class="bg-white rounded-2xl shadow-sm p-8">
-              <h2 class="text-2xl font-semibold text-gray-900 mb-4">Your Username</h2>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Current username: <span class="font-bold text-gray-900">{@username}</span>
-              </label>
+            <!-- Username Editor -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+              <div class="flex items-center gap-3 mb-3">
+                <img
+                  src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
+                  alt={@username}
+                  class="w-12 h-12 rounded-full bg-white"
+                />
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">
+                    Your username
+                  </label>
+                  <span class="font-bold text-gray-900">{@username}</span>
+                </div>
+              </div>
               <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
                 <input
                   type="text"
@@ -187,11 +195,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   75 min
                 </button>
               </div>
-
+              
     <!-- Duration Slider -->
               <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Duration: <%= @duration_minutes %> minutes
+                  Duration: {@duration_minutes} minutes
                 </label>
                 <form phx-change="set_duration">
                   <input
@@ -217,9 +225,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </button>
             </div>
           </div>
+          <!-- This closes the Right Column -->
         </div>
-        
-    <!-- Full Width: Open Rooms -->
+        <!-- This closes the grid -->
+
+        <!-- Full Width: Open Rooms -->
         <div class="bg-white rounded-2xl shadow-sm p-8">
           <h2 class="text-2xl font-semibold text-gray-900 mb-6">Open Rooms</h2>
 
@@ -232,15 +242,17 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% else %>
               <%= for room <- @rooms do %>
                 <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
-                  if room.room_id == @my_room_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
+                  if room.room_id == @user_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
                   <div class="flex items-center justify-between">
                     <div class="flex-1">
                       <!-- Participant Avatars -->
                       <div class="flex items-center gap-2 mb-2">
                         <%= for participant <- room.participants do %>
-                          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold text-sm">
-                            {String.first(participant.username) |> String.upcase()}
-                          </div>
+                          <img
+                            src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+                            alt={participant.username}
+                            class="w-10 h-10 rounded-full bg-white"
+                          />
                         <% end %>
                       </div>
                       
@@ -295,7 +307,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
         </div>
       </div>
     </div>
-    
+
     <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
