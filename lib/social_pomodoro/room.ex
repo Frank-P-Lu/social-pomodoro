@@ -149,6 +149,15 @@ defmodule SocialPomodoro.Room do
           reactions: []
       }
 
+      # Broadcast to all participants to navigate to session page
+      Enum.each(state.participants, fn participant ->
+        Phoenix.PubSub.broadcast(
+          SocialPomodoro.PubSub,
+          "user:#{participant.user_id}",
+          {:session_started, state.room_id}
+        )
+      end)
+
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else
@@ -258,6 +267,13 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def terminate(_reason, state) do
+    # Broadcast room removal to all lobby viewers
+    Phoenix.PubSub.broadcast(
+      SocialPomodoro.PubSub,
+      "rooms",
+      {:room_removed, state.room_id}
+    )
+
     SocialPomodoro.RoomRegistry.remove_room(state.room_id)
     :ok
   end

@@ -32,6 +32,14 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @doc """
+  Finds which room (if any) a user is currently in.
+  Returns {:ok, room_id} or {:error, :not_found}
+  """
+  def find_user_room(user_id) do
+    GenServer.call(__MODULE__, {:find_user_room, user_id})
+  end
+
+  @doc """
   Removes a room from the registry (called when room process terminates).
   """
   def remove_room(room_id) do
@@ -90,6 +98,25 @@ defmodule SocialPomodoro.RoomRegistry do
 
       [] ->
         {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:find_user_room, user_id}, _from, state) do
+    result =
+      :ets.tab2list(@table_name)
+      |> Enum.find_value(fn {room_id, pid} ->
+        if Process.alive?(pid) do
+          room_state = SocialPomodoro.Room.get_state(pid)
+          if Enum.any?(room_state.participants, &(&1.user_id == user_id)) do
+            room_id
+          end
+        end
+      end)
+
+    case result do
+      nil -> {:reply, {:error, :not_found}, state}
+      room_id -> {:reply, {:ok, room_id}, state}
     end
   end
 

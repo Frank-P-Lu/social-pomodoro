@@ -14,6 +14,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
     rooms = SocialPomodoro.RoomRegistry.list_rooms()
 
+    # Check if user is already in a room
+    my_room_id =
+      case SocialPomodoro.RoomRegistry.find_user_room(user_id) do
+        {:ok, room_id} -> room_id
+        {:error, :not_found} -> nil
+      end
+
     socket =
       socket
       |> assign(:user_id, user_id)
@@ -22,7 +29,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:rooms, rooms)
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
-      |> assign(:my_room_id, nil)
+      |> assign(:my_room_id, my_room_id)
 
     {:ok, socket}
   end
@@ -66,6 +73,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("start_my_room", %{"room-id" => room_id}, socket) do
+    SocialPomodoro.Room.start_session(room_id)
     {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
   end
 
@@ -73,7 +81,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
   def handle_event("join_room", %{"room-id" => room_id}, socket) do
     case SocialPomodoro.Room.join(room_id, socket.assigns.user_id) do
       :ok ->
-        {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
+        # Stay in lobby, just update state to show we're in the room
+        {:noreply, assign(socket, :my_room_id, room_id)}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not join room")}
@@ -81,7 +90,32 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def handle_event("leave_room", _params, socket) do
+    if socket.assigns.my_room_id do
+      SocialPomodoro.Room.leave(socket.assigns.my_room_id, socket.assigns.user_id)
+      {:noreply, assign(socket, :my_room_id, nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:room_update, _room_state}, socket) do
+    rooms = SocialPomodoro.RoomRegistry.list_rooms()
+    {:noreply, assign(socket, :rooms, rooms)}
+  end
+
+  @impl true
+  def handle_info({:room_removed, room_id}, socket) do
+    # If we were in this room, reset my_room_id
+    socket =
+      if socket.assigns.my_room_id == room_id do
+        assign(socket, :my_room_id, nil)
+      else
+        socket
+      end
+
+    # Update rooms list
     rooms = SocialPomodoro.RoomRegistry.list_rooms()
     {:noreply, assign(socket, :rooms, rooms)}
   end
@@ -98,6 +132,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_info({:session_started, room_id}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
   end
 
   @impl true
@@ -176,35 +215,47 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <!-- Create Room Section -->
             <div class="bg-white rounded-2xl shadow-sm p-8">
               <h2 class="text-2xl font-semibold text-gray-900 mb-6">Create a Room</h2>
-              
+
+              <%= if @my_room_id do %>
+                <div class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <p class="text-sm text-indigo-700">You're already in a room!</p>
+                </div>
+              <% end %>
+
     <!-- Duration Presets -->
               <div class="flex gap-3 mb-6">
                 <button
                   phx-click="set_duration"
                   phx-value-minutes="25"
+                  disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    if @duration_minutes == 25, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200"}
+                    (if @duration_minutes == 25, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   25 min
                 </button>
                 <button
                   phx-click="set_duration"
                   phx-value-minutes="50"
+                  disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    if @duration_minutes == 50, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200"}
+                    (if @duration_minutes == 50, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   50 min
                 </button>
                 <button
                   phx-click="set_duration"
                   phx-value-minutes="75"
+                  disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    if @duration_minutes == 75, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200"}
+                    (if @duration_minutes == 75, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   75 min
                 </button>
               </div>
-              
+
     <!-- Duration Slider -->
               <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -217,7 +268,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     max="180"
                     value={@duration_minutes}
                     name="minutes"
-                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    disabled={@my_room_id != nil}
+                    class={"w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" <>
+                      if @my_room_id, do: " opacity-50 cursor-not-allowed", else: ""}
                   />
                 </form>
                 <div class="flex justify-between text-xs text-gray-500 mt-1">
@@ -228,7 +281,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
               <button
                 phx-click="create_room"
-                class="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors"
+                disabled={@my_room_id != nil}
+                class={"w-full font-semibold py-3 rounded-lg transition-colors " <>
+                  if @my_room_id, do: "bg-gray-300 text-gray-500 cursor-not-allowed", else: "bg-indigo-600 text-white hover:bg-indigo-700"}
               >
                 Create Room
               </button>
@@ -251,7 +306,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% else %>
               <%= for room <- @rooms do %>
                 <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
-                  if room.creator == @user_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
+                  if room.room_id == @my_room_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
                   <div class="flex items-center justify-between">
                     <div class="flex-1">
                       <!-- Participant Avatars -->
@@ -264,7 +319,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                           />
                         <% end %>
                       </div>
-                      
+
     <!-- Room Info -->
                       <div class="text-sm text-gray-600">
                         {length(room.participants)} {if length(room.participants) == 1,
@@ -275,17 +330,29 @@ defmodule SocialPomodoroWeb.LobbyLive do
                         <% end %>
                       </div>
                     </div>
-                    
+
     <!-- Action Button -->
-                    <div class="ml-4">
+                    <div class="ml-4 flex gap-2">
                       <%= if room.status == :waiting do %>
                         <%= if room.room_id == @my_room_id do %>
+                          <%= if room.creator == @user_id do %>
+                            <button
+                              phx-click="start_my_room"
+                              phx-value-room-id={room.room_id}
+                              class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              Start
+                            </button>
+                          <% else %>
+                            <div class="text-sm text-gray-400">
+                              Waiting for host...
+                            </div>
+                          <% end %>
                           <button
-                            phx-click="start_my_room"
-                            phx-value-room-id={room.room_id}
-                            class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            phx-click="leave_room"
+                            class="px-4 py-2 bg-red-50 text-red-700 font-medium rounded-lg hover:bg-red-100 transition-colors border border-red-200"
                           >
-                            Start
+                            Leave
                           </button>
                         <% else %>
                           <button
