@@ -3,12 +3,14 @@ defmodule SocialPomodoroWeb.FeedbackController do
 
   alias SocialPomodoro.Discord.Webhook
 
-  def create(conn, %{"feedback" => feedback_params}) do
+  def create(conn, params) do
+    feedback_params = Map.get(params, "feedback", %{})
     message = Map.get(feedback_params, "message", "")
     email = Map.get(feedback_params, "email")
+    username = Map.get(params, "username", "Anonymous")
 
     # Send to Discord webhook
-    case Webhook.send_feedback(message, email) do
+    case Webhook.send_feedback(message, email, username) do
       {:ok, _} ->
         conn
         |> put_flash(:info, "Thank you for your feedback!")

@@ -609,6 +609,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
       </.feedback_modal>
   """
   attr :id, :string, required: true
+  attr :username, :string, required: true
   slot :trigger, required: true
 
   def feedback_modal(assigns) do
@@ -617,23 +618,25 @@ defmodule SocialPomodoroWeb.CoreComponents do
     <.modal id={@id}>
       <div class="space-y-6">
         <h2 class="text-2xl font-semibold text-gray-900">What do you think?</h2>
-        
-        <.simple_form for={%{}} as={:feedback} action="/api/feedback" method="post">
+
+        <.simple_form :let={f} for={%{}} as={:feedback} action="/api/feedback" method="post">
+          <input type="hidden" name="username" value={@username} />
+
           <.input
+            field={f[:message]}
             type="textarea"
-            name="message"
             label="Your feedback"
             placeholder="Tell us what you think..."
             required
           />
-          
+
           <.input
+            field={f[:email]}
             type="email"
-            name="email"
             label="Email (optional)"
             placeholder="your@email.com"
           />
-          
+
           <:actions>
             <.button type="submit" class="w-full">Send Feedback</.button>
           </:actions>

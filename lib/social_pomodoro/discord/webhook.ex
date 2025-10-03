@@ -11,42 +11,41 @@ defmodule SocialPomodoro.Discord.Webhook do
   ## Parameters
     - message: The feedback message text
     - email: Optional email address for reply (can be nil)
+    - username: Optional username of the person submitting feedback (can be nil)
 
   ## Returns
     - {:ok, response} on success
     - {:error, reason} on failure
   """
-  def send_feedback(message, email \\ nil) do
+  def send_feedback(message, email \\ nil, username \\ nil) do
     webhook_url = Application.get_env(:social_pomodoro, :discord_webhook_url)
 
     if is_nil(webhook_url) or webhook_url == "" do
       Logger.warning("Discord webhook URL not configured. Feedback not sent.")
       {:error, :webhook_not_configured}
     else
-      payload = build_feedback_payload(message, email)
+      payload = build_feedback_payload(message, email, username)
       send_webhook(webhook_url, payload)
     end
   end
 
-  defp build_feedback_payload(message, email) do
-    content =
+  defp build_feedback_payload(message, email, username) do
+    user_info = if username, do: "**From:** #{username}\n", else: ""
+
+    email_info =
       if email do
-        """
-        **New Feedback Received**
-        
-        **Message:** #{message}
-        
-        **Reply to:** #{email}
-        """
+        "**Reply to:** #{email}"
       else
-        """
-        **New Feedback Received**
-        
-        **Message:** #{message}
-        
-        **Reply to:** _No email provided_
-        """
+        "**Reply to:** _No email provided_"
       end
+
+    content = """
+    **New Feedback Received**
+
+    #{user_info}**Message:** #{message}
+
+    #{email_info}
+    """
 
     %{
       content: content,

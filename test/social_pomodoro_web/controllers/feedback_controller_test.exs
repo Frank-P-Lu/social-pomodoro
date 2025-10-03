@@ -8,7 +8,8 @@ defmodule SocialPomodoroWeb.FeedbackControllerTest do
           feedback: %{
             message: "Great app!",
             email: "test@example.com"
-          }
+          },
+          username: "TestUser"
         })
 
       assert redirected_to(conn) == "/"
@@ -16,6 +17,19 @@ defmodule SocialPomodoroWeb.FeedbackControllerTest do
     end
 
     test "submits feedback without email", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/feedback", %{
+          feedback: %{
+            message: "Great app!"
+          },
+          username: "TestUser"
+        })
+
+      assert redirected_to(conn) == "/"
+      assert get_flash(conn, :info) =~ "Thank you for your feedback"
+    end
+
+    test "submits feedback without username", %{conn: conn} do
       conn =
         post(conn, ~p"/api/feedback", %{
           feedback: %{

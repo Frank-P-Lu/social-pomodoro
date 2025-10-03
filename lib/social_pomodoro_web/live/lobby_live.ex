@@ -296,7 +296,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
     
-    <.feedback_modal id="feedback-modal">
+    <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
     """
