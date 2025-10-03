@@ -299,9 +299,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
           <div class="space-y-4">
             <%= if Enum.empty?(@rooms) do %>
-              <div class="text-center py-12 text-gray-500">
-                <p class="text-lg">No rooms available</p>
-                <p class="text-sm mt-2">Create one to get started!</p>
+              <div class="text-center py-12 text-gray-600">
+                <p class="text-lg">No one is here yet 🥺. That's okay! You can focus with yourself!</p>
               </div>
             <% else %>
               <%= for room <- @rooms do %>
