@@ -151,7 +151,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       <% else %>
         <p class="text-gray-500">Waiting for {@room_state.creator_username} to start...</p>
       <% end %>
-      
+
       <button phx-click="leave_room" class="mt-4 text-gray-500 hover:text-gray-700 underline">
         Leave Room
       </button>
@@ -163,12 +163,15 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div class="bg-white rounded-2xl shadow-lg p-12">
       <!-- Timer Display -->
-      <div class="text-center mb-12">
-        <div class="text-8xl font-bold text-indigo-600 mb-4">
-          {format_time(@room_state.seconds_remaining)}
-        </div>
-        <p class="text-xl text-gray-600">Focus time remaining</p>
+      <div
+        id="timer-display"
+        class="text-5xl font-bold text-indigo-600 mb-2"
+        phx-hook="Timer"
+        data-seconds-remaining={@room_state.seconds_remaining}
+      >
+        {format_time(@room_state.seconds_remaining)}
       </div>
+      <p class="text-xl text-gray-600">Focus time remaining</p>
       
     <!-- Participants -->
       <div class="flex justify-center gap-4 mb-8">
@@ -273,7 +276,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           </div>
         <% end %>
       </div>
-      
+
       <div class="flex gap-4 justify-center">
         <button
           phx-click="go_again"
