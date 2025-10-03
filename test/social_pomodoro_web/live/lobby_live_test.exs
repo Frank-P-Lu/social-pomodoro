@@ -334,4 +334,30 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       refute htmlB_after =~ room_id
     end
   end
+
+  describe "empty state" do
+    test "displays friendly empty state message when no rooms available" do
+      conn = setup_user_conn("user1")
+      {:ok, _lobby, html} = live(conn, "/")
+
+      # Should see the friendly empty state message
+      assert html =~ "No one is here yet"
+      assert html =~ "That's okay! You can focus with yourself!"
+    end
+
+    test "does not display empty state when rooms are available" do
+      conn = setup_user_conn("user1")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      # Create a room
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      # Should NOT see the empty state message
+      refute html =~ "No one is here yet"
+    end
+  end
 end
