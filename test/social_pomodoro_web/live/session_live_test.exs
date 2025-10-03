@@ -72,4 +72,73 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       assert htmlA_session =~ "Waiting to Start"
     end
   end
+
+  describe "waiting room empty state" do
+    test "single participant sees friendly empty state message" do
+      connA = setup_user_conn("userA")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      # Extract room_id
+      room_id =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-id="([^"]+)"/, htmlA) do
+          [_, room_id] -> room_id
+          _ -> nil
+        end
+
+      # User A accesses their own room
+      {:ok, _sessionA, htmlA_session} = live(connA, "/room/#{room_id}")
+
+      # Should see the friendly empty state message
+      assert htmlA_session =~ "No one is here yet"
+      assert htmlA_session =~ "That's okay! You can focus with yourself!"
+    end
+
+    test "multiple participants see regular participant count message" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      # Extract room_id
+      room_id =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-id="([^"]+)"/, htmlA) do
+          [_, room_id] -> room_id
+          _ -> nil
+        end
+
+      # User B joins the room from lobby
+      {:ok, lobbyB, _html} = live(connB, "/")
+
+      lobbyB
+      |> element("button[phx-value-room-id='#{room_id}']")
+      |> render_click()
+
+      # Wait a moment for PubSub to update
+      Process.sleep(50)
+
+      # User A checks the room again
+      {:ok, _sessionA, htmlA_session} = live(connA, "/room/#{room_id}")
+
+      # Should NOT see the empty state message
+      refute htmlA_session =~ "No one is here yet"
+      # Should see the regular participant count
+      assert htmlA_session =~ "2"
+      assert htmlA_session =~ "people in room"
+    end
+  end
 end

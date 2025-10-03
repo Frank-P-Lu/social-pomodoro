@@ -153,12 +153,21 @@ defmodule SocialPomodoroWeb.SessionLive do
         <% end %>
       </div>
 
-      <p class="text-lg text-gray-600 mb-8">
-        {length(@room_state.participants)} {if length(@room_state.participants) == 1,
-          do: "person",
-          else: "people"} in room
-        · {@room_state.duration_minutes} minute session
-      </p>
+      <%= if length(@room_state.participants) == 1 do %>
+        <p class="text-lg text-gray-600 mb-8">
+          No one is here yet 🥺. That's okay! You can focus with yourself!
+        </p>
+        <p class="text-md text-gray-500 mb-8">
+          {@room_state.duration_minutes} minute session
+        </p>
+      <% else %>
+        <p class="text-lg text-gray-600 mb-8">
+          {length(@room_state.participants)} {if length(@room_state.participants) == 1,
+            do: "person",
+            else: "people"} in room
+          · {@room_state.duration_minutes} minute session
+        </p>
+      <% end %>
 
       <%= if @room_state.creator == @user_id do %>
         <button
