@@ -10,7 +10,7 @@ kill_signal = 'SIGTERM'
 [build]
 
 [env]
-  PHX_HOST = 'social-pomodoro.fly.dev'
+  PHX_HOST = 'focuswithstrangers.com'
   PORT = '8080'
 
 [http_service]
