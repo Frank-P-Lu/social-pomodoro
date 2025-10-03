@@ -21,30 +21,33 @@ defmodule SocialPomodoroWeb.SessionLive do
         # Check if user is already in the room, if not, try to join
         user_in_room = Enum.any?(room_state.participants, &(&1.user_id == user_id))
 
-        room_state =
-          if not user_in_room do
-            case SocialPomodoro.Room.join(room_id, user_id) do
-              :ok ->
-                # Get updated room state after joining
-                SocialPomodoro.Room.get_state(pid)
+        if user_in_room do
+          # User is already in the room, let them in
+          socket =
+            socket
+            |> assign(:room_id, room_id)
+            |> assign(:room_state, room_state)
+            |> assign(:user_id, user_id)
+            |> assign(:username, username)
+            |> assign(:selected_emoji, nil)
+            |> assign(:redirect_countdown, nil)
 
-              {:error, _reason} ->
-                # User can't join (maybe session in progress), but let them observe
-                room_state
-            end
-          else
-            room_state
-          end
+          {:ok, socket}
+        else
+          # User not in room, show redirect screen
+          Process.send_after(self(), :countdown, 1000)
 
-        socket =
-          socket
-          |> assign(:room_id, room_id)
-          |> assign(:room_state, room_state)
-          |> assign(:user_id, user_id)
-          |> assign(:username, username)
-          |> assign(:selected_emoji, nil)
+          socket =
+            socket
+            |> assign(:room_id, room_id)
+            |> assign(:room_state, room_state)
+            |> assign(:user_id, user_id)
+            |> assign(:username, username)
+            |> assign(:selected_emoji, nil)
+            |> assign(:redirect_countdown, 5)
 
-        {:ok, socket}
+          {:ok, socket}
+        end
 
       {:error, :not_found} ->
         {:ok, push_navigate(socket, to: ~p"/")}
@@ -95,20 +98,36 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_info(:countdown, socket) do
+    case socket.assigns.redirect_countdown do
+      1 ->
+        {:noreply, push_navigate(socket, to: ~p"/")}
+
+      n ->
+        Process.send_after(self(), :countdown, 1000)
+        {:noreply, assign(socket, :redirect_countdown, n - 1)}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-8">
       <div class="max-w-4xl w-full">
-        <%= if @room_state.status == :waiting do %>
-          <.waiting_view room_state={@room_state} user_id={@user_id} />
-        <% end %>
+        <%= if @redirect_countdown do %>
+          <.redirect_view countdown={@redirect_countdown} />
+        <% else %>
+          <%= if @room_state.status == :waiting do %>
+            <.waiting_view room_state={@room_state} user_id={@user_id} />
+          <% end %>
 
-        <%= if @room_state.status == :active do %>
-          <.active_session_view room_state={@room_state} />
-        <% end %>
+          <%= if @room_state.status == :active do %>
+            <.active_session_view room_state={@room_state} />
+          <% end %>
 
-        <%= if @room_state.status == :break do %>
-          <.break_view room_state={@room_state} user_id={@user_id} />
+          <%= if @room_state.status == :break do %>
+            <.break_view room_state={@room_state} user_id={@user_id} />
+          <% end %>
         <% end %>
       </div>
     </div>
@@ -308,4 +327,26 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp format_time(_), do: "0:00"
+
+  defp redirect_view(assigns) do
+    ~H"""
+    <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
+      <div class="text-6xl mb-6">👋</div>
+      <h1 class="text-3xl font-bold text-gray-900 mb-4">Oops! You're not in this room</h1>
+      <p class="text-xl text-gray-600 mb-8">
+        This session is only for participants who joined from the lobby.
+      </p>
+      <p class="text-lg text-gray-500 mb-8">
+        Heading back to the lobby in <span class="font-bold text-indigo-600">{@countdown}</span>
+        {if @countdown == 1, do: "second", else: "seconds"}...
+      </p>
+      <a
+        href="/"
+        class="inline-block px-8 py-4 bg-indigo-600 text-white font-semibold text-lg rounded-lg hover:bg-indigo-700 transition-colors"
+      >
+        Go to Lobby Now
+      </a>
+    </div>
+    """
+  end
 end
