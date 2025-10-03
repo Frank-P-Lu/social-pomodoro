@@ -106,6 +106,16 @@ defmodule SocialPomodoroWeb.LobbyLive do
     ~H"""
     <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-8">
       <div class="max-w-7xl mx-auto">
+        <!-- Feedback Button -->
+        <div class="flex justify-end mb-4">
+          <button
+            phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
+            class="px-4 py-2 bg-white text-gray-700 font-medium rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-200 hover:border-gray-300"
+          >
+            💬 Give Feedback
+          </button>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <!-- Left Column: Explanation -->
           <div class="bg-white rounded-2xl shadow-sm p-8">
@@ -120,8 +130,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <p>Keep going or return to the lobby when you're done.</p>
             </div>
           </div>
-          
-    <!-- Right Column: Username & Create Room -->
+
+          <!-- Right Column: Username & Create Room -->
           <div class="space-y-8">
     <!-- Username Editor -->
             <div class="bg-white rounded-2xl shadow-sm p-8">
@@ -285,6 +295,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
         </div>
       </div>
     </div>
+    
+    <.feedback_modal id="feedback-modal">
+      <:trigger></:trigger>
+    </.feedback_modal>
     """
   end
 
