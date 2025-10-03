@@ -112,7 +112,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-8">
+    <div class="min-h-screen bg-gray-900 flex items-center justify-center p-8">
       <div class="max-w-4xl w-full">
         <%= if @redirect_countdown do %>
           <.redirect_view countdown={@redirect_countdown} />
@@ -136,8 +136,8 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp waiting_view(assigns) do
     ~H"""
-    <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
-      <h1 class="text-3xl font-bold text-gray-900 mb-8">Waiting to Start</h1>
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-700">
+      <h1 class="text-3xl font-bold text-gray-100 mb-8">Waiting to Start</h1>
       
     <!-- Participants -->
       <div class="flex justify-center gap-4 mb-8">
@@ -146,14 +146,14 @@ defmodule SocialPomodoroWeb.SessionLive do
             <img
               src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
               alt={participant.username}
-              class="w-16 h-16 rounded-full bg-white mb-2"
+              class="w-16 h-16 rounded-full bg-gray-700 mb-2"
             />
-            <p class="text-sm text-gray-600">{participant.username}</p>
+            <p class="text-sm text-gray-300">{participant.username}</p>
           </div>
         <% end %>
       </div>
 
-      <p class="text-lg text-gray-600 mb-8">
+      <p class="text-lg text-gray-300 mb-8">
         {length(@room_state.participants)} {if length(@room_state.participants) == 1,
           do: "person",
           else: "people"} in room
@@ -163,15 +163,15 @@ defmodule SocialPomodoroWeb.SessionLive do
       <%= if @room_state.creator == @user_id do %>
         <button
           phx-click="start_session"
-          class="px-8 py-4 bg-indigo-600 text-white font-semibold text-lg rounded-lg hover:bg-indigo-700 transition-colors"
+          class="px-8 py-4 bg-emerald-400 text-gray-900 font-semibold text-lg rounded-lg hover:bg-emerald-500 transition-colors"
         >
           Start Session
         </button>
       <% else %>
-        <p class="text-gray-500">Waiting for {@room_state.creator_username} to start...</p>
+        <p class="text-gray-400">Waiting for {@room_state.creator_username} to start...</p>
       <% end %>
 
-      <button phx-click="leave_room" class="mt-4 text-gray-500 hover:text-gray-700 underline">
+      <button phx-click="leave_room" class="mt-4 text-gray-400 hover:text-gray-300 underline">
         Leave Room
       </button>
     </div>
@@ -180,17 +180,17 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp active_session_view(assigns) do
     ~H"""
-    <div class="bg-white rounded-2xl shadow-lg p-12">
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-12 border border-gray-700">
       <!-- Timer Display -->
       <div
         id="timer-display"
-        class="text-5xl font-bold text-indigo-600 mb-2"
+        class="text-5xl font-bold text-emerald-400 mb-2"
         phx-hook="Timer"
         data-seconds-remaining={@room_state.seconds_remaining}
       >
         {format_time(@room_state.seconds_remaining)}
       </div>
-      <p class="text-xl text-gray-600">Focus time remaining</p>
+      <p class="text-xl text-gray-300">Focus time remaining</p>
       
     <!-- Participants -->
       <div class="flex justify-center gap-4 mb-8">
@@ -198,7 +198,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           <img
             src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
             alt={participant.username}
-            class="w-12 h-12 rounded-full bg-white"
+            class="w-12 h-12 rounded-full bg-gray-700"
           />
         <% end %>
       </div>
@@ -207,28 +207,28 @@ defmodule SocialPomodoroWeb.SessionLive do
         <button
           phx-click="send_reaction"
           phx-value-emoji="🔥"
-          class="px-6 py-3 text-4xl bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          class="px-6 py-3 text-4xl bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
         >
           🔥
         </button>
         <button
           phx-click="send_reaction"
           phx-value-emoji="💪"
-          class="px-6 py-3 text-4xl bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          class="px-6 py-3 text-4xl bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
         >
           💪
         </button>
         <button
           phx-click="send_reaction"
           phx-value-emoji="⚡"
-          class="px-6 py-3 text-4xl bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          class="px-6 py-3 text-4xl bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
         >
           ⚡
         </button>
         <button
           phx-click="send_reaction"
           phx-value-emoji="🎯"
-          class="px-6 py-3 text-4xl bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          class="px-6 py-3 text-4xl bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
         >
           🎯
         </button>
@@ -236,12 +236,12 @@ defmodule SocialPomodoroWeb.SessionLive do
       
     <!-- Recent Reactions -->
       <%= if !Enum.empty?(@room_state.reactions) do %>
-        <div class="bg-gray-50 rounded-lg p-4 max-h-32 overflow-y-auto">
+        <div class="bg-gray-700/50 rounded-lg p-4 max-h-32 overflow-y-auto">
           <div class="flex flex-wrap gap-2">
             <%= for reaction <- Enum.take(@room_state.reactions, 20) do %>
-              <div class="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full text-sm">
+              <div class="inline-flex items-center gap-1 bg-gray-800 px-3 py-1 rounded-full text-sm">
                 <span>{reaction.emoji}</span>
-                <span class="text-gray-600">{reaction.username}</span>
+                <span class="text-gray-300">{reaction.username}</span>
               </div>
             <% end %>
           </div>
@@ -249,7 +249,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       <% end %>
 
       <div class="text-center mt-6">
-        <button phx-click="leave_room" class="text-gray-500 hover:text-gray-700 underline text-sm">
+        <button phx-click="leave_room" class="text-gray-400 hover:text-gray-300 underline text-sm">
           Leave Session
         </button>
       </div>
@@ -259,19 +259,19 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp break_view(assigns) do
     ~H"""
-    <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-700">
       <div class="text-6xl mb-6">🎉</div>
-      <h1 class="text-4xl font-bold text-gray-900 mb-4">Great Work!</h1>
-      <p class="text-xl text-gray-600 mb-8">
+      <h1 class="text-4xl font-bold text-gray-100 mb-4">Great Work!</h1>
+      <p class="text-xl text-gray-300 mb-8">
         You just focused for {@room_state.duration_minutes} minutes with {length(
           @room_state.participants
         )} {if length(@room_state.participants) == 1, do: "person", else: "people"}!
       </p>
 
-      <div class="text-5xl font-bold text-indigo-600 mb-2">
+      <div class="text-5xl font-bold text-emerald-400 mb-2">
         {format_time(@room_state.seconds_remaining)}
       </div>
-      <p class="text-lg text-gray-500 mb-12">Break time remaining</p>
+      <p class="text-lg text-gray-400 mb-12">Break time remaining</p>
       
     <!-- Participants with ready status -->
       <div class="flex justify-center gap-4 mb-8">
@@ -281,16 +281,16 @@ defmodule SocialPomodoroWeb.SessionLive do
               <img
                 src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
                 alt={participant.username}
-                class="w-16 h-16 rounded-full bg-white"
+                class="w-16 h-16 rounded-full bg-gray-700"
               />
               <%= if participant.ready_for_next do %>
-                <div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                  <span class="text-white text-xs">✓</span>
+                <div class="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-gray-800 flex items-center justify-center">
+                  <span class="text-gray-900 text-xs">✓</span>
                 </div>
               <% end %>
             </div>
             <%= if participant.ready_for_next do %>
-              <p class="text-xs text-green-600 font-semibold">Ready!</p>
+              <p class="text-xs text-emerald-400 font-semibold">Ready!</p>
             <% end %>
           </div>
         <% end %>
@@ -299,20 +299,20 @@ defmodule SocialPomodoroWeb.SessionLive do
       <div class="flex gap-4 justify-center">
         <button
           phx-click="go_again"
-          class="px-8 py-4 bg-indigo-600 text-white font-semibold text-lg rounded-lg hover:bg-indigo-700 transition-colors"
+          class="px-8 py-4 bg-emerald-400 text-gray-900 font-semibold text-lg rounded-lg hover:bg-emerald-500 transition-colors"
         >
           Go Again Together
         </button>
         <button
           phx-click="leave_room"
-          class="px-8 py-4 bg-gray-200 text-gray-700 font-semibold text-lg rounded-lg hover:bg-gray-300 transition-colors"
+          class="px-8 py-4 bg-gray-700 text-gray-100 font-semibold text-lg rounded-lg hover:bg-gray-600 transition-colors"
         >
           Return to Lobby
         </button>
       </div>
 
       <%= if Enum.any?(@room_state.participants, & &1.ready_for_next) do %>
-        <p class="text-sm text-gray-500 mt-6">
+        <p class="text-sm text-gray-400 mt-6">
           Waiting for everyone to be ready...
         </p>
       <% end %>
@@ -330,19 +330,19 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp redirect_view(assigns) do
     ~H"""
-    <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-700">
       <div class="text-6xl mb-6">👋</div>
-      <h1 class="text-3xl font-bold text-gray-900 mb-4">Oops! You're not in this room</h1>
-      <p class="text-xl text-gray-600 mb-8">
+      <h1 class="text-3xl font-bold text-gray-100 mb-4">Oops! You're not in this room</h1>
+      <p class="text-xl text-gray-300 mb-8">
         This session is only for participants who joined from the lobby.
       </p>
-      <p class="text-lg text-gray-500 mb-8">
-        Heading back to the lobby in <span class="font-bold text-indigo-600">{@countdown}</span>
+      <p class="text-lg text-gray-400 mb-8">
+        Heading back to the lobby in <span class="font-bold text-emerald-400">{@countdown}</span>
         {if @countdown == 1, do: "second", else: "seconds"}...
       </p>
       <a
         href="/"
-        class="inline-block px-8 py-4 bg-indigo-600 text-white font-semibold text-lg rounded-lg hover:bg-indigo-700 transition-colors"
+        class="inline-block px-8 py-4 bg-emerald-400 text-gray-900 font-semibold text-lg rounded-lg hover:bg-emerald-500 transition-colors"
       >
         Go to Lobby Now
       </a>

@@ -142,13 +142,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 p-8">
+    <div class="min-h-screen bg-gray-900 p-8">
       <div class="max-w-7xl mx-auto">
         <!-- Feedback Button -->
         <div class="flex justify-end mb-4">
           <button
             phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
-            class="px-4 py-2 bg-white text-gray-700 font-medium rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-200 hover:border-gray-300"
+            class="px-4 py-2 bg-gray-800 text-gray-100 font-medium rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-700 hover:border-emerald-400"
           >
             💬 Give Feedback
           </button>
@@ -156,9 +156,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <!-- Left Column: Explanation -->
-          <div class="bg-white rounded-2xl shadow-sm p-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-4">Fancy a Pomodoro?</h1>
-            <div class="text-gray-600 space-y-3">
+          <div class="bg-gray-800 rounded-2xl shadow-sm p-8 border border-gray-700">
+            <h1 class="text-3xl font-bold text-gray-100 mb-4">Fancy a Pomodoro?</h1>
+            <div class="text-gray-300 space-y-3">
               <p>Focus with strangers around the world.</p>
               <strong>No webcam. No chat.</strong>
 
@@ -177,22 +177,21 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </p>
             </div>
           </div>
-          
-    <!-- Right Column: Username & Create Room -->
+          <!-- Right Column: Username & Create Room -->
           <div class="space-y-8">
             <!-- Username Editor -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
+            <div class="mt-6 pt-6 border-t border-gray-700">
               <div class="flex items-center gap-3 mb-3">
                 <img
                   src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
                   alt={@username}
-                  class="w-12 h-12 rounded-full bg-white"
+                  class="w-12 h-12 rounded-full bg-gray-700"
                 />
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">
+                  <label class="block text-sm font-medium text-gray-300">
                     Your username
                   </label>
-                  <span class="font-bold text-gray-900">{@username}</span>
+                  <span class="font-bold text-gray-100">{@username}</span>
                 </div>
               </div>
               <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
@@ -200,12 +199,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   type="text"
                   value={@edit_username}
                   name="username"
-                  class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  class="flex-1 px-4 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                   placeholder="Enter username"
                 />
                 <button
                   type="submit"
-                  class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  class="px-4 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors"
                 >
                   Update
                 </button>
@@ -213,12 +212,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
             </div>
             
     <!-- Create Room Section -->
-            <div class="bg-white rounded-2xl shadow-sm p-8">
-              <h2 class="text-2xl font-semibold text-gray-900 mb-6">Create a Room</h2>
+            <div class="bg-gray-800 rounded-2xl shadow-sm p-8 border border-gray-700">
+              <h2 class="text-2xl font-semibold text-gray-100 mb-6">Create a Room</h2>
 
               <%= if @my_room_id do %>
-                <div class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <p class="text-sm text-indigo-700">You're already in a room!</p>
+                <div class="mb-4 p-3 bg-emerald-900/30 border border-emerald-400/30 rounded-lg">
+                  <p class="text-sm text-emerald-300">You're already in a room!</p>
                 </div>
               <% end %>
               
@@ -229,7 +228,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   phx-value-minutes="25"
                   disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    (if @duration_minutes == 25, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @duration_minutes == 25, do: "bg-emerald-400 text-gray-900", else: "bg-gray-700 text-gray-100 hover:bg-gray-600") <>
                     (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   25 min
@@ -239,7 +238,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   phx-value-minutes="50"
                   disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    (if @duration_minutes == 50, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @duration_minutes == 50, do: "bg-emerald-400 text-gray-900", else: "bg-gray-700 text-gray-100 hover:bg-gray-600") <>
                     (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   50 min
@@ -249,7 +248,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   phx-value-minutes="75"
                   disabled={@my_room_id != nil}
                   class={"px-6 py-2 rounded-lg font-medium transition-colors " <>
-                    (if @duration_minutes == 75, do: "bg-indigo-600 text-white", else: "bg-gray-100 text-gray-700 hover:bg-gray-200") <>
+                    (if @duration_minutes == 75, do: "bg-emerald-400 text-gray-900", else: "bg-gray-700 text-gray-100 hover:bg-gray-600") <>
                     (if @my_room_id, do: " opacity-50 cursor-not-allowed", else: "")}
                 >
                   75 min
@@ -258,7 +257,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               
     <!-- Duration Slider -->
               <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
+                <label class="block text-sm font-medium text-gray-300 mb-2">
                   Duration: {@duration_minutes} minutes
                 </label>
                 <form phx-change="set_duration">
@@ -269,11 +268,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     value={@duration_minutes}
                     name="minutes"
                     disabled={@my_room_id != nil}
-                    class={"w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" <>
+                    class={"w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-400" <>
                       if @my_room_id, do: " opacity-50 cursor-not-allowed", else: ""}
                   />
                 </form>
-                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                <div class="flex justify-between text-xs text-gray-400 mt-1">
                   <span>5 min</span>
                   <span>3 hours</span>
                 </div>
@@ -283,7 +282,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 phx-click="create_room"
                 disabled={@my_room_id != nil}
                 class={"w-full font-semibold py-3 rounded-lg transition-colors " <>
-                  if @my_room_id, do: "bg-gray-300 text-gray-500 cursor-not-allowed", else: "bg-indigo-600 text-white hover:bg-indigo-700"}
+                  if @my_room_id, do: "bg-gray-700 text-gray-500 cursor-not-allowed", else: "bg-emerald-400 text-gray-900 hover:bg-emerald-500"}
               >
                 Create Room
               </button>
@@ -294,18 +293,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <!-- This closes the grid -->
 
         <!-- Full Width: Open Rooms -->
-        <div class="bg-white rounded-2xl shadow-sm p-8">
-          <h2 class="text-2xl font-semibold text-gray-900 mb-6">Open Rooms</h2>
+        <div class="bg-gray-800 rounded-2xl shadow-sm p-8 border border-gray-700">
+          <h2 class="text-2xl font-semibold text-gray-100 mb-6">Open Rooms</h2>
 
           <div class="space-y-4">
             <%= if Enum.empty?(@rooms) do %>
-              <div class="text-center py-12 text-gray-600">
+              <div class="text-center py-12 text-gray-300">
                 <p class="text-lg">No one is here yet 🥺. That's okay! You can focus with yourself!</p>
               </div>
             <% else %>
               <%= for room <- @rooms do %>
-                <div class={"rounded-lg p-4 hover:border-indigo-300 transition-colors " <>
-                  if room.room_id == @my_room_id, do: "border-2 border-indigo-500", else: "border border-gray-200"}>
+                <div class={"rounded-lg p-4 hover:border-emerald-400/50 transition-colors " <>
+                  if room.room_id == @my_room_id, do: "border-2 border-emerald-400", else: "border border-gray-700 bg-gray-800/50"}>
                   <div class="flex items-center justify-between">
                     <div class="flex-1">
                       <!-- Participant Avatars -->
@@ -314,13 +313,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
                           <img
                             src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
                             alt={participant.username}
-                            class="w-10 h-10 rounded-full bg-white"
+                            class="w-10 h-10 rounded-full bg-gray-700"
                           />
                         <% end %>
                       </div>
                       
     <!-- Room Info -->
-                      <div class="text-sm text-gray-600">
+                      <div class="text-sm text-gray-400">
                         {length(room.participants)} {if length(room.participants) == 1,
                           do: "person",
                           else: "people"} · {room.duration_minutes} min
@@ -338,18 +337,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
                             <button
                               phx-click="start_my_room"
                               phx-value-room-id={room.room_id}
-                              class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                              class="px-6 py-2 bg-emerald-500 text-gray-900 font-medium rounded-lg hover:bg-emerald-400 transition-colors"
                             >
                               Start
                             </button>
                           <% else %>
-                            <div class="text-sm text-gray-400">
+                            <div class="text-sm text-gray-500">
                               Waiting for host...
                             </div>
                           <% end %>
                           <button
                             phx-click="leave_room"
-                            class="px-4 py-2 bg-red-50 text-red-700 font-medium rounded-lg hover:bg-red-100 transition-colors border border-red-200"
+                            class="px-4 py-2 bg-rose-900/30 text-rose-300 font-medium rounded-lg hover:bg-rose-900/50 transition-colors border border-rose-700"
                           >
                             Leave
                           </button>
@@ -357,13 +356,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
                           <button
                             phx-click="join_room"
                             phx-value-room-id={room.room_id}
-                            class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                            class="px-6 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors"
                           >
                             Join
                           </button>
                         <% end %>
                       <% else %>
-                        <div class="flex items-center gap-2 text-gray-400">
+                        <div class="flex items-center gap-2 text-gray-500">
                           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fill-rule="evenodd"
