@@ -614,7 +614,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
 
   def feedback_modal(assigns) do
     ~H"""
-    <%= render_slot(@trigger) %>
+    {render_slot(@trigger)}
     <.modal id={@id}>
       <div class="space-y-6">
         <h2 class="text-2xl font-semibold text-gray-900">What do you think?</h2>

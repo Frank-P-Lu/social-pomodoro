@@ -5,7 +5,8 @@ defmodule SocialPomodoroWeb.Plugs.UsernameSession do
   import Plug.Conn
 
   @cookie_key "_social_pomodoro_username"
-  @max_age 60 * 60 * 24 * 365  # 1 year
+  # 1 year
+  @max_age 60 * 60 * 24 * 365
 
   def init(_opts), do: %{}
 
@@ -20,14 +21,39 @@ defmodule SocialPomodoroWeb.Plugs.UsernameSession do
 
     # Always sync cookie with current username (handles updates from LiveView)
     conn
-    |> put_session(:username, username)  # Makes it available in LiveView mount/3
-    |> assign(:username, username)       # Makes it available in controllers
+    # Makes it available in LiveView mount/3
+    |> put_session(:username, username)
+    # Makes it available in controllers
+    |> assign(:username, username)
     |> put_resp_cookie(@cookie_key, username, max_age: @max_age, http_only: true)
   end
 
   defp generate_friendly_username do
-    adjectives = ["Happy", "Focused", "Calm", "Bright", "Swift", "Quiet", "Bold", "Clever", "Gentle", "Brave"]
-    nouns = ["Panda", "Tiger", "Eagle", "Dolphin", "Phoenix", "Dragon", "Wolf", "Fox", "Bear", "Lion"]
+    adjectives = [
+      "Happy",
+      "Focused",
+      "Calm",
+      "Bright",
+      "Swift",
+      "Quiet",
+      "Bold",
+      "Clever",
+      "Gentle",
+      "Brave"
+    ]
+
+    nouns = [
+      "Panda",
+      "Tiger",
+      "Eagle",
+      "Dolphin",
+      "Phoenix",
+      "Dragon",
+      "Wolf",
+      "Fox",
+      "Bear",
+      "Lion"
+    ]
 
     adj = Enum.random(adjectives)
     noun = Enum.random(nouns)

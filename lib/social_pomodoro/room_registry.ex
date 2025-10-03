@@ -108,6 +108,7 @@ defmodule SocialPomodoro.RoomRegistry do
       |> Enum.find_value(fn {room_id, pid} ->
         if Process.alive?(pid) do
           room_state = SocialPomodoro.Room.get_state(pid)
+
           if Enum.any?(room_state.participants, &(&1.user_id == user_id)) do
             room_id
           end

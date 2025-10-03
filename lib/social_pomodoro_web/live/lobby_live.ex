@@ -221,7 +221,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   <p class="text-sm text-indigo-700">You're already in a room!</p>
                 </div>
               <% end %>
-
+              
     <!-- Duration Presets -->
               <div class="flex gap-3 mb-6">
                 <button
@@ -255,7 +255,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   75 min
                 </button>
               </div>
-
+              
     <!-- Duration Slider -->
               <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -319,7 +319,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                           />
                         <% end %>
                       </div>
-
+                      
     <!-- Room Info -->
                       <div class="text-sm text-gray-600">
                         {length(room.participants)} {if length(room.participants) == 1,
@@ -330,7 +330,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                         <% end %>
                       </div>
                     </div>
-
+                    
     <!-- Action Button -->
                     <div class="ml-4 flex gap-2">
                       <%= if room.status == :waiting do %>
