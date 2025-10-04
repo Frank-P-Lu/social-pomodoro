@@ -22,10 +22,43 @@ defmodule SocialPomodoro.Application do
       SocialPomodoroWeb.Endpoint
     ]
 
+    # Attach telemetry handlers for analytics
+    attach_telemetry_handlers()
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: SocialPomodoro.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp attach_telemetry_handlers do
+    :telemetry.attach(
+      "pomodoro-room-created",
+      [:pomodoro, :room, :created],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
+      "pomodoro-session-started",
+      [:pomodoro, :session, :started],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
+      "pomodoro-session-restarted",
+      [:pomodoro, :session, :restarted],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
+      "pomodoro-session-completed",
+      [:pomodoro, :session, :completed],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
   end
 
   # Tell Phoenix to update the endpoint configuration
