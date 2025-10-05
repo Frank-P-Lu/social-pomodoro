@@ -1,12 +1,19 @@
 defmodule SocialPomodoro.TelemetryHandler do
   @moduledoc """
   Handles telemetry events and sends analytics to Discord webhook.
+
+  All webhook sending is done asynchronously to prevent blocking the caller
+  (typically a GenServer handling room state). This ensures that HTTP requests
+  don't cause timeouts in critical code paths.
   """
 
   require Logger
 
   @doc """
   Handles telemetry events and sends them to Discord webhook for analytics.
+
+  Note: This function returns immediately. Webhook requests are sent asynchronously
+  in a separate process to avoid blocking.
   """
   def handle_event([:pomodoro, :room, :created], _measurements, metadata, _config) do
     send_analytics("Room Created", %{
@@ -49,7 +56,9 @@ defmodule SocialPomodoro.TelemetryHandler do
       :ok
     else
       payload = build_analytics_payload(event_type, data)
-      send_webhook(webhook_url, payload)
+      # Send webhook asynchronously to avoid blocking the caller
+      Task.start(fn -> send_webhook(webhook_url, payload) end)
+      :ok
     end
   end
 
