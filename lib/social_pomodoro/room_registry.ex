@@ -66,6 +66,18 @@ defmodule SocialPomodoro.RoomRegistry do
       )
 
     :ets.insert(@table_name, {room_id, pid})
+
+    # Emit telemetry event for room creation
+    :telemetry.execute(
+      [:pomodoro, :room, :created],
+      %{count: 1},
+      %{
+        room_id: room_id,
+        user_id: creator_user_id,
+        duration_minutes: duration_minutes
+      }
+    )
+
     {:reply, {:ok, room_id}, state}
   end
 
