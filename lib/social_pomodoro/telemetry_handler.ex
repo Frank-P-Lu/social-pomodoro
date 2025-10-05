@@ -49,7 +49,9 @@ defmodule SocialPomodoro.TelemetryHandler do
       :ok
     else
       payload = build_analytics_payload(event_type, data)
-      send_webhook(webhook_url, payload)
+      # Send webhook asynchronously to avoid blocking the caller
+      Task.start(fn -> send_webhook(webhook_url, payload) end)
+      :ok
     end
   end
 
