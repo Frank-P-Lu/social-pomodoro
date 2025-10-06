@@ -4,7 +4,7 @@ import Config
 # you can enable the server option below.
 config :social_pomodoro, SocialPomodoroWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
-  secret_key_base: "dLdAEIVT/XSA3JdPFC6zDKexuQrwq/0/ZAK1dy1gCmwLRRc36W+YTwdXNZW+Ngel",
+  secret_key_base: "0zYJqQVMVYabO6BvsKKnRKMpJg+7HQVnNPK3WXIsDYtKIeW3JjcYbMxKfLSd0R7P",
   server: false
 
 # In test we don't send emails

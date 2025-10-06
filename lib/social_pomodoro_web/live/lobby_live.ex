@@ -26,6 +26,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:user_id, user_id)
       |> assign(:username, username)
       |> assign(:edit_username, username)
+      |> assign(:editing_username, false)
       |> assign(:rooms, rooms)
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
@@ -40,6 +41,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def handle_event("toggle_edit_username", _params, socket) do
+    {:noreply, assign(socket, :editing_username, !socket.assigns.editing_username)}
+  end
+
+  @impl true
   def handle_event("update_username", %{"username" => username}, socket) do
     user_id = socket.assigns.user_id
     SocialPomodoro.UserRegistry.set_username(user_id, username)
@@ -48,6 +54,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       socket
       |> assign(:username, username)
       |> assign(:edit_username, username)
+      |> assign(:editing_username, false)
       |> put_flash(:info, "Username updated!")
 
     {:noreply, socket}
@@ -191,24 +198,34 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   <label class="block text-sm font-medium text-gray-300">
                     Your username
                   </label>
-                  <span class="font-bold text-gray-100">{@username}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-100">{@username}</span>
+                    <button
+                      phx-click="toggle_edit_username"
+                      class="text-xs text-gray-400 underline hover:text-gray-300"
+                    >
+                      change?
+                    </button>
+                  </div>
                 </div>
               </div>
-              <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
-                <input
-                  type="text"
-                  value={@edit_username}
-                  name="username"
-                  class="flex-1 px-4 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
-                  placeholder="Enter username"
-                />
-                <button
-                  type="submit"
-                  class="px-4 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors"
-                >
-                  Update
-                </button>
-              </form>
+              <%= if @editing_username do %>
+                <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
+                  <input
+                    type="text"
+                    value={@edit_username}
+                    name="username"
+                    class="flex-1 px-4 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+                    placeholder="Enter username"
+                  />
+                  <button
+                    type="submit"
+                    class="px-4 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors"
+                  >
+                    Update
+                  </button>
+                </form>
+              <% end %>
             </div>
             
     <!-- Create Room Section -->
@@ -288,13 +305,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </button>
             </div>
           </div>
-          <!-- This closes the Right Column -->
         </div>
-        <!-- This closes the grid -->
 
-        <!-- Full Width: Open Rooms -->
         <div class="bg-gray-800 rounded-2xl shadow-sm p-8 border border-gray-700">
-          <h2 class="text-2xl font-semibold text-gray-100 mb-6">Open Rooms</h2>
+          <h2 class="text-2xl font-semibold text-gray-100 mb-6">Lobby</h2>
 
           <div class="space-y-4">
             <%= if Enum.empty?(@rooms) do %>
