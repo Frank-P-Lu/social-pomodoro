@@ -25,24 +25,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
       socket
       |> assign(:user_id, user_id)
       |> assign(:username, username)
-      |> assign(:edit_username, username)
-      |> assign(:editing_username, false)
       |> assign(:rooms, rooms)
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
       |> assign(:my_room_id, my_room_id)
 
     {:ok, socket}
-  end
-
-  @impl true
-  def handle_event("change_username", %{"username" => username}, socket) do
-    {:noreply, assign(socket, :edit_username, username)}
-  end
-
-  @impl true
-  def handle_event("toggle_edit_username", _params, socket) do
-    {:noreply, assign(socket, :editing_username, !socket.assigns.editing_username)}
   end
 
   @impl true
@@ -53,8 +41,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
     socket =
       socket
       |> assign(:username, username)
-      |> assign(:edit_username, username)
-      |> assign(:editing_username, false)
       |> put_flash(:info, "Username updated!")
 
     {:noreply, socket}
@@ -130,12 +116,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_info({:username_updated, user_id, username}, socket) do
     if socket.assigns.user_id == user_id do
-      socket =
-        socket
-        |> assign(:username, username)
-        |> assign(:edit_username, username)
-
-      {:noreply, socket}
+      {:noreply, assign(socket, :username, username)}
     else
       {:noreply, socket}
     end
@@ -194,38 +175,43 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   alt={@username}
                   class="w-12 h-12 rounded-full bg-gray-700"
                 />
-                <div>
+                <div class="flex-1">
                   <label class="block text-sm font-medium text-gray-300">
                     Your username
                   </label>
                   <div class="flex items-center gap-2">
-                    <span class="font-bold text-gray-100">{@username}</span>
+                    <span id="username-display" class="font-bold text-gray-100">{@username}</span>
                     <button
-                      phx-click="toggle_edit_username"
-                      class="text-xs text-gray-400 underline hover:text-gray-300"
+                      type="button"
+                      phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
+                      class="text-xs text-gray-400 underline hover:text-gray-300 cursor-pointer"
                     >
                       change?
                     </button>
                   </div>
+                  <form
+                    id="username-form"
+                    phx-submit="update_username"
+                    phx-submit-end={JS.hide(to: "#username-form")}
+                    class="mt-2 flex gap-2 hidden"
+                  >
+                    <input
+                      type="text"
+                      id="username-input"
+                      value={@username}
+                      name="username"
+                      class="flex-1 px-4 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+                      placeholder="Enter username"
+                    />
+                    <button
+                      type="submit"
+                      class="px-4 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors cursor-pointer"
+                    >
+                      Update
+                    </button>
+                  </form>
                 </div>
               </div>
-              <%= if @editing_username do %>
-                <form phx-change="change_username" phx-submit="update_username" class="flex gap-2">
-                  <input
-                    type="text"
-                    value={@edit_username}
-                    name="username"
-                    class="flex-1 px-4 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
-                    placeholder="Enter username"
-                  />
-                  <button
-                    type="submit"
-                    class="px-4 py-2 bg-emerald-400 text-gray-900 font-medium rounded-lg hover:bg-emerald-500 transition-colors"
-                  >
-                    Update
-                  </button>
-                </form>
-              <% end %>
             </div>
             
     <!-- Create Room Section -->
