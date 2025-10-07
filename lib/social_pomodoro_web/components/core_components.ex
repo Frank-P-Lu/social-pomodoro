@@ -503,7 +503,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
     >
       <div
         id={"#{@id}-bg"}
-        class="bg-gray-900/90 fixed inset-0 transition-opacity"
+        class="bg-base-100/90 fixed inset-0 transition-opacity"
         aria-hidden="true"
       />
       <div
@@ -521,19 +521,19 @@ defmodule SocialPomodoroWeb.CoreComponents do
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-gray-800 p-14 shadow-lg ring-1 transition"
+              class="card bg-base-200 relative hidden shadow-lg transition"
             >
               <div class="absolute top-6 right-5">
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="-m-3 flex-none p-3 opacity-20 hover:opacity-40"
+                  class="btn btn-ghost btn-sm btn-circle"
                   aria-label={gettext("close")}
                 >
                   <.icon name="hero-x-mark-solid" class="h-5 w-5" />
                 </button>
               </div>
-              <div id={"#{@id}-content"}>
+              <div id={"#{@id}-content"} class="card-body">
                 {render_slot(@inner_block)}
               </div>
             </.focus_wrap>
@@ -570,9 +570,9 @@ defmodule SocialPomodoroWeb.CoreComponents do
   def simple_form(assigns) do
     ~H"""
     <.form :let={f} for={@for} as={@as} {@rest}>
-      <div class="mt-10 space-y-8 bg-gray-800">
+      <div class="space-y-4">
         {render_slot(@inner_block, f)}
-        <div :for={action <- @actions} class="mt-2 flex items-center justify-between gap-6">
+        <div :for={action <- @actions} class="card-actions justify-end mt-6">
           {render_slot(action, f)}
         </div>
       </div>
@@ -592,32 +592,30 @@ defmodule SocialPomodoroWeb.CoreComponents do
     ~H"""
     {render_slot(@trigger)}
     <.modal id={@id}>
-      <div class="space-y-6">
-        <h2 class="text-2xl font-semibold text-gray-100">What do you think?</h2>
+      <h2 class="card-title text-2xl mb-4">What do you think?</h2>
 
-        <.simple_form :let={f} for={%{}} as={:feedback} action="/api/feedback" method="post">
-          <input type="hidden" name="username" value={@username} />
+      <.simple_form :let={f} for={%{}} as={:feedback} action="/api/feedback" method="post">
+        <input type="hidden" name="username" value={@username} />
 
-          <.input
-            field={f[:message]}
-            type="textarea"
-            label="Your feedback"
-            placeholder="Tell us what you think..."
-            required
-          />
+        <.input
+          field={f[:message]}
+          type="textarea"
+          label="Your feedback"
+          placeholder="Tell us what you think..."
+          required
+        />
 
-          <.input
-            field={f[:email]}
-            type="email"
-            label="Email (optional)"
-            placeholder="your@email.com"
-          />
+        <.input
+          field={f[:email]}
+          type="email"
+          label="Email (optional)"
+          placeholder="your@email.com"
+        />
 
-          <:actions>
-            <.button type="submit" class="w-full">Send Feedback</.button>
-          </:actions>
-        </.simple_form>
-      </div>
+        <:actions>
+          <.button type="submit" class="btn btn-outline btn-primary btn-block">Send Feedback</.button>
+        </:actions>
+      </.simple_form>
     </.modal>
     """
   end
