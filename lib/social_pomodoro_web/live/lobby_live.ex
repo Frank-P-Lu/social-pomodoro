@@ -12,7 +12,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
     user_id = session["user_id"]
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
-    rooms = SocialPomodoro.RoomRegistry.list_rooms()
+    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), user_id)
 
     # Check if user is already in a room
     my_room_id =
@@ -94,7 +94,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_info({:room_update, _room_state}, socket) do
-    rooms = SocialPomodoro.RoomRegistry.list_rooms()
+    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), socket.assigns.user_id)
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
@@ -109,7 +109,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       end
 
     # Update rooms list
-    rooms = SocialPomodoro.RoomRegistry.list_rooms()
+    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), socket.assigns.user_id)
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
@@ -125,6 +125,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_info({:session_started, room_id}, socket) do
     {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
+  end
+
+  defp sort_rooms(rooms, user_id) do
+    Enum.sort_by(rooms, fn room ->
+      # false (my rooms) sorts before true (others)
+      room.creator != user_id
+    end)
   end
 
   @impl true
@@ -184,9 +191,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   </p>
                 </div>
               <% else %>
-                <%= for room <- @rooms do %>
-                  <.room_card room={room} user_id={@user_id} my_room_id={@my_room_id} />
-                <% end %>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <%= for room <- @rooms do %>
+                    <.room_card room={room} user_id={@user_id} my_room_id={@my_room_id} />
+                  <% end %>
+                </div>
               <% end %>
             </div>
           </div>
@@ -324,7 +333,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
                   class="link link-hover text-xs text-base-content/70"
                 >
-                  change?
+                  <%!-- TODO: use hero icons --%> change?
                 </button>
               </div>
             </div>
