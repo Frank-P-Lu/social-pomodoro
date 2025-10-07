@@ -130,25 +130,29 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <div class="navbar bg-base-300 text-neutral-content">
+      <div class="flex-1">
+        <a href="/" class="btn btn-ghost text-xl">Focus with Strangers</a>
+      </div>
+      <div class="flex-none">
+        <button
+          phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
+          class="btn btn-secondary btn-dash"
+        >
+          Give Feedback
+        </button>
+      </div>
+    </div>
+
     <div class="min-h-screen bg-base-100 p-8">
       <div class="max-w-6xl mx-auto">
-        <!-- Feedback Button -->
-        <div class="flex justify-end mb-4">
-          <button
-            phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
-            class="btn btn-secondary btn-dash"
-          >
-            Give Feedback
-          </button>
-        </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
           <div class="card bg-base-200">
             <div class="card-body">
               <h1 class="card-title text-4xl mb-4">Fancy a Pomodoro?</h1>
               <div class="space-y-4 text-lg">
-                <p class="leading-relaxed">Focus alongside strangers from around the world.</p>
+                <p class="leading-relaxed">Focus with strangers. Or friends.</p>
                 <div class="badge badge-primary badge-lg p-4">No webcam. No chat. Just work.</div>
 
                 <p class="leading-relaxed">
@@ -181,84 +185,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 </div>
               <% else %>
                 <%= for room <- @rooms do %>
-                  <div class={"card bg-base-100 " <>
-                    if room.room_id == @my_room_id, do: "border-2 border-primary", else: ""}>
-                    <div class="card-body p-4">
-                      <div class="flex items-center justify-between">
-                        <div class="flex-1">
-                          <!-- Participant Avatars -->
-                          <div class="avatar-group -space-x-6 mb-2">
-                            <%= for participant <- room.participants do %>
-                              <div class="avatar">
-                                <div class="w-10">
-                                  <img
-                                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                                    alt={participant.username}
-                                  />
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                          
-    <!-- Room Info -->
-                          <div class="text-sm opacity-70">
-                            {length(room.participants)} {if length(room.participants) == 1,
-                              do: "person",
-                              else: "people"} waiting · {room.duration_minutes} min
-                            <%= if room.status != :waiting do %>
-                              · {format_time_remaining(room.seconds_remaining)} remaining
-                            <% end %>
-                          </div>
-                        </div>
-                        
-    <!-- Action Button -->
-                        <div class="card-actions">
-                          <%= if room.status == :waiting do %>
-                            <%= if room.room_id == @my_room_id do %>
-                              <%= if room.creator == @user_id do %>
-                                <button
-                                  phx-click="start_my_room"
-                                  phx-value-room-id={room.room_id}
-                                  class="btn btn-primary"
-                                >
-                                  Start
-                                </button>
-                              <% else %>
-                                <div class="text-sm opacity-50">
-                                  Waiting for host...
-                                </div>
-                              <% end %>
-                              <button
-                                phx-click="leave_room"
-                                class="btn btn-error btn-outline"
-                              >
-                                Leave
-                              </button>
-                            <% else %>
-                              <button
-                                phx-click="join_room"
-                                phx-value-room-id={room.room_id}
-                                class="btn btn-primary"
-                              >
-                                Join
-                              </button>
-                            <% end %>
-                          <% else %>
-                            <div class="badge badge-lg badge-neutral gap-2">
-                              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fill-rule="evenodd"
-                                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                                  clip-rule="evenodd"
-                                />
-                              </svg>
-                              In Progress
-                            </div>
-                          <% end %>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <.room_card room={room} user_id={@user_id} my_room_id={@my_room_id} />
                 <% end %>
               <% end %>
             </div>
@@ -270,6 +197,104 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
+    """
+  end
+
+  defp room_card(assigns) do
+    ~H"""
+    <div class={"card bg-base-100 " <>
+      if @room.room_id == @my_room_id, do: "border-2 border-primary", else: ""}>
+      <div class="card-body p-4 gap-0">
+        <h3 class="card-title font-semibold">ROOM_NAME</h3>
+        <div class="text-sm opacity-70">
+          {length(@room.participants)} {if length(@room.participants) == 1,
+            do: "person",
+            else: "people"} waiting · {@room.duration_minutes} min
+          <%= if @room.status != :waiting do %>
+            · {format_time_remaining(@room.seconds_remaining)} remaining
+          <% end %>
+        </div>
+        
+    <!-- Participant Avatars -->
+        <div class="flex items-center justify-center my-2">
+          <div class="avatar-group -space-x-6 mb-2">
+            <%= for participant <- @room.participants do %>
+              <div class="avatar">
+                <div class="w-10">
+                  <img
+                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+                    alt={participant.username}
+                  />
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+        
+    <!-- Action Button -->
+        <div class="flex items-center justify-between gap-4">
+          <!-- Status -->
+          <div>
+            <%= if @room.status == :waiting do %>
+              <%= if @room.room_id == @my_room_id do %>
+                <%= if @room.creator == @user_id do %>
+                  <div class="text-sm opacity-70">Ready to start</div>
+                <% else %>
+                  <div class="text-sm opacity-50">
+                    <div class="status status-primary animate-bounce"></div>
+                    Waiting for host...
+                  </div>
+                <% end %>
+              <% else %>
+                <div class="text-sm opacity-70">Waiting</div>
+              <% end %>
+            <% else %>
+              <div class="badge badge-lg badge-neutral gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fill-rule="evenodd"
+                    d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                In Progress
+              </div>
+            <% end %>
+          </div>
+          
+    <!-- Actions -->
+          <div class="card-actions">
+            <%= if @room.status == :waiting do %>
+              <%= if @room.room_id == @my_room_id do %>
+                <%= if @room.creator == @user_id do %>
+                  <button
+                    phx-click="start_my_room"
+                    phx-value-room-id={@room.room_id}
+                    class="btn btn-primary btn-sm"
+                  >
+                    Start
+                  </button>
+                <% end %>
+                <button
+                  phx-click="leave_room"
+                  class="btn btn-error btn-outline btn-sm"
+                >
+                  Leave
+                </button>
+              <% else %>
+                <button
+                  phx-click="join_room"
+                  phx-value-room-id={@room.room_id}
+                  class="btn btn-primary btn-sm"
+                >
+                  Join
+                </button>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
     """
   end
 
@@ -290,11 +315,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </div>
             </div>
             <div>
-              <label class="label">
-                <span class="label-text">That's you</span>
-              </label>
-              <div class="flex items-center gap-2">
-                <span id="username-display" class="font-bold">{@username}</span>
+              <span class="label label-text">Look, it's you!</span>
+
+              <div class="flex items-center gap-4">
+                <span id="username-display" class="font-bold text-base">{@username}</span>
                 <button
                   type="button"
                   phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
