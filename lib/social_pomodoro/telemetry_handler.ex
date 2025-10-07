@@ -52,7 +52,7 @@ defmodule SocialPomodoro.TelemetryHandler do
     webhook_url = Application.get_env(:social_pomodoro, :discord_webhook_url)
 
     if is_nil(webhook_url) or webhook_url == "" do
-      Logger.debug("Discord webhook URL not configured. Analytics not sent for: #{event_type}")
+      Logger.warning("Discord webhook URL not configured. Analytics not sent for: #{event_type}")
       :ok
     else
       payload = build_analytics_payload(event_type, data)
