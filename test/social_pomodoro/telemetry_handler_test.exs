@@ -20,7 +20,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
           )
         end)
 
-      assert log =~ "Discord webhook URL not configured"
+      assert log =~ "Discord analytics webhook URL not configured"
       assert log =~ "Room Created"
     end
   end
@@ -42,7 +42,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
           )
         end)
 
-      assert log =~ "Discord webhook URL not configured"
+      assert log =~ "Discord analytics webhook URL not configured"
       assert log =~ "Session Started"
     end
   end
@@ -63,7 +63,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
           )
         end)
 
-      assert log =~ "Discord webhook URL not configured"
+      assert log =~ "Discord analytics webhook URL not configured"
       assert log =~ "Session Restarted"
     end
   end
@@ -84,7 +84,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
           )
         end)
 
-      assert log =~ "Discord webhook URL not configured"
+      assert log =~ "Discord analytics webhook URL not configured"
       assert log =~ "Session Completed"
     end
   end
