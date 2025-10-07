@@ -10,6 +10,7 @@ defmodule SocialPomodoro.Room do
 
   defstruct [
     :room_id,
+    :name,
     :creator,
     :duration_minutes,
     :status,
@@ -81,6 +82,7 @@ defmodule SocialPomodoro.Room do
 
     state = %__MODULE__{
       room_id: room_id,
+      name: SocialPomodoro.RoomNameGenerator.generate(),
       creator: creator,
       duration_minutes: duration_minutes,
       status: :waiting,
@@ -367,6 +369,7 @@ defmodule SocialPomodoro.Room do
 
     %{
       room_id: state.room_id,
+      name: state.name,
       creator: state.creator,
       creator_username: creator_username,
       duration_minutes: state.duration_minutes,

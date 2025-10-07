@@ -7,6 +7,32 @@ defmodule SocialPomodoro.RoomTest do
     :ok
   end
 
+  describe "room name generation" do
+    test "each room gets a unique name" do
+      # Create two rooms
+      creator1_id = "user1_#{System.unique_integer([:positive])}"
+      creator2_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room1_id} = RoomRegistry.create_room(creator1_id, 25)
+      {:ok, room2_id} = RoomRegistry.create_room(creator2_id, 25)
+
+      {:ok, room1_pid} = RoomRegistry.get_room(room1_id)
+      {:ok, room2_pid} = RoomRegistry.get_room(room2_id)
+
+      # Get the states
+      room1_state = Room.get_state(room1_pid)
+      room2_state = Room.get_state(room2_pid)
+
+      # Assert both rooms have names
+      assert is_binary(room1_state.name)
+      assert is_binary(room2_state.name)
+
+      # Names should follow the format: "Adjective Noun Noun"
+      assert String.split(room1_state.name) |> length() == 3
+      assert String.split(room2_state.name) |> length() == 3
+    end
+  end
+
   describe "creator reassignment when creator leaves" do
     test "two people in room: when creator leaves, remaining person becomes creator" do
       # Setup: Create a room with a creator

@@ -217,7 +217,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     " <>
       if @room.room_id == @my_room_id, do: "border-2 border-primary", else: ""}>
       <div class="card-body p-4 gap-0">
-        <h3 class="card-title font-semibold">ROOM_NAME</h3>
+        <h3 class="card-title font-semibold">{@room.name}</h3>
         <div class="text-sm opacity-70">
           {length(@room.participants)} {if length(@room.participants) == 1,
             do: "person",
