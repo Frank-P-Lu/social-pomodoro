@@ -300,7 +300,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 <button
                   phx-click="join_room"
                   phx-value-room-id={@room.room_id}
-                  class="btn btn-primary btn-sm"
+                  class="btn btn-primary btn-outline btn-sm"
                 >
                   Join
                 </button>
