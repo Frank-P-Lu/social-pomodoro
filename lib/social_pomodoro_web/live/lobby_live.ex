@@ -131,7 +131,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-100 p-8">
-      <div class="max-w-7xl mx-auto">
+      <div class="max-w-6xl mx-auto">
         <!-- Feedback Button -->
         <div class="flex justify-end mb-4">
           <button
@@ -142,7 +142,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
           </button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
           <div class="card bg-base-200">
             <div class="card-body">
@@ -169,128 +169,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
           </div>
           <!-- Right Column: Username & Create Room -->
           <div class="space-y-8">
-            <!-- Username Editor -->
-            <div class="mt-6 pt-6 border-t border-base-300">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="avatar">
-                  <div class="w-12 rounded-full">
-                    <img
-                      src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
-                      alt={@username}
-                    />
-                  </div>
-                </div>
-                <div class="flex-1">
-                  <label class="label">
-                    <span class="label-text">Your username</span>
-                  </label>
-                  <div class="flex items-center gap-2">
-                    <span id="username-display" class="font-bold">{@username}</span>
-                    <button
-                      type="button"
-                      phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
-                      class="link link-hover text-xs"
-                    >
-                      change?
-                    </button>
-                  </div>
-                  <form
-                    id="username-form"
-                    phx-submit="update_username"
-                    phx-submit-end={JS.hide(to: "#username-form")}
-                    class="mt-2 flex gap-2 hidden"
-                  >
-                    <input
-                      type="text"
-                      id="username-input"
-                      value={@username}
-                      name="username"
-                      class="input input-primary flex-1"
-                      placeholder="Enter username"
-                    />
-                    <button
-                      type="submit"
-                      class="btn btn-primary"
-                    >
-                      Update
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-            
-    <!-- Create Room Section -->
-            <div class="card bg-base-200">
-              <div class="card-body">
-                <h2 class="card-title">Create a Room</h2>
-
-                <%= if @my_room_id do %>
-                  <div role="alert" class="alert alert-success">
-                    <span>You're already in a room!</span>
-                  </div>
-                <% end %>
-                
-    <!-- Duration Presets -->
-                <div class="join">
-                  <button
-                    phx-click="set_duration"
-                    phx-value-minutes="25"
-                    disabled={@my_room_id != nil}
-                    class={"join-item btn " <> if @duration_minutes == 25, do: "btn-primary", else: ""}
-                  >
-                    25 min
-                  </button>
-                  <button
-                    phx-click="set_duration"
-                    phx-value-minutes="50"
-                    disabled={@my_room_id != nil}
-                    class={"join-item btn " <> if @duration_minutes == 50, do: "btn-primary", else: ""}
-                  >
-                    50 min
-                  </button>
-                  <button
-                    phx-click="set_duration"
-                    phx-value-minutes="75"
-                    disabled={@my_room_id != nil}
-                    class={"join-item btn " <> if @duration_minutes == 75, do: "btn-primary", else: ""}
-                  >
-                    75 min
-                  </button>
-                </div>
-                
-    <!-- Duration Slider -->
-                <div>
-                  <label class="label">
-                    <span class="label-text">Duration: {@duration_minutes} minutes</span>
-                  </label>
-                  <form phx-change="set_duration">
-                    <input
-                      type="range"
-                      min="5"
-                      max="180"
-                      value={@duration_minutes}
-                      name="minutes"
-                      disabled={@my_room_id != nil}
-                      class="range range-primary"
-                    />
-                  </form>
-                  <div class="flex justify-between text-xs opacity-50 mt-1">
-                    <span>5 min</span>
-                    <span>3 hours</span>
-                  </div>
-                </div>
-
-                <div class="card-actions">
-                  <button
-                    phx-click="create_room"
-                    disabled={@my_room_id != nil}
-                    class="btn btn-primary btn-block"
-                  >
-                    Create Room
-                  </button>
-                </div>
-              </div>
-            </div>
+            <.user_card
+              user_id={@user_id}
+              username={@username}
+              my_room_id={@my_room_id}
+              duration_minutes={@duration_minutes}
+            />
           </div>
         </div>
 
@@ -396,6 +280,138 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
+    """
+  end
+
+  defp user_card(assigns) do
+    ~H"""
+    <div class="card bg-base-200">
+      <div class="card-body">
+        <!-- Username Editor -->
+        <div class="pb-4 border-b border-base-300">
+          <!-- Avatar + username -->
+          <div class="flex gap-2">
+            <div class="avatar">
+              <div class="w-12 rounded-full">
+                <img
+                  src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
+                  alt={@username}
+                />
+              </div>
+            </div>
+            <div>
+              <label class="label">
+                <span class="label-text">Your username</span>
+              </label>
+              <div class="flex items-center gap-2">
+                <span id="username-display" class="font-bold">{@username}</span>
+                <button
+                  type="button"
+                  phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
+                  class="link link-hover text-xs text-base-content/70"
+                >
+                  change?
+                </button>
+              </div>
+            </div>
+          </div>
+          <form
+            id="username-form"
+            phx-submit="update_username"
+            class="mt-4 hidden"
+          >
+            <input
+              type="text"
+              id="username-input"
+              value={@username}
+              name="username"
+              autocomplete="username"
+              class="input input-primary mr-1 w-64"
+              placeholder="Enter username"
+            />
+            <button
+              type="submit"
+              phx-click={JS.hide(to: "#username-form")}
+              class="btn btn-primary"
+            >
+              Update
+            </button>
+          </form>
+        </div>
+
+        <h2 class="card-title mt-4 mb-2">Create a Room</h2>
+
+        <div class="flex flex-col mx-auto w-xs">
+          <%= if @my_room_id do %>
+            <div role="alert" class="alert alert-success">
+              <span>You're already in a room!</span>
+            </div>
+          <% end %>
+          
+    <!-- Duration Presets -->
+          <%!-- TODO: make this client side --%>
+          <div class="join w-full mb-2">
+            <button
+              phx-click="set_duration"
+              phx-value-minutes="25"
+              disabled={@my_room_id != nil}
+              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+            >
+              25 min
+            </button>
+            <button
+              phx-click="set_duration"
+              phx-value-minutes="50"
+              disabled={@my_room_id != nil}
+              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+            >
+              50 min
+            </button>
+            <button
+              phx-click="set_duration"
+              phx-value-minutes="75"
+              disabled={@my_room_id != nil}
+              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+            >
+              75 min
+            </button>
+          </div>
+          
+    <!-- Duration Slider -->
+          <div class="mb-4">
+            <form phx-change="set_duration">
+              <input
+                type="range"
+                id="duration-slider"
+                min="5"
+                max="180"
+                value={@duration_minutes}
+                name="minutes"
+                disabled={@my_room_id != nil}
+                class="range range-neutral"
+              />
+            </form>
+            <div class="flex justify-between text-xs opacity-50 mt-1">
+              <span>5 min</span>
+              <span>3 hours</span>
+            </div>
+            <label for="duration-slider" class="label w-full">
+              <span class="label-text mx-auto">Duration: {@duration_minutes} minutes</span>
+            </label>
+          </div>
+
+          <div class="card-actions">
+            <button
+              phx-click="create_room"
+              disabled={@my_room_id != nil}
+              class="btn btn-primary btn-block"
+            >
+              Create Room
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     """
   end
 
