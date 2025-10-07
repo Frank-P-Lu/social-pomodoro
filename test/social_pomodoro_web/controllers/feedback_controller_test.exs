@@ -13,7 +13,7 @@ defmodule SocialPomodoroWeb.FeedbackControllerTest do
         })
 
       assert redirected_to(conn) == "/"
-      assert get_flash(conn, :info) =~ "Thank you for your feedback"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Thank you for your feedback"
     end
 
     test "submits feedback without email", %{conn: conn} do
@@ -26,7 +26,7 @@ defmodule SocialPomodoroWeb.FeedbackControllerTest do
         })
 
       assert redirected_to(conn) == "/"
-      assert get_flash(conn, :info) =~ "Thank you for your feedback"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Thank you for your feedback"
     end
 
     test "submits feedback without username", %{conn: conn} do
@@ -38,7 +38,7 @@ defmodule SocialPomodoroWeb.FeedbackControllerTest do
         })
 
       assert redirected_to(conn) == "/"
-      assert get_flash(conn, :info) =~ "Thank you for your feedback"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Thank you for your feedback"
     end
   end
 end

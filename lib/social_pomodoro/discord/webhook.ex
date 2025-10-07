@@ -18,12 +18,15 @@ defmodule SocialPomodoro.Discord.Webhook do
     - {:error, reason} on failure
   """
   def send_feedback(message, email \\ nil, username \\ nil) do
-    webhook_url = Application.get_env(:social_pomodoro, :discord_webhook_url)
+    webhook_url = Application.get_env(:social_pomodoro, :discord_feedback_webhook_url)
+
+    Logger.debug("Feedback webhook URL: #{inspect(webhook_url)}")
 
     if is_nil(webhook_url) or webhook_url == "" do
-      Logger.warning("Discord webhook URL not configured. Feedback not sent.")
+      Logger.warning("Discord feedback webhook URL not configured. Feedback not sent.")
       {:error, :webhook_not_configured}
     else
+      Logger.info("Sending feedback to Discord")
       payload = build_feedback_payload(message, email, username)
       send_webhook(webhook_url, payload)
     end
@@ -51,22 +54,14 @@ defmodule SocialPomodoro.Discord.Webhook do
   end
 
   defp send_webhook(url, payload) do
-    headers = [{~c"Content-Type", ~c"application/json"}]
-    body = Jason.encode!(payload)
-
-    case :httpc.request(
-           :post,
-           {String.to_charlist(url), headers, ~c"application/json", String.to_charlist(body)},
-           [],
-           []
-         ) do
-      {:ok, {{_, status_code, _}, _headers, _body}} when status_code in 200..299 ->
-        Logger.info("Feedback sent to Discord successfully")
+    case Req.post(url, json: payload) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
+        Logger.info("Feedback sent to Discord successfully (status: #{status})")
         {:ok, :sent}
 
-      {:ok, {{_, status_code, _}, _headers, response_body}} ->
+      {:ok, %Req.Response{status: status, body: body}} ->
         Logger.error(
-          "Failed to send feedback to Discord. Status: #{status_code}, Body: #{response_body}"
+          "Failed to send feedback to Discord. Status: #{status}, Body: #{inspect(body)}"
         )
 
         {:error, :request_failed}

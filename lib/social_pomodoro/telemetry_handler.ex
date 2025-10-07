@@ -49,12 +49,18 @@ defmodule SocialPomodoro.TelemetryHandler do
   end
 
   defp send_analytics(event_type, data) do
-    webhook_url = Application.get_env(:social_pomodoro, :discord_webhook_url)
+    webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
+
+    Logger.debug("Analytics webhook URL: #{inspect(webhook_url)}")
 
     if is_nil(webhook_url) or webhook_url == "" do
-      Logger.warning("Discord webhook URL not configured. Analytics not sent for: #{event_type}")
+      Logger.warning(
+        "Discord analytics webhook URL not configured. Analytics not sent for: #{event_type}"
+      )
+
       :ok
     else
+      Logger.info("Sending analytics event to Discord: #{event_type}")
       payload = build_analytics_payload(event_type, data)
       # Send webhook asynchronously to avoid blocking the caller
       Task.start(fn -> send_webhook(webhook_url, payload) end)
@@ -89,28 +95,23 @@ defmodule SocialPomodoro.TelemetryHandler do
   end
 
   defp send_webhook(url, payload) do
-    headers = [{~c"Content-Type", ~c"application/json"}]
-    body = Jason.encode!(payload)
+    Logger.debug("Sending webhook request to: #{url}")
+    Logger.debug("Payload: #{inspect(payload)}")
 
-    case :httpc.request(
-           :post,
-           {String.to_charlist(url), headers, ~c"application/json", String.to_charlist(body)},
-           [],
-           []
-         ) do
-      {:ok, {{_, status_code, _}, _headers, _body}} when status_code in 200..299 ->
-        Logger.debug("Analytics sent to Discord successfully")
+    case Req.post(url, json: payload) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
+        Logger.info("Analytics sent to Discord successfully (status: #{status})")
         :ok
 
-      {:ok, {{_, status_code, _}, _headers, response_body}} ->
-        Logger.warning(
-          "Failed to send analytics to Discord. Status: #{status_code}, Body: #{response_body}"
+      {:ok, %Req.Response{status: status, body: body}} ->
+        Logger.error(
+          "Failed to send analytics to Discord. Status: #{status}, Body: #{inspect(body)}"
         )
 
         :ok
 
       {:error, reason} ->
-        Logger.warning("Failed to send analytics to Discord: #{inspect(reason)}")
+        Logger.error("Failed to send analytics to Discord: #{inspect(reason)}")
         :ok
     end
   end

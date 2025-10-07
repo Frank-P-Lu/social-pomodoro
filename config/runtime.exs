@@ -20,6 +20,15 @@ if System.get_env("PHX_SERVER") do
   config :social_pomodoro, SocialPomodoroWeb.Endpoint, server: true
 end
 
+# Configure Discord webhooks for all environments
+config :social_pomodoro,
+       :discord_feedback_webhook_url,
+       System.get_env("DISCORD_FEEDBACK_WEBHOOK_URL")
+
+config :social_pomodoro,
+       :discord_analytics_webhook_url,
+       System.get_env("DISCORD_ANALYTICS_WEBHOOK_URL")
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
