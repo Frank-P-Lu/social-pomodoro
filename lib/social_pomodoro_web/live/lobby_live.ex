@@ -136,9 +136,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="flex justify-end mb-4">
           <button
             phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
-            class="btn btn-secondary"
+            class="btn btn-secondary btn-dash"
           >
-            💬 Give Feedback
+            Give Feedback
           </button>
         </div>
 
@@ -146,23 +146,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <!-- Left Column: Explanation -->
           <div class="card bg-base-200">
             <div class="card-body">
-              <h1 class="card-title text-3xl">Fancy a Pomodoro?</h1>
-              <div class="space-y-3">
-                <p>Focus with strangers around the world.</p>
-                <strong>No webcam. No chat.</strong>
+              <h1 class="card-title text-4xl mb-4">Fancy a Pomodoro?</h1>
+              <div class="space-y-4 text-lg">
+                <p class="leading-relaxed">Focus alongside strangers from around the world.</p>
+                <div class="badge badge-primary badge-lg p-4">No webcam. No chat. Just work.</div>
 
-                <p>
-                  Join a room or create your own. Set a timer, and work alongside others in real-time.
-                </p>
-
-                <p>
-                  React with emojis to share your progress and energy.
-                </p>
-                <p>
-                  After each session, take a 5-minute break together.
-                </p>
-                <p>
-                  Keep going or return to the lobby when you're done.
+                <p class="leading-relaxed">
+                  Create a room, set your timer, and get things done together.
                 </p>
               </div>
             </div>
@@ -214,7 +204,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                           <div class="text-sm opacity-70">
                             {length(room.participants)} {if length(room.participants) == 1,
                               do: "person",
-                              else: "people"} · {room.duration_minutes} min
+                              else: "people"} waiting · {room.duration_minutes} min
                             <%= if room.status != :waiting do %>
                               · {format_time_remaining(room.seconds_remaining)} remaining
                             <% end %>
@@ -301,7 +291,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             </div>
             <div>
               <label class="label">
-                <span class="label-text">Your username</span>
+                <span class="label-text">That's you</span>
               </label>
               <div class="flex items-center gap-2">
                 <span id="username-display" class="font-bold">{@username}</span>
@@ -318,32 +308,34 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <form
             id="username-form"
             phx-submit="update_username"
-            class="mt-4 hidden"
+            class="mt-4 hidden "
           >
-            <input
-              type="text"
-              id="username-input"
-              value={@username}
-              name="username"
-              autocomplete="username"
-              class="input input-primary mr-1 w-64"
-              placeholder="Enter username"
-            />
-            <button
-              type="submit"
-              phx-click={JS.hide(to: "#username-form")}
-              class="btn btn-primary"
-            >
-              Update
-            </button>
+            <div class="flex flex-col gap-2">
+              <input
+                type="text"
+                id="username-input"
+                value={@username}
+                name="username"
+                autocomplete="username"
+                class="input input-primary"
+                placeholder="Enter username"
+              />
+              <button
+                type="submit"
+                phx-click={JS.hide(to: "#username-form")}
+                class="btn btn-primary btn-outline "
+              >
+                Update
+              </button>
+            </div>
           </form>
         </div>
 
-        <h2 class="card-title mt-4 mb-2">Create a Room</h2>
+        <h2 class="card-title mt-4 mb-2">Set your timer</h2>
 
-        <div class="flex flex-col mx-auto w-xs">
+        <div class="flex flex-col mx-auto w-full lg:w-xs">
           <%= if @my_room_id do %>
-            <div role="alert" class="alert alert-success">
+            <div role="alert" class="alert alert-success mb-4">
               <span>You're already in a room!</span>
             </div>
           <% end %>
@@ -406,7 +398,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               disabled={@my_room_id != nil}
               class="btn btn-primary btn-block"
             >
-              Create Room
+              Let's go
             </button>
           </div>
         </div>
