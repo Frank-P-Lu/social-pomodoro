@@ -401,6 +401,105 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     end
   end
 
+  describe "rejoin feature" do
+    test "user can rejoin an in-progress room they previously left" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_id = extract_room_id(htmlA)
+
+      # User B joins the room
+      {:ok, lobbyB, _html} = live(connB, "/")
+
+      lobbyB
+      |> element("button[phx-value-room-id='#{room_id}']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      Process.sleep(50)
+
+      # User A starts the session
+      lobbyA
+      |> element("button[phx-value-room-id='#{room_id}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      Process.sleep(50)
+
+      # User B navigates to the room
+      {:ok, sessionB, _html} = live(connB, "/room/#{room_id}")
+
+      # User B leaves the room
+      sessionB
+      |> element("button", "Leave Room")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      Process.sleep(50)
+
+      # User B should be back in lobby
+      {:ok, lobbyB2, htmlB2} = live(connB, "/")
+
+      # Room should still be visible (User A is still in it)
+      assert htmlB2 =~ room_id
+
+      # Should show "In Progress" badge
+      assert htmlB2 =~ "In Progress"
+
+      # Should show "Rejoin" button (not "Join")
+      assert htmlB2 =~ "Rejoin"
+      refute htmlB2 =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>\s*Join\s*<\/button>/
+    end
+
+    test "rejoin button only appears for rooms the user left" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+      connC = setup_user_conn("userC")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_id = extract_room_id(htmlA)
+
+      # User B joins the room
+      {:ok, lobbyB, _html} = live(connB, "/")
+
+      lobbyB
+      |> element("button[phx-value-room-id='#{room_id}']")
+      |> render_click()
+
+      # User A starts the session
+      lobbyA
+      |> element("button[phx-value-room-id='#{room_id}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      Process.sleep(50)
+
+      # User C loads lobby (never joined this room)
+      {:ok, _lobbyC, htmlC} = live(connC, "/")
+
+      # User C should see the room as "In Progress" but NO button to join/rejoin
+      assert htmlC =~ room_id
+      assert htmlC =~ "In Progress"
+      refute htmlC =~ "Rejoin"
+      refute htmlC =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"/
+    end
+  end
+
   describe "empty state" do
     test "displays friendly empty state message when no rooms available" do
       # Wait for any existing rooms from other tests to be cleaned up
