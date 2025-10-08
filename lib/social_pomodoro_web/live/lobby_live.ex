@@ -1,5 +1,6 @@
 defmodule SocialPomodoroWeb.LobbyLive do
   use SocialPomodoroWeb, :live_view
+  alias SocialPomodoroWeb.Icons
 
   @impl true
   def mount(_params, session, socket) do
@@ -363,14 +364,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <div>
               <span class="label label-text">Look, it's you!</span>
 
-              <div class="flex items-center gap-4">
+              <div class="flex items-center gap-2">
                 <span id="username-display" class="font-bold text-base">{@username}</span>
                 <button
                   type="button"
                   phx-click={JS.toggle(to: "#username-form") |> JS.focus(to: "#username-input")}
                   class="link link-hover text-xs text-base-content/70"
                 >
-                  <%!-- TODO: use hero icons --%> change?
+                  <Icons.pencil class="w-4 h-4 inline fill-current" />
                 </button>
               </div>
             </div>
