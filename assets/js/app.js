@@ -26,6 +26,22 @@ import topbar from "../vendor/topbar"
 
 let Hooks = {}
 
+Hooks.CopyToClipboard = {
+  mounted() {
+    this.el.addEventListener("click", (e) => {
+      e.preventDefault()
+      const roomName = this.el.dataset.roomName
+      const url = `${window.location.origin}/at/${roomName}`
+
+      navigator.clipboard.writeText(url).then(() => {
+        this.pushEvent("link_copied", {})
+      }).catch(err => {
+        console.error("Failed to copy:", err)
+      })
+    })
+  }
+}
+
 Hooks.Timer = {
   mounted() {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)

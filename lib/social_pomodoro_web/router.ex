@@ -19,6 +19,7 @@ defmodule SocialPomodoroWeb.Router do
     pipe_through :browser
 
     live "/", LobbyLive
+    live "/at/:room_name", LobbyLive
     live "/room/:room_id", SessionLive
   end
 

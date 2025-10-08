@@ -27,6 +27,14 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     end
   end
 
+  # Helper to extract room_name from HTML (looks for data-room-name attribute)
+  defp extract_room_name(html) do
+    case Regex.run(~r/data-room-name="([^"]+)"/, html) do
+      [_, room_name] -> room_name
+      _ -> nil
+    end
+  end
+
   describe "single user flow" do
     test "user can create room, start it, and navigate to session" do
       conn = setup_user_conn("user1")
@@ -497,6 +505,67 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert htmlC =~ "In Progress"
       refute htmlC =~ "Rejoin"
       refute htmlC =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"/
+    end
+  end
+
+  describe "room sharing via link" do
+    test "user A creates room, user B can join via direct link" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name(htmlA)
+
+      # User B visits the direct link /at/:room_name
+      # This triggers a push_navigate during connected mount with flash
+      assert {:error, {:live_redirect, %{to: "/"}}} = live(connB, "/at/#{room_name}")
+
+      # Follow the redirect
+      {:ok, _lobbyB, htmlB} = live(connB, "/")
+
+      # User B should now be in the room
+      assert htmlB =~ "Waiting for host..."
+
+      # Both users should see 2 participants
+      htmlA_after = render(lobbyA)
+
+      assert htmlA_after =~ "2 people"
+      assert htmlB =~ "2 people"
+    end
+
+    test "visiting non-existent room link shows error message" do
+      conn = setup_user_conn("user1")
+
+      # Visit a link to a room that doesn't exist
+      # This triggers a push_navigate during connected mount with error flash
+      assert {:error, {:live_redirect, %{to: "/"}}} = live(conn, "/at/Nonexistent-Room-Name")
+    end
+
+    test "share button copies correct link format" do
+      conn = setup_user_conn("user1")
+
+      # Create room
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+      room_id = extract_room_id(html)
+      room_name = extract_room_name(html)
+
+      # Verify share button exists with correct room_name data attribute
+      assert html =~ ~r/id="share-btn-#{room_id}"/
+      assert html =~ ~r/data-room-name="#{Regex.escape(room_name)}"/
+      assert html =~ ~r/phx-hook="CopyToClipboard"/
     end
   end
 

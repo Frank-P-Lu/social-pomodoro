@@ -58,12 +58,12 @@ defmodule SocialPomodoro.RoomNameGenerator do
   ]
 
   @doc """
-  Generates a random room name by combining an adjective, noun A, and noun B.
+  Generates a random room name by combining an adjective, noun A, and noun B with hyphens.
 
   ## Examples
 
       iex> SocialPomodoro.RoomNameGenerator.generate()
-      "Hushed Coffee Corner"
+      "Hushed-Coffee-Corner"
 
   """
   def generate do
@@ -71,6 +71,6 @@ defmodule SocialPomodoro.RoomNameGenerator do
     noun_a = Enum.random(@nouns_a)
     noun_b = Enum.random(@nouns_b)
 
-    "#{adjective} #{noun_a} #{noun_b}"
+    "#{adjective}-#{noun_a}-#{noun_b}"
   end
 end

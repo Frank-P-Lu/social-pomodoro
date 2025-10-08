@@ -3,15 +3,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
   alias SocialPomodoroWeb.Icons
 
   @impl true
-  def mount(_params, session, socket) do
+  def mount(params, session, socket) do
+    user_id = session["user_id"]
+
     if connected?(socket) do
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "rooms")
-
-      user_id = session["user_id"]
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
     end
 
-    user_id = session["user_id"]
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
     rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), user_id)
 
@@ -32,7 +31,43 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:my_room_id, my_room_id)
       |> assign(:left_room_ids, [])
 
+    # Handle direct room link (/at/:room_name) - only during connected mount
+    socket =
+      case {params, connected?(socket)} do
+        {%{"room_name" => room_name}, true} when is_binary(room_name) ->
+          handle_direct_room_join(socket, room_name, user_id)
+
+        _ ->
+          socket
+      end
+
     {:ok, socket}
+  end
+
+  defp handle_direct_room_join(socket, room_name, user_id) do
+    case SocialPomodoro.RoomRegistry.find_room_by_name(room_name) do
+      {:ok, room_id} ->
+        # Room exists, try to join
+        case SocialPomodoro.Room.join(room_id, user_id) do
+          :ok ->
+            display_name = String.replace(room_name, "-", " ")
+
+            socket
+            |> assign(:my_room_id, room_id)
+            |> put_flash(:info, "Joined #{display_name}")
+            |> push_navigate(to: ~p"/")
+
+          {:error, _reason} ->
+            socket
+            |> put_flash(:error, "Could not join room")
+            |> push_navigate(to: ~p"/")
+        end
+
+      {:error, :not_found} ->
+        socket
+        |> put_flash(:error, "This room no longer exists")
+        |> push_navigate(to: ~p"/")
+    end
   end
 
   @impl true
@@ -110,6 +145,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def handle_event("link_copied", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Room link copied!")}
+  end
+
+  @impl true
   def handle_info({:room_update, _room_state}, socket) do
     rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), socket.assigns.user_id)
     {:noreply, assign(socket, :rooms, rooms)}
@@ -154,6 +194,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <.flash kind={:info} flash={@flash} />
+    <.flash kind={:error} flash={@flash} />
     <div class="navbar bg-base-300 text-neutral-content">
       <div class="flex-1">
         <a href="/" class="btn btn-ghost text-xl">Focus with Strangers</a>
@@ -239,7 +281,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
     " <>
       if @room.room_id == @my_room_id, do: "border-2 border-primary", else: ""}>
       <div class="card-body p-4 gap-0">
-        <h3 class="card-title font-semibold">{@room.name}</h3>
+        <div class="flex items-start justify-between gap-2">
+          <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
+          <button
+            id={"share-btn-#{@room.room_id}"}
+            phx-hook="CopyToClipboard"
+            data-room-name={@room.name}
+            class="btn btn-ghost btn-xs btn-square"
+            title="Share room"
+          >
+            <Icons.share class="w-4 h-4 fill-current" />
+          </button>
+        </div>
         <div class="text-sm opacity-70">
           {length(@room.participants)} {if length(@room.participants) == 1,
             do: "person",
@@ -349,7 +402,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body">
-        <!-- Username Editor -->
+        <%= if @my_room_id do %>
+          <div role="alert" class="alert alert-success mb-4">
+            <span>You're already in a room!</span>
+          </div>
+        <% end %>
+        
+    <!-- Username Editor -->
         <div class="pb-4 border-b border-base-300">
           <!-- Avatar + username -->
           <div class="flex gap-2">
@@ -405,11 +464,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <h2 class="card-title mt-4 mb-2">Set your timer</h2>
 
         <div class="flex flex-col mx-auto w-full lg:w-xs">
-          <%= if @my_room_id do %>
-            <div role="alert" class="alert alert-success mb-4">
-              <span>You're already in a room!</span>
-            </div>
-          <% end %>
           
     <!-- Duration Presets -->
           <%!-- TODO: make this client side --%>
