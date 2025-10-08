@@ -308,43 +308,47 @@ defmodule SocialPomodoroWeb.LobbyLive do
     bg-[size:20px_20px]
     " <>
       if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
-      <div class="card-body p-4 gap-0">
-        <div class="flex items-start justify-between gap-2">
-          <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
-          <button
-            id={"share-btn-#{@room.name}"}
-            phx-hook="CopyToClipboard"
-            data-room-name={@room.name}
-            class="btn btn-ghost btn-xs btn-square"
-            title="Share room"
-          >
-            <Icons.share class="w-4 h-4 fill-current" />
-          </button>
-        </div>
-        <div class="text-sm opacity-70">
-          {length(@room.participants)} {if length(@room.participants) == 1,
-            do: "person",
-            else: "people"} waiting · {@room.duration_minutes} min
-          <%= if @room.status != :waiting do %>
-            · {format_time_remaining(@room.seconds_remaining)} remaining
-          <% end %>
-        </div>
-        
-    <!-- Participant Avatars -->
-        <div class="flex items-center justify-center my-2 h-full">
-          <div class="avatar-group -space-x-6 mb-2">
-            <%= for participant <- @room.participants do %>
-              <div class="avatar">
-                <div class="w-10">
-                  <img
-                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                    alt={participant.username}
-                  />
-                </div>
-              </div>
+      <div class="card-body p-4 gap-0 flex flex-col justify-between">
+        <div>
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
+            <button
+              id={"share-btn-#{@room.name}"}
+              phx-hook="CopyToClipboard"
+              data-room-name={@room.name}
+              class="btn btn-ghost btn-xs btn-square"
+              title="Share room"
+            >
+              <Icons.share class="w-4 h-4 fill-current" />
+            </button>
+          </div>
+          <div class="text-sm opacity-70">
+            {length(@room.participants)} {if length(@room.participants) == 1,
+              do: "person",
+              else: "people"} waiting · {@room.duration_minutes} min
+            <%= if @room.status != :waiting do %>
+              · {format_time_remaining(@room.seconds_remaining)} remaining
             <% end %>
           </div>
         </div>
+        
+    <!-- Participant Avatars -->
+        <%= if length(@room.participants) > 0 do %>
+          <div class="flex items-center justify-center min-h-16">
+            <div class="avatar-group -space-x-6">
+              <%= for participant <- @room.participants do %>
+                <div class="avatar">
+                  <div class="w-10">
+                    <img
+                      src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+                      alt={participant.username}
+                    />
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
         
     <!-- Action Button -->
         <div class="flex items-center justify-between gap-4">
