@@ -468,13 +468,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       refute htmlB2 =~
                ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Join\s*<\/button>/
 
-      # User B clicks Rejoin button
+      # User B clicks Rejoin button and should be redirected to room
       lobbyB2
-      |> element("button[phx-value-room-name='#{room_name}']", "Rejoin")
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
       |> render_click()
 
-      # Wait for PubSub
-      Process.sleep(50)
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobbyB2, "/room/#{room_name}")
 
       # User B should be able to navigate to the room screen successfully
       {:ok, _sessionB2, htmlSession} = live(connB, "/room/#{room_name}")

@@ -129,6 +129,17 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def handle_event("rejoin_room", %{"room-name" => name}, socket) do
+    case join_room_and_update_state(socket, name, socket.assigns.user_id) do
+      {:ok, socket} ->
+        {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+
+      {:error, socket} ->
+        {:noreply, put_flash(socket, :error, "Could not rejoin room")}
+    end
+  end
+
+  @impl true
   def handle_event("leave_room", _params, socket) do
     if socket.assigns.my_room_name do
       name = socket.assigns.my_room_name
@@ -390,7 +401,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% else %>
               <%= if can_rejoin?(@room, @user_id) do %>
                 <button
-                  phx-click="join_room"
+                  phx-click="rejoin_room"
                   phx-value-room-name={@room.name}
                   class="btn btn-primary btn-outline btn-sm"
                 >
