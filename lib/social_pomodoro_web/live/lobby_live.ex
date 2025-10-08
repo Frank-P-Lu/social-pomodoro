@@ -29,6 +29,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
       |> assign(:my_room_id, my_room_id)
+      |> assign(:left_room_ids, [])
 
     {:ok, socket}
   end
@@ -75,7 +76,15 @@ defmodule SocialPomodoroWeb.LobbyLive do
     case SocialPomodoro.Room.join(room_id, socket.assigns.user_id) do
       :ok ->
         # Stay in lobby, just update state to show we're in the room
-        {:noreply, assign(socket, :my_room_id, room_id)}
+        # Remove from left_room_ids if rejoining
+        left_room_ids = Enum.reject(socket.assigns.left_room_ids, &(&1 == room_id))
+        
+        socket =
+          socket
+          |> assign(:my_room_id, room_id)
+          |> assign(:left_room_ids, left_room_ids)
+        
+        {:noreply, socket}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not join room")}
@@ -85,8 +94,15 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_event("leave_room", _params, socket) do
     if socket.assigns.my_room_id do
-      SocialPomodoro.Room.leave(socket.assigns.my_room_id, socket.assigns.user_id)
-      {:noreply, assign(socket, :my_room_id, nil)}
+      room_id = socket.assigns.my_room_id
+      SocialPomodoro.Room.leave(room_id, socket.assigns.user_id)
+      
+      socket =
+        socket
+        |> assign(:my_room_id, nil)
+        |> assign(:left_room_ids, [room_id | socket.assigns.left_room_ids])
+      
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -193,7 +209,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <% else %>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <%= for room <- @rooms do %>
-                    <.room_card room={room} user_id={@user_id} my_room_id={@my_room_id} />
+                    <.room_card 
+                      room={room} 
+                      user_id={@user_id} 
+                      my_room_id={@my_room_id}
+                      left_room_ids={@left_room_ids}
+                    />
                   <% end %>
                 </div>
               <% end %>
@@ -303,6 +324,16 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   class="btn btn-primary btn-outline btn-sm"
                 >
                   Join
+                </button>
+              <% end %>
+            <% else %>
+              <%= if Enum.member?(@left_room_ids, @room.room_id) do %>
+                <button
+                  phx-click="join_room"
+                  phx-value-room-id={@room.room_id}
+                  class="btn btn-primary btn-outline btn-sm"
+                >
+                  Rejoin
                 </button>
               <% end %>
             <% end %>
