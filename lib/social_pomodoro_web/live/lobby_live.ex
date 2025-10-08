@@ -78,12 +78,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
         # Stay in lobby, just update state to show we're in the room
         # Remove from left_room_ids if rejoining
         left_room_ids = Enum.reject(socket.assigns.left_room_ids, &(&1 == room_id))
-        
+
         socket =
           socket
           |> assign(:my_room_id, room_id)
           |> assign(:left_room_ids, left_room_ids)
-        
+
         {:noreply, socket}
 
       {:error, _reason} ->
@@ -96,12 +96,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
     if socket.assigns.my_room_id do
       room_id = socket.assigns.my_room_id
       SocialPomodoro.Room.leave(room_id, socket.assigns.user_id)
-      
+
       socket =
         socket
         |> assign(:my_room_id, nil)
         |> assign(:left_room_ids, [room_id | socket.assigns.left_room_ids])
-      
+
       {:noreply, socket}
     else
       {:noreply, socket}
@@ -209,9 +209,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <% else %>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <%= for room <- @rooms do %>
-                    <.room_card 
-                      room={room} 
-                      user_id={@user_id} 
+                    <.room_card
+                      room={room}
+                      user_id={@user_id}
                       my_room_id={@my_room_id}
                       left_room_ids={@left_room_ids}
                     />

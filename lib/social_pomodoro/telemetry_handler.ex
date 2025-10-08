@@ -71,7 +71,7 @@ defmodule SocialPomodoro.TelemetryHandler do
   defp build_analytics_payload(event_type, data) do
     formatted_data =
       data
-      |> Enum.map(fn {key, value} -> "**#{format_key(key)}:** #{inspect(value)}" end)
+      |> Enum.map(fn {key, value} -> "**#{format_key(key)}:** #{format_value(key, value)}" end)
       |> Enum.join("\n")
 
     content = """
@@ -93,6 +93,24 @@ defmodule SocialPomodoro.TelemetryHandler do
     |> Enum.map(&String.capitalize/1)
     |> Enum.join(" ")
   end
+
+  defp format_value(:wait_time_seconds, seconds) when is_integer(seconds) do
+    minutes = div(seconds, 60)
+    remaining_seconds = rem(seconds, 60)
+
+    cond do
+      minutes > 0 and remaining_seconds > 0 ->
+        "#{minutes}m #{remaining_seconds}s"
+
+      minutes > 0 ->
+        "#{minutes}m"
+
+      true ->
+        "#{remaining_seconds}s"
+    end
+  end
+
+  defp format_value(_key, value), do: inspect(value)
 
   defp send_webhook(url, payload) do
     Logger.debug("Sending webhook request to: #{url}")

@@ -345,16 +345,17 @@ defmodule SocialPomodoroWeb.SessionLive do
       participant_count == 1 ->
         # Random message for solo sessions
         Enum.random([
-          "You focused solo!",
+          "You focused solo for #{duration_minutes} minutes!",
           "Flying solo today - nice work!",
           "Solo focus session complete!",
-          "You stayed focused!"
+          "You stayed focused for #{duration_minutes} minutes!"
         ])
 
       true ->
         # Message for group sessions
         other_count = participant_count - 1
-        "You focused with #{other_count} #{if other_count == 1, do: "other person", else: "other people"}!"
+
+        "You focused with #{other_count} #{if other_count == 1, do: "other person", else: "other people"} for #{duration_minutes} minutes!"
     end
   end
 
