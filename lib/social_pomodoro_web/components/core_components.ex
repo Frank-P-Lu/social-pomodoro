@@ -600,7 +600,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
         <.input
           field={f[:email]}
           type="email"
-          label="Email (optional)"
+          label="Want a reply? (optional)"
           placeholder="your@email.com"
         />
 

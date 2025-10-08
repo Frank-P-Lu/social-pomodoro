@@ -417,11 +417,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body">
-        <%= if @my_room_id do %>
-          <div role="alert" class="alert alert-success mb-4">
-            <span>You're already in a room!</span>
-          </div>
-        <% end %>
         
     <!-- Username Editor -->
         <div class="pb-4 border-b border-base-300">
@@ -478,69 +473,78 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
         <h2 class="card-title mt-4 mb-2">Set your timer</h2>
 
-        <div class="flex flex-col mx-auto w-full lg:w-xs">
-          
-    <!-- Duration Presets -->
-          <%!-- TODO: make this client side --%>
-          <div class="join w-full mb-2">
-            <button
-              phx-click="set_duration"
-              phx-value-minutes="25"
-              disabled={@my_room_id != nil}
-              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-            >
-              25 min
-            </button>
-            <button
-              phx-click="set_duration"
-              phx-value-minutes="50"
-              disabled={@my_room_id != nil}
-              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-            >
-              50 min
-            </button>
-            <button
-              phx-click="set_duration"
-              phx-value-minutes="75"
-              disabled={@my_room_id != nil}
-              class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-            >
-              75 min
-            </button>
-          </div>
-          
-    <!-- Duration Slider -->
-          <div class="mb-4">
-            <form phx-change="set_duration">
-              <input
-                type="range"
-                id="duration-slider"
-                min="5"
-                max="180"
-                value={@duration_minutes}
-                name="minutes"
+        <div class="flex flex-col mx-auto w-full lg:w-xs relative">
+          <div class="relative z-0 bg-base-200/50 p-4 rounded-box">
+            <!-- Duration Presets -->
+            <%!-- TODO: make this client side --%>
+            <div class="join w-full mb-2">
+              <button
+                phx-click="set_duration"
+                phx-value-minutes="25"
                 disabled={@my_room_id != nil}
-                class="range range-neutral"
-              />
-            </form>
-            <div class="flex justify-between text-xs opacity-50 mt-1">
-              <span>5 min</span>
-              <span>3 hours</span>
+                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+              >
+                25 min
+              </button>
+              <button
+                phx-click="set_duration"
+                phx-value-minutes="50"
+                disabled={@my_room_id != nil}
+                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+              >
+                50 min
+              </button>
+              <button
+                phx-click="set_duration"
+                phx-value-minutes="75"
+                disabled={@my_room_id != nil}
+                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+              >
+                75 min
+              </button>
             </div>
-            <label for="duration-slider" class="label w-full">
-              <span class="label-text mx-auto">Duration: {@duration_minutes} minutes</span>
-            </label>
+            
+    <!-- Duration Slider -->
+            <div class="mb-4">
+              <form phx-change="set_duration">
+                <input
+                  type="range"
+                  id="duration-slider"
+                  min="5"
+                  max="180"
+                  value={@duration_minutes}
+                  name="minutes"
+                  disabled={@my_room_id != nil}
+                  class="range range-neutral"
+                />
+              </form>
+              <div class="flex justify-between text-xs opacity-50 mt-1">
+                <span>5 min</span>
+                <span>3 hours</span>
+              </div>
+              <label for="duration-slider" class="label w-full">
+                <span class="label-text mx-auto">Duration: {@duration_minutes} minutes</span>
+              </label>
+            </div>
+
+            <div class="card-actions">
+              <button
+                phx-click="create_room"
+                disabled={@my_room_id != nil}
+                class="btn btn-primary btn-block"
+              >
+                Let's go
+              </button>
+            </div>
           </div>
 
-          <div class="card-actions">
-            <button
-              phx-click="create_room"
-              disabled={@my_room_id != nil}
-              class="btn btn-primary btn-block"
-            >
-              Let's go
-            </button>
-          </div>
+          <%= if @my_room_id do %>
+            <div class="absolute inset-0 z-10 flex items-center justify-center p-4 rounded-box backdrop-blur-md bg-white/[0.01] shadow-xl pointer-events-none">
+              <div role="alert" class="alert alert-success pointer-events-auto">
+                <span>You're already in a room!</span>
+              </div>
+            </div>
+          <% end %>
         </div>
       </div>
     </div>
