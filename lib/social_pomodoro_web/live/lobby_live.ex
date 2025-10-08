@@ -13,7 +13,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     end
 
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
-    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), user_id)
+    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(user_id), user_id)
 
     # Check if user is already in a room
     my_room_name =
@@ -162,7 +162,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_info({:room_update, _room_state}, socket) do
-    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), socket.assigns.user_id)
+    rooms =
+      sort_rooms(
+        SocialPomodoro.RoomRegistry.list_rooms(socket.assigns.user_id),
+        socket.assigns.user_id
+      )
+
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
@@ -177,7 +182,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
       end
 
     # Update rooms list
-    rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), socket.assigns.user_id)
+    rooms =
+      sort_rooms(
+        SocialPomodoro.RoomRegistry.list_rooms(socket.assigns.user_id),
+        socket.assigns.user_id
+      )
+
     {:noreply, assign(socket, :rooms, rooms)}
   end
 
@@ -321,7 +331,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
         </div>
         
     <!-- Participant Avatars -->
-        <div class="flex items-center justify-center my-2">
+        <div class="flex items-center justify-center my-2 h-full">
           <div class="avatar-group -space-x-6 mb-2">
             <%= for participant <- @room.participants do %>
               <div class="avatar">

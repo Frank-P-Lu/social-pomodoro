@@ -19,9 +19,10 @@ defmodule SocialPomodoro.RoomRegistry do
 
   @doc """
   Returns a list of all rooms with their current state.
+  Empty rooms are filtered out unless the user_id is an original participant.
   """
-  def list_rooms do
-    GenServer.call(__MODULE__, :list_rooms)
+  def list_rooms(user_id) do
+    GenServer.call(__MODULE__, {:list_rooms, user_id})
   end
 
   @doc """
@@ -82,7 +83,7 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @impl true
-  def handle_call(:list_rooms, _from, state) do
+  def handle_call({:list_rooms, user_id}, _from, state) do
     rooms =
       :ets.tab2list(@table_name)
       |> Enum.map(fn {_name, pid} ->
@@ -93,6 +94,11 @@ defmodule SocialPomodoro.RoomRegistry do
         end
       end)
       |> Enum.reject(&is_nil/1)
+      |> Enum.filter(fn room ->
+        # Show room if it has participants OR if user is an original participant
+        not Enum.empty?(room.participants) or
+          Enum.member?(room.original_participants, user_id)
+      end)
 
     {:reply, rooms, state}
   end

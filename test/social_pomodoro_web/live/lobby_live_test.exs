@@ -592,8 +592,12 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # for any lingering room processes to terminate
       Process.sleep(50)
 
+      # Set up a unique user for this test
+      user_id = "empty_state_test_user_#{System.unique_integer([:positive])}"
+      conn = setup_user_conn(user_id)
+
       # Clean up any lingering rooms by making participants leave
-      existing_rooms = SocialPomodoro.RoomRegistry.list_rooms()
+      existing_rooms = SocialPomodoro.RoomRegistry.list_rooms(user_id)
 
       for room <- existing_rooms do
         # Get all participants and make them leave
@@ -605,7 +609,6 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Wait a bit more for cleanup to complete
       Process.sleep(50)
 
-      conn = setup_user_conn("user1")
       {:ok, _lobby, html} = live(conn, "/")
 
       # Should see the friendly empty state message

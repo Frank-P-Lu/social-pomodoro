@@ -11,15 +11,16 @@ defmodule SocialPomodoro.Room do
   defstruct [
     :name,
     :creator,
-    :duration_minutes,
+    :duration_seconds,
     :status,
     :participants,
     :original_participants,
     :timer_ref,
     :seconds_remaining,
     :reactions,
-    :break_duration_minutes,
-    :created_at
+    :break_duration_seconds,
+    :created_at,
+    :tick_interval
   ]
 
   def start_link(opts) do
@@ -79,19 +80,22 @@ defmodule SocialPomodoro.Room do
     name = Keyword.fetch!(opts, :name)
     creator = Keyword.fetch!(opts, :creator)
     duration_minutes = Keyword.fetch!(opts, :duration_minutes)
+    tick_interval = Keyword.get(opts, :tick_interval, @tick_interval)
+    break_duration_seconds = Keyword.get(opts, :break_duration_seconds, 5 * 60)
 
     state = %__MODULE__{
       name: name,
       creator: creator,
-      duration_minutes: duration_minutes,
+      duration_seconds: trunc(duration_minutes * 60),
       status: :waiting,
       participants: [%{user_id: creator, ready_for_next: false}],
       original_participants: [],
       timer_ref: nil,
       seconds_remaining: nil,
       reactions: [],
-      break_duration_minutes: 5,
-      created_at: System.system_time(:second)
+      break_duration_seconds: break_duration_seconds,
+      created_at: System.system_time(:second),
+      tick_interval: tick_interval
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -135,31 +139,26 @@ defmodule SocialPomodoro.Room do
   def handle_call({:leave, user_id}, _from, state) do
     new_participants = Enum.reject(state.participants, &(&1.user_id == user_id))
 
-    # If room becomes empty, terminate
-    if Enum.empty?(new_participants) do
-      {:stop, :normal, :ok, state}
-    else
-      # Check if the leaving user is the creator
-      new_creator =
-        if state.creator == user_id do
-          # Assign a random remaining participant as the new creator
-          random_participant = Enum.random(new_participants)
-          random_participant.user_id
-        else
-          state.creator
-        end
+    # Check if the leaving user is the creator
+    new_creator =
+      if state.creator == user_id && not Enum.empty?(new_participants) do
+        # Assign a random remaining participant as the new creator
+        random_participant = Enum.random(new_participants)
+        random_participant.user_id
+      else
+        state.creator
+      end
 
-      new_state = %{state | participants: new_participants, creator: new_creator}
-      broadcast_room_update(new_state)
-      {:reply, :ok, new_state}
-    end
+    new_state = %{state | participants: new_participants, creator: new_creator}
+    broadcast_room_update(new_state)
+    {:reply, :ok, new_state}
   end
 
   @impl true
   def handle_call(:start_session, _from, state) do
     if state.status == :waiting do
-      seconds = state.duration_minutes * 60
-      timer_ref = Process.send_after(self(), :tick, @tick_interval)
+      seconds = state.duration_seconds
+      timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
       # Calculate wait time (time between room creation and session start)
       wait_time_seconds = System.system_time(:second) - state.created_at
@@ -226,8 +225,8 @@ defmodule SocialPomodoro.Room do
 
       if all_ready do
         # Start new session
-        seconds = state.duration_minutes * 60
-        timer_ref = Process.send_after(self(), :tick, @tick_interval)
+        seconds = state.duration_seconds
+        timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
         final_state = %{
           new_state
@@ -277,8 +276,8 @@ defmodule SocialPomodoro.Room do
   @impl true
   def handle_info(:tick, %{seconds_remaining: 0, status: :active} = state) do
     # Session complete, start break
-    seconds = state.break_duration_minutes * 60
-    timer_ref = Process.send_after(self(), :tick, @tick_interval)
+    seconds = state.break_duration_seconds
+    timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
     # Emit telemetry event for session completion
     :telemetry.execute(
@@ -287,7 +286,7 @@ defmodule SocialPomodoro.Room do
       %{
         room_name: state.name,
         participant_count: length(state.participants),
-        duration_minutes: state.duration_minutes
+        duration_minutes: div(state.duration_seconds, 60)
       }
     )
 
@@ -305,17 +304,14 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def handle_info(:tick, %{seconds_remaining: 0, status: :break} = state) do
-    # Break complete, return to waiting
-    new_state = %{state | status: :waiting, seconds_remaining: nil, timer_ref: nil, reactions: []}
-
-    broadcast_room_update(new_state)
-    {:noreply, new_state}
+    # Break complete, terminate the room
+    {:stop, :normal, state}
   end
 
   @impl true
   def handle_info(:tick, state) do
     new_seconds = state.seconds_remaining - 1
-    timer_ref = Process.send_after(self(), :tick, @tick_interval)
+    timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
     new_state = %{state | seconds_remaining: new_seconds, timer_ref: timer_ref}
 
@@ -381,14 +377,14 @@ defmodule SocialPomodoro.Room do
       name: state.name,
       creator: state.creator,
       creator_username: creator_username,
-      duration_minutes: state.duration_minutes,
+      duration_minutes: div(state.duration_seconds, 60),
       status: state.status,
       participants: participants_with_usernames,
       original_participants: state.original_participants,
       seconds_remaining: state.seconds_remaining,
       # Latest 50 reactions
       reactions: reactions_with_usernames |> Enum.take(50) |> Enum.reverse(),
-      break_duration_minutes: state.break_duration_minutes
+      break_duration_minutes: div(state.break_duration_seconds, 60)
     }
   end
 end
