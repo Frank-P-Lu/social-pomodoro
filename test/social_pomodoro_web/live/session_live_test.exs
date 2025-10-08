@@ -24,15 +24,15 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       htmlA = render(lobbyA)
 
-      # Extract room_id
-      room_id =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-id="([^"]+)"/, htmlA) do
-          [_, room_id] -> room_id
+      # Extract room_name
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
           _ -> nil
         end
 
       # User B tries to access room URL directly without joining
-      {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_id}")
+      {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
 
       # Should see redirect screen (apostrophes are HTML-encoded)
       assert htmlB =~ "Oops"
@@ -56,15 +56,15 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       htmlA = render(lobbyA)
 
-      # Extract room_id
-      room_id =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-id="([^"]+)"/, htmlA) do
-          [_, room_id] -> room_id
+      # Extract room_name
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
           _ -> nil
         end
 
       # User A accesses their own room
-      {:ok, _sessionA, htmlA_session} = live(connA, "/room/#{room_id}")
+      {:ok, _sessionA, htmlA_session} = live(connA, "/room/#{room_name}")
 
       # Should NOT see redirect screen
       refute htmlA_session =~ "Oops! You're not in this room"

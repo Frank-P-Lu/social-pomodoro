@@ -11,17 +11,17 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     |> Plug.Test.init_test_session(%{"user_id" => unique_id})
   end
 
-  # Helper to extract room_id from HTML (looks for Start or Join button)
-  defp extract_room_id(html) do
-    # Try to find room-id from Start button first (for creator)
-    case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-id="([^"]+)"/, html) do
-      [_, room_id] ->
-        room_id
+  # Helper to extract room name from HTML (looks for Start or Join button)
+  defp extract_room_name_from_button(html) do
+    # Try to find room name from Start button first (for creator)
+    case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+      [_, room_name] ->
+        room_name
 
       _ ->
         # Try Join button (for non-creator)
-        case Regex.run(~r/phx-click="join_room"[^>]*phx-value-room-id="([^"]+)"/, html) do
-          [_, room_id] -> room_id
+        case Regex.run(~r/phx-click="join_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
           _ -> nil
         end
     end
@@ -48,14 +48,14 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Room should appear in lobby with Start button
       html = render(lobby)
       assert html =~ "Start"
-      room_id = extract_room_id(html)
+      room_name = extract_room_name_from_button(html)
 
       # Click Start and verify navigation
       lobby
       |> element("button", "Start")
       |> render_click()
 
-      assert_redirect(lobby, "/room/#{room_id}")
+      assert_redirect(lobby, "/room/#{room_name}")
     end
   end
 
@@ -72,15 +72,15 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B loads lobby and sees the room
       {:ok, lobbyB, htmlB} = live(conn2, "/")
-      assert htmlB =~ room_id
+      assert htmlB =~ room_name
 
-      # User B joins the specific room using phx-value-room-id
+      # User B joins the specific room using phx-value-room-name
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Both lobbies should now show 2 participants
@@ -94,21 +94,21 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User B should see "Waiting for host..." somewhere in the page
       assert htmlB =~ "Waiting for host..."
-      # And the room_id should exist in a button (no longer Join for this room)
-      refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-id="#{room_id}"/
+      # And the room_name should exist in a button (no longer Join for this room)
+      refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-name="#{room_name}"/
 
-      # User A should see "Start" button for their room (with room_id attribute)
-      assert htmlA =~ ~r/phx-value-room-id="#{room_id}"/
+      # User A should see "Start" button for their room (with room_name attribute)
+      assert htmlA =~ ~r/phx-value-room-name="#{room_name}"/
       assert htmlA =~ "Start"
 
       # User A starts the session
       lobbyA
-      |> element("button[phx-value-room-id='#{room_id}']", "Start")
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Both should navigate to the same room
-      assert_redirect(lobbyA, "/room/#{room_id}")
-      assert_redirect(lobbyB, "/room/#{room_id}")
+      assert_redirect(lobbyA, "/room/#{room_name}")
+      assert_redirect(lobbyB, "/room/#{room_name}")
     end
   end
 
@@ -145,13 +145,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B joins
       {:ok, lobbyB1, _html} = live(connB, "/")
 
       lobbyB1
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       html1 = render(lobbyB1)
@@ -162,7 +162,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # Should still see "Waiting for host..." (not "Join")
       assert html2 =~ "Waiting for host..."
-      refute html2 =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>Join<\/button>/
+      refute html2 =~ ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>Join<\/button>/
     end
 
     test "non-participant still sees Join button after refresh" do
@@ -177,7 +177,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B loads lobby but doesn't join
       {:ok, _lobbyB1, html1} = live(connB, "/")
@@ -187,7 +187,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       {:ok, _lobbyB2, html2} = live(connB, "/")
 
       # Should still see Join button for that specific room (not in the room)
-      assert html2 =~ ~r/phx-value-room-id="#{room_id}"/
+      assert html2 =~ ~r/phx-value-room-name="#{room_name}"/
       assert html2 =~ "Join"
     end
   end
@@ -205,14 +205,14 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B loads lobby and sees the room
       {:ok, lobbyB, htmlB} = live(connB, "/")
-      assert htmlB =~ room_id
+      assert htmlB =~ room_name
 
       # User A navigates to the room page
-      {:ok, sessionA, _html} = live(connA, "/room/#{room_id}")
+      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
 
       # User A leaves the room (which should close it since they're the only participant)
       sessionA
@@ -224,7 +224,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User B's lobby should update and no longer show this room
       htmlB_after = render(lobbyB)
-      refute htmlB_after =~ room_id
+      refute htmlB_after =~ room_name
     end
   end
 
@@ -255,13 +255,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B joins room
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # User B's Create Room button should be disabled
@@ -281,13 +281,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B joins room
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       htmlB1 = render(lobbyB)
@@ -308,7 +308,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # User B should no longer be in participants (check on User A's view)
       htmlA = render(lobbyA)
       # Room should still exist and show "1 person" (not "2 people")
-      assert htmlA =~ room_id
+      assert htmlA =~ room_name
       assert htmlA =~ "1 person"
     end
 
@@ -324,11 +324,11 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B loads lobby and sees the room
       {:ok, lobbyB, htmlB} = live(connB, "/")
-      assert htmlB =~ room_id
+      assert htmlB =~ room_name
 
       # User A leaves room from lobby
       lobbyA
@@ -340,7 +340,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # Room should disappear from User B's lobby
       htmlB_after = render(lobbyB)
-      refute htmlB_after =~ room_id
+      refute htmlB_after =~ room_name
     end
 
     test "creator leaves room with participants: room stays open and new creator is assigned" do
@@ -356,19 +356,19 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B and C join the room
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       {:ok, lobbyC, _html} = live(connC, "/")
 
       lobbyC
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Wait for PubSub broadcasts to propagate
@@ -391,17 +391,17 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       htmlC_after = render(lobbyC)
 
       # At least one of them should see the room (may take time for both to update)
-      assert (htmlB_after =~ room_id and htmlB_after =~ "2 people") or
-               (htmlC_after =~ room_id and htmlC_after =~ "2 people")
+      assert (htmlB_after =~ room_name and htmlB_after =~ "2 people") or
+               (htmlC_after =~ room_name and htmlC_after =~ "2 people")
 
       # One of User B or User C should now see the Start button (indicating they're the new creator)
       has_start_button_B =
         htmlB_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-id="#{room_id}"[^>]*>\s*Start\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
 
       has_start_button_C =
         htmlC_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-id="#{room_id}"[^>]*>\s*Start\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
 
       # Exactly one of them should be the new creator
       assert has_start_button_B or has_start_button_C
@@ -422,13 +422,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B joins the room
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Wait for PubSub to propagate
@@ -436,14 +436,14 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User A starts the session
       lobbyA
-      |> element("button[phx-value-room-id='#{room_id}']", "Start")
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Wait for room to start
       Process.sleep(50)
 
       # User B navigates to the room
-      {:ok, sessionB, _html} = live(connB, "/room/#{room_id}")
+      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
 
       # User B leaves the room
       sessionB
@@ -457,25 +457,27 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       {:ok, lobbyB2, htmlB2} = live(connB, "/")
 
       # Room should still be visible (User A is still in it)
-      assert htmlB2 =~ room_id
+      assert htmlB2 =~ room_name
 
       # Should show "In Progress" badge
       assert htmlB2 =~ "In Progress"
 
       # Should show "Rejoin" button (not "Join")
       assert htmlB2 =~ "Rejoin"
-      refute htmlB2 =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>\s*Join\s*<\/button>/
+
+      refute htmlB2 =~
+               ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Join\s*<\/button>/
 
       # User B clicks Rejoin button
       lobbyB2
-      |> element("button[phx-value-room-id='#{room_id}']", "Rejoin")
+      |> element("button[phx-value-room-name='#{room_name}']", "Rejoin")
       |> render_click()
 
       # Wait for PubSub
       Process.sleep(50)
 
       # User B should be able to navigate to the room screen successfully
-      {:ok, _sessionB2, htmlSession} = live(connB, "/room/#{room_id}")
+      {:ok, _sessionB2, htmlSession} = live(connB, "/room/#{room_name}")
 
       # Should see active session
       assert htmlSession =~ "Focus time remaining"
@@ -495,18 +497,18 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       htmlA = render(lobbyA)
-      room_id = extract_room_id(htmlA)
+      room_name = extract_room_name_from_button(htmlA)
 
       # User B joins the room
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
-      |> element("button[phx-value-room-id='#{room_id}']")
+      |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # User A starts the session
       lobbyA
-      |> element("button[phx-value-room-id='#{room_id}']", "Start")
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Wait for room to start
@@ -516,10 +518,10 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       {:ok, _lobbyC, htmlC} = live(connC, "/")
 
       # User C should see the room as "In Progress" but NO button to join/rejoin
-      assert htmlC =~ room_id
+      assert htmlC =~ room_name
       assert htmlC =~ "In Progress"
       refute htmlC =~ "Rejoin"
-      refute htmlC =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"/
+      refute htmlC =~ ~r/<button[^>]*phx-value-room-name="#{room_name}"/
     end
   end
 
@@ -574,11 +576,10 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       html = render(lobby)
-      room_id = extract_room_id(html)
       room_name = extract_room_name(html)
 
       # Verify share button exists with correct room_name data attribute
-      assert html =~ ~r/id="share-btn-#{room_id}"/
+      assert html =~ ~r/id="share-btn-#{room_name}"/
       assert html =~ ~r/data-room-name="#{Regex.escape(room_name)}"/
       assert html =~ ~r/phx-hook="CopyToClipboard"/
     end
@@ -591,13 +592,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # for any lingering room processes to terminate
       Process.sleep(50)
 
-      # Clean up any lingering rooms by getting their room_ids and stopping them
+      # Clean up any lingering rooms by making participants leave
       existing_rooms = SocialPomodoro.RoomRegistry.list_rooms()
 
       for room <- existing_rooms do
         # Get all participants and make them leave
         for participant <- room.participants do
-          SocialPomodoro.Room.leave(room.room_id, participant.user_id)
+          SocialPomodoro.Room.leave(room.name, participant.user_id)
         end
       end
 

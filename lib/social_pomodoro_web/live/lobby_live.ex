@@ -16,9 +16,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
     rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(), user_id)
 
     # Check if user is already in a room
-    my_room_id =
+    my_room_name =
       case SocialPomodoro.RoomRegistry.find_user_room(user_id) do
-        {:ok, room_id} -> room_id
+        {:ok, name} -> name
         {:error, :not_found} -> nil
       end
 
@@ -29,7 +29,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:rooms, rooms)
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
-      |> assign(:my_room_id, my_room_id)
+      |> assign(:my_room_name, my_room_name)
 
     # Handle direct room link (/at/:room_name) - only during connected mount
     socket =
@@ -45,45 +45,37 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   defp handle_direct_room_join(socket, room_name, user_id) do
-    case SocialPomodoro.RoomRegistry.find_room_by_name(room_name) do
-      {:ok, room_id} ->
-        # Room exists, try to join
-        case join_room_and_update_state(socket, room_id, user_id) do
-          {:ok, socket} ->
-            display_name = String.replace(room_name, "-", " ")
+    # Room name is the identifier, so we can directly try to join
+    case join_room_and_update_state(socket, room_name, user_id) do
+      {:ok, socket} ->
+        display_name = String.replace(room_name, "-", " ")
 
-            socket
-            |> put_flash(:info, "Joined #{display_name}")
-            |> push_navigate(to: ~p"/")
-
-          {:error, socket} ->
-            Logger.error("Failed to join room #{room_name}")
-
-            socket
-            |> put_flash(:error, "Could not join room")
-            |> push_navigate(to: ~p"/")
-        end
-
-      {:error, :not_found} ->
         socket
-        |> put_flash(:error, "This room no longer exists")
+        |> put_flash(:info, "Joined #{display_name}")
+        |> push_navigate(to: ~p"/")
+
+      {:error, socket} ->
+        Logger.error("Failed to join room #{room_name}")
+
+        socket
+        |> put_flash(:error, "Could not join room")
         |> push_navigate(to: ~p"/")
     end
   end
 
-  defp join_room_and_update_state(socket, room_id, user_id) do
-    case SocialPomodoro.Room.join(room_id, user_id) do
+  defp join_room_and_update_state(socket, name, user_id) do
+    case SocialPomodoro.Room.join(name, user_id) do
       :ok ->
-        Logger.info("User #{user_id} joined room #{room_id}")
+        Logger.info("User #{user_id} joined room #{name}")
 
         socket =
           socket
-          |> assign(:my_room_id, room_id)
+          |> assign(:my_room_name, name)
 
         {:ok, socket}
 
       {:error, reason} ->
-        Logger.error("User #{user_id} failed to join room #{room_id}: #{inspect(reason)}")
+        Logger.error("User #{user_id} failed to join room #{name}: #{inspect(reason)}")
         {:error, socket}
     end
   end
@@ -109,25 +101,25 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("create_room", _params, socket) do
-    {:ok, room_id} =
+    {:ok, name} =
       SocialPomodoro.RoomRegistry.create_room(
         socket.assigns.user_id,
         socket.assigns.duration_minutes
       )
 
-    socket = assign(socket, :my_room_id, room_id)
+    socket = assign(socket, :my_room_name, name)
     {:noreply, socket}
   end
 
   @impl true
-  def handle_event("start_my_room", %{"room-id" => room_id}, socket) do
-    SocialPomodoro.Room.start_session(room_id)
-    {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
+  def handle_event("start_my_room", %{"room-name" => name}, socket) do
+    SocialPomodoro.Room.start_session(name)
+    {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
   end
 
   @impl true
-  def handle_event("join_room", %{"room-id" => room_id}, socket) do
-    case join_room_and_update_state(socket, room_id, socket.assigns.user_id) do
+  def handle_event("join_room", %{"room-name" => name}, socket) do
+    case join_room_and_update_state(socket, name, socket.assigns.user_id) do
       {:ok, socket} ->
         {:noreply, socket}
 
@@ -138,13 +130,13 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("leave_room", _params, socket) do
-    if socket.assigns.my_room_id do
-      room_id = socket.assigns.my_room_id
-      SocialPomodoro.Room.leave(room_id, socket.assigns.user_id)
+    if socket.assigns.my_room_name do
+      name = socket.assigns.my_room_name
+      SocialPomodoro.Room.leave(name, socket.assigns.user_id)
 
       socket =
         socket
-        |> assign(:my_room_id, nil)
+        |> assign(:my_room_name, nil)
 
       {:noreply, socket}
     else
@@ -164,11 +156,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
-  def handle_info({:room_removed, room_id}, socket) do
-    # If we were in this room, reset my_room_id
+  def handle_info({:room_removed, name}, socket) do
+    # If we were in this room, reset my_room_name
     socket =
-      if socket.assigns.my_room_id == room_id do
-        assign(socket, :my_room_id, nil)
+      if socket.assigns.my_room_name == name do
+        assign(socket, :my_room_name, nil)
       else
         socket
       end
@@ -188,8 +180,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
-  def handle_info({:session_started, room_id}, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/room/#{room_id}")}
+  def handle_info({:session_started, name}, socket) do
+    {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
   end
 
   defp sort_rooms(rooms, user_id) do
@@ -240,7 +232,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <.user_card
               user_id={@user_id}
               username={@username}
-              my_room_id={@my_room_id}
+              my_room_name={@my_room_name}
               duration_minutes={@duration_minutes}
             />
           </div>
@@ -263,7 +255,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     <.room_card
                       room={room}
                       user_id={@user_id}
-                      my_room_id={@my_room_id}
+                      my_room_name={@my_room_name}
                     />
                   <% end %>
                 </div>
@@ -294,12 +286,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
     bg-[repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0,rgba(255,255,255,0.05)_2px,transparent_1px,transparent_20px)]
     bg-[size:20px_20px]
     " <>
-      if @room.room_id == @my_room_id, do: "border-2 border-primary", else: ""}>
+      if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
       <div class="card-body p-4 gap-0">
         <div class="flex items-start justify-between gap-2">
           <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
           <button
-            id={"share-btn-#{@room.room_id}"}
+            id={"share-btn-#{@room.name}"}
             phx-hook="CopyToClipboard"
             data-room-name={@room.name}
             class="btn btn-ghost btn-xs btn-square"
@@ -338,7 +330,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <!-- Status -->
           <div>
             <%= if @room.status == :waiting do %>
-              <%= if @room.room_id == @my_room_id do %>
+              <%= if @room.name == @my_room_name do %>
                 <%= if @room.creator == @user_id do %>
                   <div class="badge badge-soft badge-success">
                     <div class="status status-success "></div>
@@ -370,7 +362,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <!-- Actions -->
           <div class="card-actions">
             <%= if @room.status == :waiting do %>
-              <%= if @room.room_id == @my_room_id do %>
+              <%= if @room.name == @my_room_name do %>
                 <button
                   phx-click="leave_room"
                   class="btn btn-error btn-outline btn-sm"
@@ -380,7 +372,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 <%= if @room.creator == @user_id do %>
                   <button
                     phx-click="start_my_room"
-                    phx-value-room-id={@room.room_id}
+                    phx-value-room-name={@room.name}
                     class="btn btn-primary btn-sm"
                   >
                     Start
@@ -389,7 +381,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <% else %>
                 <button
                   phx-click="join_room"
-                  phx-value-room-id={@room.room_id}
+                  phx-value-room-name={@room.name}
                   class="btn btn-primary btn-outline btn-sm"
                 >
                   Join
@@ -399,7 +391,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <%= if can_rejoin?(@room, @user_id) do %>
                 <button
                   phx-click="join_room"
-                  phx-value-room-id={@room.room_id}
+                  phx-value-room-name={@room.name}
                   class="btn btn-primary btn-outline btn-sm"
                 >
                   Rejoin
@@ -481,7 +473,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <button
                 phx-click="set_duration"
                 phx-value-minutes="25"
-                disabled={@my_room_id != nil}
+                disabled={@my_room_name != nil}
                 class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
               >
                 25 min
@@ -489,7 +481,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <button
                 phx-click="set_duration"
                 phx-value-minutes="50"
-                disabled={@my_room_id != nil}
+                disabled={@my_room_name != nil}
                 class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
               >
                 50 min
@@ -497,7 +489,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <button
                 phx-click="set_duration"
                 phx-value-minutes="75"
-                disabled={@my_room_id != nil}
+                disabled={@my_room_name != nil}
                 class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
               >
                 75 min
@@ -514,7 +506,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   max="180"
                   value={@duration_minutes}
                   name="minutes"
-                  disabled={@my_room_id != nil}
+                  disabled={@my_room_name != nil}
                   class="range range-neutral"
                 />
               </form>
@@ -530,7 +522,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <div class="card-actions">
               <button
                 phx-click="create_room"
-                disabled={@my_room_id != nil}
+                disabled={@my_room_name != nil}
                 class="btn btn-primary btn-block"
               >
                 Let's go
@@ -538,7 +530,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             </div>
           </div>
 
-          <%= if @my_room_id do %>
+          <%= if @my_room_name do %>
             <div class="absolute inset-0 z-10 flex items-center justify-center p-4 rounded-box backdrop-blur-md bg-white/[0.01] shadow-xl pointer-events-none">
               <div role="alert" class="alert alert-success pointer-events-auto">
                 <span>You're already in a room!</span>

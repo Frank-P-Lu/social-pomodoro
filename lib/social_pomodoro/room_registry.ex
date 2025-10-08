@@ -11,7 +11,7 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @doc """
-  Creates a new room and returns its ID.
+  Creates a new room and returns its name.
   """
   def create_room(creator_user_id, duration_minutes) do
     GenServer.call(__MODULE__, {:create_room, creator_user_id, duration_minutes})
@@ -25,33 +25,25 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @doc """
-  Gets a specific room by ID.
+  Gets a specific room by name.
   """
-  def get_room(room_id) do
-    GenServer.call(__MODULE__, {:get_room, room_id})
+  def get_room(name) do
+    GenServer.call(__MODULE__, {:get_room, name})
   end
 
   @doc """
   Finds which room (if any) a user is currently in.
-  Returns {:ok, room_id} or {:error, :not_found}
+  Returns {:ok, room_name} or {:error, :not_found}
   """
   def find_user_room(user_id) do
     GenServer.call(__MODULE__, {:find_user_room, user_id})
   end
 
   @doc """
-  Finds a room by its name.
-  Returns {:ok, room_id} or {:error, :not_found}
-  """
-  def find_room_by_name(room_name) do
-    GenServer.call(__MODULE__, {:find_room_by_name, room_name})
-  end
-
-  @doc """
   Removes a room from the registry (called when room process terminates).
   """
-  def remove_room(room_id) do
-    GenServer.cast(__MODULE__, {:remove_room, room_id})
+  def remove_room(name) do
+    GenServer.cast(__MODULE__, {:remove_room, name})
   end
 
   ## Callbacks
@@ -64,36 +56,36 @@ defmodule SocialPomodoro.RoomRegistry do
 
   @impl true
   def handle_call({:create_room, creator_user_id, duration_minutes}, _from, state) do
-    room_id = generate_room_id()
+    name = SocialPomodoro.RoomNameGenerator.generate()
 
     {:ok, pid} =
       SocialPomodoro.Room.start_link(
-        room_id: room_id,
+        name: name,
         creator: creator_user_id,
         duration_minutes: duration_minutes
       )
 
-    :ets.insert(@table_name, {room_id, pid})
+    :ets.insert(@table_name, {name, pid})
 
     # Emit telemetry event for room creation
     :telemetry.execute(
       [:pomodoro, :room, :created],
       %{count: 1},
       %{
-        room_id: room_id,
+        room_name: name,
         user_id: creator_user_id,
         duration_minutes: duration_minutes
       }
     )
 
-    {:reply, {:ok, room_id}, state}
+    {:reply, {:ok, name}, state}
   end
 
   @impl true
   def handle_call(:list_rooms, _from, state) do
     rooms =
       :ets.tab2list(@table_name)
-      |> Enum.map(fn {_room_id, pid} ->
+      |> Enum.map(fn {_name, pid} ->
         if Process.alive?(pid) do
           SocialPomodoro.Room.get_state(pid)
         else
@@ -106,13 +98,13 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @impl true
-  def handle_call({:get_room, room_id}, _from, state) do
-    case :ets.lookup(@table_name, room_id) do
-      [{^room_id, pid}] when is_pid(pid) ->
+  def handle_call({:get_room, name}, _from, state) do
+    case :ets.lookup(@table_name, name) do
+      [{^name, pid}] when is_pid(pid) ->
         if Process.alive?(pid) do
           {:reply, {:ok, pid}, state}
         else
-          :ets.delete(@table_name, room_id)
+          :ets.delete(@table_name, name)
           {:reply, {:error, :not_found}, state}
         end
 
@@ -125,49 +117,25 @@ defmodule SocialPomodoro.RoomRegistry do
   def handle_call({:find_user_room, user_id}, _from, state) do
     result =
       :ets.tab2list(@table_name)
-      |> Enum.find_value(fn {room_id, pid} ->
+      |> Enum.find_value(fn {name, pid} ->
         if Process.alive?(pid) do
           room_state = SocialPomodoro.Room.get_state(pid)
 
           if Enum.any?(room_state.participants, &(&1.user_id == user_id)) do
-            room_id
+            name
           end
         end
       end)
 
     case result do
       nil -> {:reply, {:error, :not_found}, state}
-      room_id -> {:reply, {:ok, room_id}, state}
+      name -> {:reply, {:ok, name}, state}
     end
   end
 
   @impl true
-  def handle_call({:find_room_by_name, room_name}, _from, state) do
-    result =
-      :ets.tab2list(@table_name)
-      |> Enum.find_value(fn {room_id, pid} ->
-        if Process.alive?(pid) do
-          room_state = SocialPomodoro.Room.get_state(pid)
-
-          if room_state.name == room_name do
-            room_id
-          end
-        end
-      end)
-
-    case result do
-      nil -> {:reply, {:error, :not_found}, state}
-      room_id -> {:reply, {:ok, room_id}, state}
-    end
-  end
-
-  @impl true
-  def handle_cast({:remove_room, room_id}, state) do
-    :ets.delete(@table_name, room_id)
+  def handle_cast({:remove_room, name}, state) do
+    :ets.delete(@table_name, name)
     {:noreply, state}
-  end
-
-  defp generate_room_id do
-    :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
   end
 end

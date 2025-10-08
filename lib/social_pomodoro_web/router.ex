@@ -20,7 +20,7 @@ defmodule SocialPomodoroWeb.Router do
 
     live "/", LobbyLive
     live "/at/:room_name", LobbyLive
-    live "/room/:room_id", SessionLive
+    live "/room/:name", SessionLive
   end
 
   # Other scopes may use custom stacks.

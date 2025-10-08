@@ -9,7 +9,6 @@ defmodule SocialPomodoro.Room do
   @tick_interval 1000
 
   defstruct [
-    :room_id,
     :name,
     :creator,
     :duration_minutes,
@@ -24,12 +23,12 @@ defmodule SocialPomodoro.Room do
   ]
 
   def start_link(opts) do
-    room_id = Keyword.fetch!(opts, :room_id)
-    GenServer.start_link(__MODULE__, opts, name: via_tuple(room_id))
+    name = Keyword.fetch!(opts, :name)
+    GenServer.start_link(__MODULE__, opts, name: via_tuple(name))
   end
 
-  defp via_tuple(room_id) do
-    {:via, Registry, {SocialPomodoro.RoomRegistry.Registry, room_id}}
+  defp via_tuple(name) do
+    {:via, Registry, {SocialPomodoro.RoomRegistry.Registry, name}}
   end
 
   ## Client API
@@ -38,36 +37,36 @@ defmodule SocialPomodoro.Room do
     GenServer.call(pid, :get_state)
   end
 
-  def join(room_id, user_id) do
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+  def join(name, user_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, pid} -> GenServer.call(pid, {:join, user_id})
       error -> error
     end
   end
 
-  def leave(room_id, user_id) do
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+  def leave(name, user_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, pid} -> GenServer.call(pid, {:leave, user_id})
       error -> error
     end
   end
 
-  def start_session(room_id) do
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+  def start_session(name) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, pid} -> GenServer.call(pid, :start_session)
       error -> error
     end
   end
 
-  def add_reaction(room_id, user_id, emoji) do
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+  def add_reaction(name, user_id, emoji) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, pid} -> GenServer.cast(pid, {:add_reaction, user_id, emoji})
       error -> error
     end
   end
 
-  def go_again(room_id, user_id) do
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+  def go_again(name, user_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, pid} -> GenServer.call(pid, {:go_again, user_id})
       error -> error
     end
@@ -77,13 +76,12 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def init(opts) do
-    room_id = Keyword.fetch!(opts, :room_id)
+    name = Keyword.fetch!(opts, :name)
     creator = Keyword.fetch!(opts, :creator)
     duration_minutes = Keyword.fetch!(opts, :duration_minutes)
 
     state = %__MODULE__{
-      room_id: room_id,
-      name: SocialPomodoro.RoomNameGenerator.generate(),
+      name: name,
       creator: creator,
       duration_minutes: duration_minutes,
       status: :waiting,
@@ -185,7 +183,7 @@ defmodule SocialPomodoro.Room do
         [:pomodoro, :session, :started],
         %{count: 1},
         %{
-          room_id: state.room_id,
+          room_name: state.name,
           participant_user_ids: participant_user_ids,
           participant_count: length(state.participants),
           wait_time_seconds: wait_time_seconds
@@ -197,7 +195,7 @@ defmodule SocialPomodoro.Room do
         Phoenix.PubSub.broadcast(
           SocialPomodoro.PubSub,
           "user:#{participant.user_id}",
-          {:session_started, state.room_id}
+          {:session_started, state.name}
         )
       end)
 
@@ -247,7 +245,7 @@ defmodule SocialPomodoro.Room do
           [:pomodoro, :session, :restarted],
           %{count: 1},
           %{
-            room_id: state.room_id,
+            room_name: state.name,
             participant_user_ids: participant_user_ids,
             participant_count: length(new_participants)
           }
@@ -287,7 +285,7 @@ defmodule SocialPomodoro.Room do
       [:pomodoro, :session, :completed],
       %{count: 1},
       %{
-        room_id: state.room_id,
+        room_name: state.name,
         participant_count: length(state.participants),
         duration_minutes: state.duration_minutes
       }
@@ -338,10 +336,10 @@ defmodule SocialPomodoro.Room do
     Phoenix.PubSub.broadcast(
       SocialPomodoro.PubSub,
       "rooms",
-      {:room_removed, state.room_id}
+      {:room_removed, state.name}
     )
 
-    SocialPomodoro.RoomRegistry.remove_room(state.room_id)
+    SocialPomodoro.RoomRegistry.remove_room(state.name)
     :ok
   end
 
@@ -356,7 +354,7 @@ defmodule SocialPomodoro.Room do
 
     Phoenix.PubSub.broadcast(
       SocialPomodoro.PubSub,
-      "room:#{state.room_id}",
+      "room:#{state.name}",
       {:room_state, serialize_state(state)}
     )
   end
@@ -380,7 +378,6 @@ defmodule SocialPomodoro.Room do
     creator_username = SocialPomodoro.UserRegistry.get_username(state.creator) || "Unknown User"
 
     %{
-      room_id: state.room_id,
       name: state.name,
       creator: state.creator,
       creator_username: creator_username,

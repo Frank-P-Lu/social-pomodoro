@@ -17,7 +17,7 @@ defmodule SocialPomodoro.TelemetryHandler do
   """
   def handle_event([:pomodoro, :room, :created], _measurements, metadata, _config) do
     send_analytics("Room Created", %{
-      room_id: metadata[:room_id],
+      room_name: metadata[:room_name],
       creator_user_id: metadata[:user_id],
       duration_minutes: metadata[:duration_minutes]
     })
@@ -25,7 +25,7 @@ defmodule SocialPomodoro.TelemetryHandler do
 
   def handle_event([:pomodoro, :session, :started], _measurements, metadata, _config) do
     send_analytics("Session Started", %{
-      room_id: metadata[:room_id],
+      room_name: metadata[:room_name],
       participant_user_ids: metadata[:participant_user_ids],
       participant_count: metadata[:participant_count],
       wait_time_seconds: metadata[:wait_time_seconds]
@@ -34,7 +34,7 @@ defmodule SocialPomodoro.TelemetryHandler do
 
   def handle_event([:pomodoro, :session, :restarted], _measurements, metadata, _config) do
     send_analytics("Session Restarted", %{
-      room_id: metadata[:room_id],
+      room_name: metadata[:room_name],
       participant_user_ids: metadata[:participant_user_ids],
       participant_count: metadata[:participant_count]
     })
@@ -42,7 +42,7 @@ defmodule SocialPomodoro.TelemetryHandler do
 
   def handle_event([:pomodoro, :session, :completed], _measurements, metadata, _config) do
     send_analytics("Session Completed", %{
-      room_id: metadata[:room_id],
+      room_name: metadata[:room_name],
       participant_count: metadata[:participant_count],
       duration_minutes: metadata[:duration_minutes]
     })

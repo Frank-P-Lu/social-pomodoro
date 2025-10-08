@@ -3,19 +3,19 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   @impl true
   def mount(params, session, socket) do
-    room_id = params["room_id"]
+    name = params["name"]
     user_id = session["user_id"]
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
 
-    case SocialPomodoro.RoomRegistry.get_room(room_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
       {:ok, _pid} ->
         if connected?(socket) do
-          Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "room:#{room_id}")
+          Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "room:#{name}")
           Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
         end
 
         # Get initial room state
-        {:ok, pid} = SocialPomodoro.RoomRegistry.get_room(room_id)
+        {:ok, pid} = SocialPomodoro.RoomRegistry.get_room(name)
         room_state = SocialPomodoro.Room.get_state(pid)
 
         # Check if user is already in the room, if not, try to join
@@ -25,7 +25,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           # User is already in the room, let them in
           socket =
             socket
-            |> assign(:room_id, room_id)
+            |> assign(:name, name)
             |> assign(:room_state, room_state)
             |> assign(:user_id, user_id)
             |> assign(:username, username)
@@ -39,7 +39,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
           socket =
             socket
-            |> assign(:room_id, room_id)
+            |> assign(:name, name)
             |> assign(:room_state, room_state)
             |> assign(:user_id, user_id)
             |> assign(:username, username)
@@ -56,14 +56,14 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   @impl true
   def handle_event("start_session", _params, socket) do
-    SocialPomodoro.Room.start_session(socket.assigns.room_id)
+    SocialPomodoro.Room.start_session(socket.assigns.name)
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("send_reaction", %{"emoji" => emoji}, socket) do
     SocialPomodoro.Room.add_reaction(
-      socket.assigns.room_id,
+      socket.assigns.name,
       socket.assigns.user_id,
       emoji
     )
@@ -73,13 +73,13 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   @impl true
   def handle_event("go_again", _params, socket) do
-    SocialPomodoro.Room.go_again(socket.assigns.room_id, socket.assigns.user_id)
+    SocialPomodoro.Room.go_again(socket.assigns.name, socket.assigns.user_id)
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("leave_room", _params, socket) do
-    SocialPomodoro.Room.leave(socket.assigns.room_id, socket.assigns.user_id)
+    SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     {:noreply, push_navigate(socket, to: ~p"/")}
   end
 

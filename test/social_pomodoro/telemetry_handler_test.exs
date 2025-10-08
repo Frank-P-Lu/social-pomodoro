@@ -12,7 +12,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
             [:pomodoro, :room, :created],
             %{count: 1},
             %{
-              room_id: "test_room_123",
+              room_name: "test_room_123",
               user_id: "user_456",
               duration_minutes: 25
             },
@@ -33,7 +33,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
             [:pomodoro, :session, :started],
             %{count: 1},
             %{
-              room_id: "test_room_123",
+              room_name: "test_room_123",
               participant_user_ids: ["user_456", "user_789", "user_012"],
               participant_count: 3,
               wait_time_seconds: 45
@@ -55,7 +55,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
             [:pomodoro, :session, :restarted],
             %{count: 1},
             %{
-              room_id: "test_room_123",
+              room_name: "test_room_123",
               participant_user_ids: ["user_456", "user_789"],
               participant_count: 2
             },
@@ -76,7 +76,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
             [:pomodoro, :session, :completed],
             %{count: 1},
             %{
-              room_id: "test_room_123",
+              room_name: "test_room_123",
               participant_count: 3,
               duration_minutes: 25
             },
@@ -105,7 +105,7 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
               [:pomodoro, :room, :created],
               %{count: 1},
               %{
-                room_id: "test_room_123",
+                room_name: "test_room_123",
                 user_id: "user_456",
                 duration_minutes: 25
               },
