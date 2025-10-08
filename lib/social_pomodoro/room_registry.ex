@@ -58,12 +58,13 @@ defmodule SocialPomodoro.RoomRegistry do
   @impl true
   def handle_call({:create_room, creator_user_id, duration_minutes}, _from, state) do
     name = SocialPomodoro.RoomNameGenerator.generate()
+    duration_seconds = duration_minutes * 60
 
     {:ok, pid} =
       SocialPomodoro.Room.start_link(
         name: name,
         creator: creator_user_id,
-        duration_minutes: duration_minutes
+        duration_seconds: duration_seconds
       )
 
     :ets.insert(@table_name, {name, pid})

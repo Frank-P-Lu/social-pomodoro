@@ -8,24 +8,14 @@ defmodule SocialPomodoro.RoomTest do
   end
 
   # Helper to create a room with custom options for testing
-  # Use duration_seconds option to specify duration in seconds for testing
-  defp create_test_room(creator_id, opts \\ []) do
+  defp create_test_room(creator_id, opts) do
     name = SocialPomodoro.RoomNameGenerator.generate()
-
-    # Convert duration_seconds to duration_minutes for the init opts
-    duration_minutes =
-      case Keyword.get(opts, :duration_seconds) do
-        # default 25 minutes
-        nil -> 25
-        seconds -> seconds / 60.0
-      end
 
     room_opts =
       [
         name: name,
-        creator: creator_id,
-        duration_minutes: duration_minutes
-      ] ++ Keyword.delete(opts, :duration_seconds)
+        creator: creator_id
+      ] ++ opts
 
     {:ok, pid} = Room.start_link(room_opts)
 
@@ -33,6 +23,13 @@ defmodule SocialPomodoro.RoomTest do
     :ets.insert(:room_registry, {name, pid})
 
     {:ok, name, pid}
+  end
+
+  # Helper to manually tick the timer (for fast tests)
+  defp tick(pid) do
+    send(pid, :tick)
+    # Give it a moment to process
+    Process.sleep(10)
   end
 
   describe "room name generation" do
@@ -181,15 +178,11 @@ defmodule SocialPomodoro.RoomTest do
     @tag :sync
     test "room terminates when break timer completes" do
       # Create a room with 1 second session and 1 second break
-      # Need 2 ticks to reach break (1->0, then 0->break), then 2 ticks for break (1->0, then 0->terminate)
+      # Use manual ticks instead of waiting for real time
       creator_id = "user1_#{System.unique_integer([:positive])}"
 
       {:ok, room_name, room_pid} =
-        create_test_room(creator_id,
-          duration_seconds: 1,
-          tick_interval: 1000,
-          break_duration_seconds: 1
-        )
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
 
       # Verify room is alive
       assert Process.alive?(room_pid)
@@ -202,8 +195,11 @@ defmodule SocialPomodoro.RoomTest do
       assert state.status == :active
       assert state.seconds_remaining == 1
 
-      # Wait for session to complete (2 ticks: countdown + transition)
-      Process.sleep(2150)
+      # Tick to countdown (1 -> 0)
+      tick(room_pid)
+
+      # Tick to transition to break (0, :active -> :break)
+      tick(room_pid)
 
       # Verify room transitioned to break
       if Process.alive?(room_pid) do
@@ -212,8 +208,11 @@ defmodule SocialPomodoro.RoomTest do
         assert state.seconds_remaining == 1
       end
 
-      # Wait for break to complete (2 ticks: countdown + terminate)
-      Process.sleep(2150)
+      # Tick to countdown (1 -> 0)
+      tick(room_pid)
+
+      # Tick to terminate (0, :break -> terminate)
+      tick(room_pid)
 
       # Verify room process has terminated
       refute Process.alive?(room_pid)
@@ -222,28 +221,28 @@ defmodule SocialPomodoro.RoomTest do
     @tag :sync
     test "room terminates even when empty during break" do
       # Create a room with 1 second session, 2 seconds break
-      # Need 2 ticks to reach break (1->0, then 0->break), then 3 ticks for break (2->1->0, then 0->terminate)
+      # Use manual ticks for fast testing
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
       {:ok, room_name, room_pid} =
-        create_test_room(creator_id,
-          duration_seconds: 1,
-          tick_interval: 1000,
-          break_duration_seconds: 2
-        )
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 2)
 
       # Add another participant and start session
       assert :ok = Room.join(room_name, participant_id)
       assert :ok = Room.start_session(room_name)
 
-      # Wait for session to reach break (2 ticks: countdown to 0, then transition to break)
-      Process.sleep(2150)
+      # Tick to countdown (1 -> 0)
+      tick(room_pid)
+
+      # Tick to transition to break (0, :active -> :break)
+      tick(room_pid)
 
       # Verify we're in break
       if Process.alive?(room_pid) do
         state = Room.get_state(room_pid)
         assert state.status == :break
+        assert state.seconds_remaining == 2
 
         # Both users leave during break
         assert :ok = Room.leave(room_name, creator_id)
@@ -254,8 +253,13 @@ defmodule SocialPomodoro.RoomTest do
         state = Room.get_state(room_pid)
         assert Enum.empty?(state.participants)
 
-        # Wait for break to complete (3 ticks: 2->1, 1->0, 0->terminate)
-        Process.sleep(3150)
+        # Tick through break: 2->1, 1->0, then terminate
+        # 2 -> 1
+        tick(room_pid)
+        # 1 -> 0
+        tick(room_pid)
+        # 0, :break -> terminate
+        tick(room_pid)
 
         # Room should terminate even though it was empty
         refute Process.alive?(room_pid)

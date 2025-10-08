@@ -79,14 +79,14 @@ defmodule SocialPomodoro.Room do
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
     creator = Keyword.fetch!(opts, :creator)
-    duration_minutes = Keyword.fetch!(opts, :duration_minutes)
+    duration_seconds = Keyword.fetch!(opts, :duration_seconds)
     tick_interval = Keyword.get(opts, :tick_interval, @tick_interval)
     break_duration_seconds = Keyword.get(opts, :break_duration_seconds, 5 * 60)
 
     state = %__MODULE__{
       name: name,
       creator: creator,
-      duration_seconds: trunc(duration_minutes * 60),
+      duration_seconds: duration_seconds,
       status: :waiting,
       participants: [%{user_id: creator, ready_for_next: false}],
       original_participants: [],
