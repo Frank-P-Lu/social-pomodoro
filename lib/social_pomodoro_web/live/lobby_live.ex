@@ -1,5 +1,6 @@
 defmodule SocialPomodoroWeb.LobbyLive do
   use SocialPomodoroWeb, :live_view
+  require Logger
   alias SocialPomodoroWeb.Icons
 
   @impl true
@@ -29,7 +30,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
       |> assign(:my_room_id, my_room_id)
-      |> assign(:left_room_ids, [])
 
     # Handle direct room link (/at/:room_name) - only during connected mount
     socket =
@@ -48,16 +48,17 @@ defmodule SocialPomodoroWeb.LobbyLive do
     case SocialPomodoro.RoomRegistry.find_room_by_name(room_name) do
       {:ok, room_id} ->
         # Room exists, try to join
-        case SocialPomodoro.Room.join(room_id, user_id) do
-          :ok ->
+        case join_room_and_update_state(socket, room_id, user_id) do
+          {:ok, socket} ->
             display_name = String.replace(room_name, "-", " ")
 
             socket
-            |> assign(:my_room_id, room_id)
             |> put_flash(:info, "Joined #{display_name}")
             |> push_navigate(to: ~p"/")
 
-          {:error, _reason} ->
+          {:error, socket} ->
+            Logger.error("Failed to join room #{room_name}")
+
             socket
             |> put_flash(:error, "Could not join room")
             |> push_navigate(to: ~p"/")
@@ -67,6 +68,23 @@ defmodule SocialPomodoroWeb.LobbyLive do
         socket
         |> put_flash(:error, "This room no longer exists")
         |> push_navigate(to: ~p"/")
+    end
+  end
+
+  defp join_room_and_update_state(socket, room_id, user_id) do
+    case SocialPomodoro.Room.join(room_id, user_id) do
+      :ok ->
+        Logger.info("User #{user_id} joined room #{room_id}")
+
+        socket =
+          socket
+          |> assign(:my_room_id, room_id)
+
+        {:ok, socket}
+
+      {:error, reason} ->
+        Logger.error("User #{user_id} failed to join room #{room_id}: #{inspect(reason)}")
+        {:error, socket}
     end
   end
 
@@ -109,20 +127,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("join_room", %{"room-id" => room_id}, socket) do
-    case SocialPomodoro.Room.join(room_id, socket.assigns.user_id) do
-      :ok ->
-        # Stay in lobby, just update state to show we're in the room
-        # Remove from left_room_ids if rejoining
-        left_room_ids = Enum.reject(socket.assigns.left_room_ids, &(&1 == room_id))
-
-        socket =
-          socket
-          |> assign(:my_room_id, room_id)
-          |> assign(:left_room_ids, left_room_ids)
-
+    case join_room_and_update_state(socket, room_id, socket.assigns.user_id) do
+      {:ok, socket} ->
         {:noreply, socket}
 
-      {:error, _reason} ->
+      {:error, socket} ->
         {:noreply, put_flash(socket, :error, "Could not join room")}
     end
   end
@@ -136,7 +145,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
       socket =
         socket
         |> assign(:my_room_id, nil)
-        |> assign(:left_room_ids, [room_id | socket.assigns.left_room_ids])
 
       {:noreply, socket}
     else
@@ -256,7 +264,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
                       room={room}
                       user_id={@user_id}
                       my_room_id={@my_room_id}
-                      left_room_ids={@left_room_ids}
                     />
                   <% end %>
                 </div>
@@ -271,6 +278,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
       <:trigger></:trigger>
     </.feedback_modal>
     """
+  end
+
+  defp can_rejoin?(room, user_id) do
+    # User can rejoin if they're an original participant but not currently in the room
+    is_original = Enum.member?(room.original_participants, user_id)
+    is_currently_in_room = Enum.any?(room.participants, &(&1.user_id == user_id))
+
+    is_original and not is_currently_in_room
   end
 
   defp room_card(assigns) do
@@ -381,7 +396,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 </button>
               <% end %>
             <% else %>
-              <%= if Enum.member?(@left_room_ids, @room.room_id) do %>
+              <%= if can_rejoin?(@room, @user_id) do %>
                 <button
                   phx-click="join_room"
                   phx-value-room-id={@room.room_id}

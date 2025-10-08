@@ -15,6 +15,7 @@ defmodule SocialPomodoro.Room do
     :duration_minutes,
     :status,
     :participants,
+    :original_participants,
     :timer_ref,
     :seconds_remaining,
     :reactions,
@@ -87,6 +88,7 @@ defmodule SocialPomodoro.Room do
       duration_minutes: duration_minutes,
       status: :waiting,
       participants: [%{user_id: creator, ready_for_next: false}],
+      original_participants: [],
       timer_ref: nil,
       seconds_remaining: nil,
       reactions: [],
@@ -110,14 +112,20 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def handle_call({:join, user_id}, _from, state) do
-    cond do
-      state.status != :waiting ->
-        {:reply, {:error, :session_in_progress}, state}
+    is_already_participant = Enum.any?(state.participants, &(&1.user_id == user_id))
+    is_original_participant = Enum.member?(state.original_participants, user_id)
+    is_session_in_progress = state.status in [:active, :break]
 
-      Enum.any?(state.participants, &(&1.user_id == user_id)) ->
+    cond do
+      is_already_participant ->
         {:reply, {:error, :already_joined}, state}
 
+      is_session_in_progress and not is_original_participant ->
+        # Session in progress and user was not an original participant - can't join
+        {:reply, {:error, :session_in_progress}, state}
+
       true ->
+        # Either waiting room, or rejoining as an original participant
         new_participant = %{user_id: user_id, ready_for_next: false}
         new_state = %{state | participants: [new_participant | state.participants]}
         broadcast_room_update(new_state)
@@ -158,12 +166,16 @@ defmodule SocialPomodoro.Room do
       # Calculate wait time (time between room creation and session start)
       wait_time_seconds = System.system_time(:second) - state.created_at
 
+      # Capture original participants (who were in the room when it started)
+      original_participant_ids = Enum.map(state.participants, & &1.user_id)
+
       new_state = %{
         state
         | status: :active,
           seconds_remaining: seconds,
           timer_ref: timer_ref,
-          reactions: []
+          reactions: [],
+          original_participants: original_participant_ids
       }
 
       # Emit telemetry event for session start
@@ -375,6 +387,7 @@ defmodule SocialPomodoro.Room do
       duration_minutes: state.duration_minutes,
       status: state.status,
       participants: participants_with_usernames,
+      original_participants: state.original_participants,
       seconds_remaining: state.seconds_remaining,
       # Latest 50 reactions
       reactions: reactions_with_usernames |> Enum.take(50) |> Enum.reverse(),

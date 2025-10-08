@@ -27,9 +27,9 @@ defmodule SocialPomodoro.RoomTest do
       assert is_binary(room1_state.name)
       assert is_binary(room2_state.name)
 
-      # Names should follow the format: "Adjective Noun Noun"
-      assert String.split(room1_state.name) |> length() == 3
-      assert String.split(room2_state.name) |> length() == 3
+      # Names should follow the format: "Adjective-Noun-Noun"
+      assert String.split(room1_state.name, "-") |> length() == 3
+      assert String.split(room2_state.name, "-") |> length() == 3
     end
   end
 

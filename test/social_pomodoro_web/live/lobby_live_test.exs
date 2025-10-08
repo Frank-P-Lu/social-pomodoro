@@ -447,7 +447,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User B leaves the room
       sessionB
-      |> element("button", "Leave Room")
+      |> element("button", "Leave Session")
       |> render_click()
 
       # Wait for PubSub to propagate
@@ -465,6 +465,21 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Should show "Rejoin" button (not "Join")
       assert htmlB2 =~ "Rejoin"
       refute htmlB2 =~ ~r/<button[^>]*phx-value-room-id="#{room_id}"[^>]*>\s*Join\s*<\/button>/
+
+      # User B clicks Rejoin button
+      lobbyB2
+      |> element("button[phx-value-room-id='#{room_id}']", "Rejoin")
+      |> render_click()
+
+      # Wait for PubSub
+      Process.sleep(50)
+
+      # User B should be able to navigate to the room screen successfully
+      {:ok, _sessionB2, htmlSession} = live(connB, "/room/#{room_id}")
+
+      # Should see active session
+      assert htmlSession =~ "Focus time remaining"
+      assert htmlSession =~ "Leave Session"
     end
 
     test "rejoin button only appears for rooms the user left" do
