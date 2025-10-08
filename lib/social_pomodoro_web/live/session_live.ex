@@ -275,9 +275,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="text-6xl mb-6">🎉</div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
         <p class="text-xl mb-8">
-          You just focused for {@room_state.duration_minutes} minutes with {length(
-            @room_state.participants
-          )} {if length(@room_state.participants) == 1, do: "person", else: "people"}!
+          {completion_message(@room_state.duration_minutes, length(@room_state.participants))}
         </p>
 
         <div class="text-5xl font-bold text-primary mb-2">
@@ -341,6 +339,24 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp format_time(_), do: "0:00"
+
+  defp completion_message(duration_minutes, participant_count) do
+    cond do
+      participant_count == 1 ->
+        # Random message for solo sessions
+        Enum.random([
+          "You focused solo!",
+          "Flying solo today - nice work!",
+          "Solo focus session complete!",
+          "You stayed focused!"
+        ])
+
+      true ->
+        # Message for group sessions
+        other_count = participant_count - 1
+        "You focused with #{other_count} #{if other_count == 1, do: "other person", else: "other people"}!"
+    end
+  end
 
   defp redirect_view(assigns) do
     ~H"""
