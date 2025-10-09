@@ -291,6 +291,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
 
+    <!-- Attribution Footer -->
+    <div class="text-center py-4 text-xs opacity-50">
+      Emoji graphics by <a href="https://openmoji.org" target="_blank" class="link">OpenMoji</a>
+      (CC BY-SA 4.0)
+    </div>
+
     <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
@@ -345,10 +351,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <div class="flex items-center justify-center min-h-16">
             <div class="avatar-group -space-x-6">
               <%= for participant <- @room.participants do %>
-                <.participant_avatar
+                <.avatar
                   user_id={participant.user_id}
                   username={participant.username}
-                  current_user_id={@user_id}
                   size="w-10"
                 />
               <% end %>

@@ -1,5 +1,6 @@
 defmodule SocialPomodoroWeb.SessionLive do
   use SocialPomodoroWeb, :live_view
+  alias SocialPomodoroWeb.Icons
 
   @impl true
   def mount(params, session, socket) do
@@ -149,7 +150,13 @@ defmodule SocialPomodoroWeb.SessionLive do
   defp waiting_view(assigns) do
     ~H"""
     <div class="card bg-base-200">
-      <div class="card-body text-center">
+      <div class="card-body text-center relative">
+        <!-- Leave Button -->
+        <button phx-click="leave_room" class="btn btn-ghost btn-sm absolute top-4 left-4 text-error">
+          <Icons.leave class="w-4 h-4 fill-error" />
+          <span class="text-error">Leave</span>
+        </button>
+
         <h1 class="card-title text-3xl justify-center mb-8">Waiting to Start</h1>
         
     <!-- Participants -->
@@ -185,10 +192,6 @@ defmodule SocialPomodoroWeb.SessionLive do
             <p class="opacity-50">Waiting for {@room_state.creator_username} to start...</p>
           <% end %>
         </div>
-
-        <button phx-click="leave_room" class="link link-hover mt-4">
-          Leave Room
-        </button>
       </div>
     </div>
     """
@@ -202,104 +205,112 @@ defmodule SocialPomodoroWeb.SessionLive do
     assigns = assign(assigns, :current_participant, current_participant)
 
     ~H"""
-    <div class="card bg-base-200">
-      <div class="card-body text-center">
-        <!-- Timer Display -->
-        <div
-          id="timer-display"
-          class="text-5xl font-bold text-primary mb-2"
-          phx-hook="Timer"
-          data-seconds-remaining={@room_state.seconds_remaining}
-        >
-          {format_time(@room_state.seconds_remaining)}
-        </div>
-        <p class="text-content mb-8">Focus time remaining</p>
-        
-    <!-- What are you working on? -->
-        <%= if is_nil(@current_participant.working_on) do %>
-          <div class="mb-8">
-            <form phx-submit="set_working_on" class="flex gap-2 justify-center">
-              <input
-                type="text"
-                name="text"
-                placeholder="What are you working on?"
-                class="input input-bordered w-full max-w-md"
-                required
-              />
-              <button type="submit" class="btn btn-primary">
-                Submit
-              </button>
-            </form>
-          </div>
-        <% end %>
-        
+    <div>
+      <div class="card bg-base-200">
+        <div class="card-body text-center">
+          <!-- Timer Display -->
+          <.timer_display
+            id="timer-display"
+            seconds_remaining={@room_state.seconds_remaining}
+            label="Focus time remaining"
+          />
+          
     <!-- Participants with status and working_on -->
-        <div class="flex flex-col gap-4 mb-8">
-          <%= for participant <- @room_state.participants do %>
-            <div class="flex items-center gap-2 justify-center">
-              <div class="flex flex-col items-center gap-2">
+          <div class="flex flex-wrap justify-center gap-6 mb-8">
+            <%= for participant <- @room_state.participants do %>
+              <div class="flex flex-col items-center gap-2 max-w-xs">
                 <div class="relative">
                   <.participant_avatar
                     user_id={participant.user_id}
                     username={participant.username}
                     current_user_id={@user_id}
-                    size="w-12"
+                    size="w-16"
                   />
                   <%= if participant.status_emoji do %>
-                    <span class="absolute -bottom-2 -right-2 text-xl bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
-                      {participant.status_emoji}
+                    <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
+                      <img
+                        src={emoji_to_openmoji(participant.status_emoji)}
+                        class="w-8 h-8"
+                        alt={participant.status_emoji}
+                      />
                     </span>
                   <% end %>
                 </div>
-                <p class="font-semibold text-center">{participant.username}</p>
+                <p class="font-semibold text-center text-sm">{participant.username}</p>
+                <%= if participant.working_on do %>
+                  <p class="text-xs opacity-70 text-center break-words w-full">
+                    {participant.working_on}
+                  </p>
+                <% end %>
               </div>
-              <%= if participant.working_on do %>
-                <p
-                  class="text-sm opacity-70 max-w-xs"
-                  style="transform: rotate(-45deg); transform-origin: left center;"
-                >
-                  {participant.working_on}
-                </p>
-              <% end %>
+            <% end %>
+          </div>
+          
+    <!-- Status Emoji Buttons -->
+          <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
+          <div class="join mb-8 mx-auto">
+            <button
+              phx-click="set_status"
+              phx-value-emoji="1F636"
+              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F636", do: "btn-active"}"}
+            >
+              <img src="/images/emojis/1F636.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😶" />
+            </button>
+            <button
+              phx-click="set_status"
+              phx-value-emoji="1FAE0"
+              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1FAE0", do: "btn-active"}"}
+            >
+              <img src="/images/emojis/1FAE0.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🫠" />
+            </button>
+            <button
+              phx-click="set_status"
+              phx-value-emoji="1F914"
+              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F914", do: "btn-active"}"}
+            >
+              <img src="/images/emojis/1F914.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🤔" />
+            </button>
+            <button
+              phx-click="set_status"
+              phx-value-emoji="1F604"
+              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F604", do: "btn-active"}"}
+            >
+              <img src="/images/emojis/1F604.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😄" />
+            </button>
+            <button
+              phx-click="set_status"
+              phx-value-emoji="1F60E"
+              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F60E", do: "btn-active"}"}
+            >
+              <img src="/images/emojis/1F60E.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😎" />
+            </button>
+          </div>
+          
+    <!-- What are you working on? -->
+          <%= if is_nil(@current_participant.working_on) do %>
+            <div class="mb-8">
+              <form phx-submit="set_working_on" class="flex gap-2 justify-center">
+                <input
+                  type="text"
+                  name="text"
+                  placeholder="What are you working on?"
+                  class="input input-bordered w-full max-w-md"
+                  required
+                />
+                <button type="submit" class="btn btn-square btn-primary">
+                  <Icons.submit class="w-6 h-6 fill-current" />
+                </button>
+              </form>
             </div>
           <% end %>
         </div>
-        
-    <!-- Status Emoji Buttons -->
-        <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
-        <div class="join mb-8">
-          <button
-            phx-click="set_status"
-            phx-value-emoji="🔥"
-            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "🔥", do: "btn-active"}"}
-          >
-            🔥
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="💪"
-            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "💪", do: "btn-active"}"}
-          >
-            💪
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="⚡"
-            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "⚡", do: "btn-active"}"}
-          >
-            ⚡
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="🎯"
-            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "🎯", do: "btn-active"}"}
-          >
-            🎯
-          </button>
-        </div>
-
-        <button phx-click="leave_room" class="link link-hover text-sm mt-6">
-          Leave Session
+      </div>
+      
+    <!-- Leave Button -->
+      <div class="flex justify-center mt-4">
+        <button phx-click="leave_room" class="btn btn-ghost btn-sm text-error">
+          <Icons.leave class="w-4 h-4 fill-error" />
+          <span class="text-error">Leave</span>
         </button>
       </div>
     </div>
@@ -316,15 +327,11 @@ defmodule SocialPomodoroWeb.SessionLive do
           {completion_message(@room_state.duration_minutes, length(@room_state.participants))}
         </p>
 
-        <div
+        <.timer_display
           id="break-timer-display"
-          class="text-5xl font-bold text-primary mb-2"
-          phx-hook="Timer"
-          data-seconds-remaining={@room_state.seconds_remaining}
-        >
-          {format_time(@room_state.seconds_remaining)}
-        </div>
-        <p class="text-lg opacity-70 mb-12">Break time remaining</p>
+          seconds_remaining={@room_state.seconds_remaining}
+          label="Break time remaining"
+        />
         
     <!-- Participants with ready status -->
         <div class="flex justify-center gap-4 mb-8">
@@ -356,9 +363,10 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
           <button
             phx-click="leave_room"
-            class="btn btn-lg"
+            class="btn btn-lg text-error"
           >
-            Return to Lobby
+            <Icons.leave class="w-5 h-5 fill-error" />
+            <span class="text-error">Return to Lobby</span>
           </button>
         </div>
 
@@ -446,5 +454,29 @@ defmodule SocialPomodoroWeb.SessionLive do
       }
     />
     """
+  end
+
+  attr :id, :string, required: true
+  attr :seconds_remaining, :integer, required: true
+  attr :label, :string, required: true
+
+  defp timer_display(assigns) do
+    ~H"""
+    <div>
+      <div
+        id={@id}
+        class="text-5xl font-bold text-primary mb-2"
+        phx-hook="Timer"
+        data-seconds-remaining={@seconds_remaining}
+      >
+        {format_time(@seconds_remaining)}
+      </div>
+      <p class="text-content mb-8">{@label}</p>
+    </div>
+    """
+  end
+
+  defp emoji_to_openmoji(unicode_code) do
+    "/images/emojis/#{unicode_code}.svg"
   end
 end
