@@ -89,6 +89,48 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
     end
   end
 
+  describe "handle_event/4 for user rejoined" do
+    test "logs user rejoined event when webhook not configured" do
+      log =
+        capture_log(fn ->
+          TelemetryHandler.handle_event(
+            [:pomodoro, :user, :rejoined],
+            %{count: 1},
+            %{
+              room_name: "test_room_123",
+              user_id: "user_456",
+              room_status: :active
+            },
+            nil
+          )
+        end)
+
+      assert log =~ "Discord analytics webhook URL not configured"
+      assert log =~ "User Rejoined"
+    end
+  end
+
+  describe "handle_event/4 for working on set" do
+    test "logs working on set event when webhook not configured" do
+      log =
+        capture_log(fn ->
+          TelemetryHandler.handle_event(
+            [:pomodoro, :user, :set_working_on],
+            %{count: 1},
+            %{
+              room_name: "test_room_123",
+              user_id: "user_456",
+              text_length: 32
+            },
+            nil
+          )
+        end)
+
+      assert log =~ "Discord analytics webhook URL not configured"
+      assert log =~ "Working On Set"
+    end
+  end
+
   describe "non-blocking behavior" do
     test "handle_event returns immediately even with webhook configured" do
       # Temporarily configure a webhook URL (won't actually send)

@@ -341,7 +341,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <div class="flex items-center justify-center min-h-16">
             <div class="avatar-group -space-x-6">
               <%= for participant <- @room.participants do %>
-                <.avatar user_id={participant.user_id} username={participant.username} size="w-10" />
+                <.participant_avatar
+                  user_id={participant.user_id}
+                  username={participant.username}
+                  current_user_id={@user_id}
+                  size="w-10"
+                />
               <% end %>
             </div>
           </div>
@@ -436,7 +441,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="pb-4 border-b border-base-300">
           <!-- Avatar + username -->
           <div class="flex gap-2">
-            <.avatar user_id={@user_id} username={@username} size="w-12" />
+            <.participant_avatar
+              user_id={@user_id}
+              username={@username}
+              current_user_id={@user_id}
+              size="w-12"
+            />
             <div>
               <span class="label label-text">Look, it's you!</span>
 
@@ -564,5 +574,22 @@ defmodule SocialPomodoroWeb.LobbyLive do
     minutes = div(seconds, 60)
     secs = rem(seconds, 60)
     "#{minutes}:#{String.pad_leading(Integer.to_string(secs), 2, "0")}"
+  end
+
+  defp participant_avatar(assigns) do
+    ~H"""
+    <.avatar
+      user_id={@user_id}
+      username={@username}
+      size={assigns[:size] || "w-16"}
+      class={
+        if @user_id == @current_user_id do
+          "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+        else
+          ""
+        end
+      }
+    />
+    """
   end
 end

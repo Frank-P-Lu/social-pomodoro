@@ -139,6 +139,20 @@ defmodule SocialPomodoro.Room do
         # Either waiting room, or rejoining as an original participant
         new_participant = %{user_id: user_id, ready_for_next: false}
         new_state = %{state | participants: [new_participant | state.participants]}
+
+        # Track rejoin analytics if this is a rejoin during an active session
+        if is_session_in_progress and is_original_participant do
+          :telemetry.execute(
+            [:pomodoro, :user, :rejoined],
+            %{count: 1},
+            %{
+              room_name: state.name,
+              user_id: user_id,
+              room_status: state.status
+            }
+          )
+        end
+
         broadcast_room_update(new_state)
         {:reply, :ok, new_state}
     end
@@ -277,6 +291,18 @@ defmodule SocialPomodoro.Room do
     if state.status == :active do
       new_working_on = Map.put(state.working_on, user_id, text)
       new_state = %{state | working_on: new_working_on}
+
+      # Track working_on analytics
+      :telemetry.execute(
+        [:pomodoro, :user, :set_working_on],
+        %{count: 1},
+        %{
+          room_name: state.name,
+          user_id: user_id,
+          text_length: String.length(text)
+        }
+      )
+
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else

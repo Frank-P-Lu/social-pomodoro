@@ -129,6 +129,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           <.redirect_view countdown={@redirect_countdown} />
         <% else %>
           <%= if @room_state.status == :waiting do %>
+            <%!-- TODO: remove waiting view --%>
             <.waiting_view room_state={@room_state} user_id={@user_id} />
           <% end %>
 
@@ -155,7 +156,11 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="flex justify-center gap-4 mb-8">
           <%= for participant <- @room_state.participants do %>
             <div class="text-center">
-              <.avatar user_id={participant.user_id} username={participant.username} />
+              <.participant_avatar
+                user_id={participant.user_id}
+                username={participant.username}
+                current_user_id={@user_id}
+              />
               <p class="text-sm mt-2">{participant.username}</p>
             </div>
           <% end %>
@@ -234,11 +239,11 @@ defmodule SocialPomodoroWeb.SessionLive do
             <div class="flex items-center gap-2 justify-center">
               <div class="flex flex-col items-center gap-2">
                 <div class="relative">
-                  <.avatar
+                  <.participant_avatar
                     user_id={participant.user_id}
                     username={participant.username}
+                    current_user_id={@user_id}
                     size="w-12"
-                    class="border-2 border-primary"
                   />
                   <%= if participant.status_emoji do %>
                     <span class="absolute -bottom-2 -right-2 text-xl bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
@@ -329,7 +334,11 @@ defmodule SocialPomodoroWeb.SessionLive do
                 <%= if participant.ready_for_next do %>
                   <span class="indicator-item badge badge-success badge-sm">✓</span>
                 <% end %>
-                <.avatar user_id={participant.user_id} username={participant.username} />
+                <.participant_avatar
+                  user_id={participant.user_id}
+                  username={participant.username}
+                  current_user_id={@user_id}
+                />
               </div>
               <%= if participant.ready_for_next do %>
                 <p class="text-xs text-success font-semibold mt-1">Ready!</p>
@@ -390,6 +399,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     end
   end
 
+  # TODO: remove this
   defp redirect_view(assigns) do
     ~H"""
     <div class="card bg-base-200">
@@ -413,6 +423,23 @@ defmodule SocialPomodoroWeb.SessionLive do
         </div>
       </div>
     </div>
+    """
+  end
+
+  defp participant_avatar(assigns) do
+    ~H"""
+    <.avatar
+      user_id={@user_id}
+      username={@username}
+      size={assigns[:size] || "w-16"}
+      class={
+        if @user_id == @current_user_id do
+          "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+        else
+          ""
+        end
+      }
+    />
     """
   end
 end

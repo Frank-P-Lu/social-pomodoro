@@ -499,6 +499,112 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
+  describe "telemetry events" do
+    test "emits telemetry event when user rejoins during active session" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, _room_pid} = RoomRegistry.get_room(room_name)
+
+      # Join another user
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session (locks in original participants)
+      assert :ok = Room.start_session(room_name)
+
+      # Participant leaves
+      assert :ok = Room.leave(room_name, participant_id)
+
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-rejoin",
+        [:pomodoro, :user, :rejoined],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Participant rejoins (should trigger telemetry)
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Assert telemetry event was emitted
+      assert_receive {:telemetry_event, [:pomodoro, :user, :rejoined], %{count: 1}, metadata}
+      assert metadata.room_name == room_name
+      assert metadata.user_id == participant_id
+      assert metadata.room_status == :active
+
+      # Clean up
+      :telemetry.detach("test-rejoin")
+    end
+
+    test "emits telemetry event when working_on is set" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-working-on",
+        [:pomodoro, :user, :set_working_on],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Set working_on (should trigger telemetry)
+      working_on_text = "Building cool features"
+      assert :ok = Room.set_working_on(room_name, creator_id, working_on_text)
+
+      # Assert telemetry event was emitted
+      assert_receive {:telemetry_event, [:pomodoro, :user, :set_working_on], %{count: 1},
+                      metadata}
+
+      assert metadata.room_name == room_name
+      assert metadata.user_id == creator_id
+      assert metadata.text_length == String.length(working_on_text)
+
+      # Clean up
+      :telemetry.detach("test-working-on")
+    end
+
+    test "does not emit rejoin telemetry when user first joins" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-first-join",
+        [:pomodoro, :user, :rejoined],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # First join (should NOT trigger rejoin telemetry)
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Assert no telemetry event was emitted
+      refute_receive {:telemetry_event, _, _, _}, 100
+
+      # Clean up
+      :telemetry.detach("test-first-join")
+    end
+  end
+
   describe "empty room filtering" do
     test "empty rooms are hidden from non-original participants before session starts" do
       # Setup: Create a room with a creator

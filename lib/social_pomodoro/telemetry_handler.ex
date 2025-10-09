@@ -48,6 +48,22 @@ defmodule SocialPomodoro.TelemetryHandler do
     })
   end
 
+  def handle_event([:pomodoro, :user, :rejoined], _measurements, metadata, _config) do
+    send_analytics("User Rejoined", %{
+      room_name: metadata[:room_name],
+      user_id: metadata[:user_id],
+      room_status: metadata[:room_status]
+    })
+  end
+
+  def handle_event([:pomodoro, :user, :set_working_on], _measurements, metadata, _config) do
+    send_analytics("Working On Set", %{
+      room_name: metadata[:room_name],
+      user_id: metadata[:user_id],
+      text_length: metadata[:text_length]
+    })
+  end
+
   defp send_analytics(event_type, data) do
     webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
 
