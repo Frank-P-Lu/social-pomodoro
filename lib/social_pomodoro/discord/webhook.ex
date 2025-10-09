@@ -19,21 +19,35 @@ defmodule SocialPomodoro.Discord.Webhook do
   """
   def send_feedback(message, email \\ nil, username \\ nil) do
     # Only send feedback in production
-    unless Mix.env() == :prod do
-      {:ok, :skipped_non_prod}
-    else
+    if Mix.env() == :prod do
       webhook_url = Application.get_env(:social_pomodoro, :discord_feedback_webhook_url)
+      payload = build_feedback_payload(message, email, username)
+      send(webhook_url, payload, "Feedback")
+    else
+      {:ok, :skipped_non_prod}
+    end
+  end
 
-      Logger.debug("Feedback webhook URL: #{inspect(webhook_url)}")
+  @doc """
+  Sends an analytics event to Discord.
 
-      if is_nil(webhook_url) or webhook_url == "" do
-        Logger.warning("Discord feedback webhook URL not configured. Feedback not sent.")
-        {:error, :webhook_not_configured}
-      else
-        Logger.info("Sending feedback to Discord")
-        payload = build_feedback_payload(message, email, username)
-        send_webhook(webhook_url, payload)
-      end
+  ## Parameters
+    - event_type: The type of analytics event
+    - data: Map of event data to include
+
+  ## Returns
+    - :ok (always returns ok, errors are logged)
+  """
+  def send_analytics(event_type, data) do
+    # Only send analytics in production
+    if Mix.env() == :prod do
+      webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
+      payload = build_analytics_payload(event_type, data)
+      # Send asynchronously to avoid blocking the caller
+      Task.start(fn -> send(webhook_url, payload, "Analytics") end)
+      :ok
+    else
+      :ok
     end
   end
 
@@ -58,22 +72,76 @@ defmodule SocialPomodoro.Discord.Webhook do
     }
   end
 
-  defp send_webhook(url, payload) do
-    case Req.post(url, json: payload) do
-      {:ok, %Req.Response{status: status}} when status in 200..299 ->
-        Logger.info("Feedback sent to Discord successfully (status: #{status})")
-        {:ok, :sent}
+  defp build_analytics_payload(event_type, data) do
+    formatted_data =
+      data
+      |> Enum.map(fn {key, value} -> "**#{format_key(key)}:** #{format_value(key, value)}" end)
+      |> Enum.join("\n")
 
-      {:ok, %Req.Response{status: status, body: body}} ->
-        Logger.error(
-          "Failed to send feedback to Discord. Status: #{status}, Body: #{inspect(body)}"
-        )
+    content = """
+    **📊 Analytics Event: #{event_type}**
+    #{formatted_data}
+    _Timestamp: #{DateTime.utc_now() |> DateTime.to_string()}_
+    """
 
-        {:error, :request_failed}
+    %{
+      content: content,
+      username: "Social Pomodoro Analytics"
+    }
+  end
 
-      {:error, reason} ->
-        Logger.error("Failed to send feedback to Discord: #{inspect(reason)}")
-        {:error, reason}
+  defp format_key(key) do
+    key
+    |> Atom.to_string()
+    |> String.split("_")
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
+  end
+
+  defp format_value(:wait_time_seconds, seconds) when is_integer(seconds) do
+    minutes = div(seconds, 60)
+    remaining_seconds = rem(seconds, 60)
+
+    cond do
+      minutes > 0 and remaining_seconds > 0 ->
+        "#{minutes}m #{remaining_seconds}s"
+
+      minutes > 0 ->
+        "#{minutes}m"
+
+      true ->
+        "#{remaining_seconds}s"
+    end
+  end
+
+  defp format_value(_key, value), do: inspect(value)
+
+  defp send(url, payload, type) do
+    Logger.debug("#{type} webhook URL: #{inspect(url)}")
+
+    if is_nil(url) or url == "" do
+      Logger.warning("Discord #{type} webhook URL not configured. Message not sent.")
+      {:error, :webhook_not_configured}
+    else
+      Logger.info("Sending #{type} to Discord")
+      Logger.debug("Payload: #{inspect(payload)}")
+
+      case Req.post(url, json: payload) do
+        {:ok, %Req.Response{status: status}} when status in 200..299 ->
+          Logger.info("#{type} sent to Discord successfully (status: #{status})")
+          {:ok, :sent}
+
+        {:ok, %Req.Response{status: status, body: body}} ->
+          Logger.error(
+            "Failed to send #{type} to Discord. Status: #{status}, Body: #{inspect(body)}"
+          )
+
+          {:error, :request_failed}
+
+        {:error, reason} ->
+          Logger.error("Failed to send #{type} to Discord: #{inspect(reason)}")
+          {:error, reason}
+      end
     end
   end
 end
