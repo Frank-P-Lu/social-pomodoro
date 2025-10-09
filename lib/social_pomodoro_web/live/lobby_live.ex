@@ -409,6 +409,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   <button
                     phx-click="start_my_room"
                     phx-value-room-name={@room.name}
+                    phx-hook="RequestWakeLock"
+                    id={"start-room-btn-#{@room.name}"}
                     class="btn btn-primary btn-sm"
                   >
                     Start
@@ -418,6 +420,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 <button
                   phx-click="join_room"
                   phx-value-room-name={@room.name}
+                  phx-hook="RequestWakeLock"
+                  id={"join-room-btn-#{@room.name}"}
                   class="btn btn-primary btn-outline btn-sm"
                 >
                   Join
@@ -561,6 +565,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <div class="card-actions">
               <button
                 phx-click="create_room"
+                phx-hook="RequestWakeLock"
+                id="create-room-btn"
                 disabled={@my_room_name != nil}
                 class="btn btn-primary btn-block"
               >

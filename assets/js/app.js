@@ -24,6 +24,37 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
+// Wake Lock functionality
+let wakeLock = null
+
+async function ensureWakeLock() {
+  if (!('wakeLock' in navigator)) {
+    return // Wake Lock API not supported
+  }
+
+  if (!wakeLock || wakeLock.released) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen')
+    } catch (err) {
+      // Fail silently - might fail if page not visible or permission denied
+    }
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock && !wakeLock.released) {
+    wakeLock.release()
+    wakeLock = null
+  }
+}
+
+// Re-acquire wake lock when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && wakeLock && wakeLock.released) {
+    ensureWakeLock()
+  }
+})
+
 let Hooks = {}
 
 Hooks.CopyToClipboard = {
@@ -51,6 +82,11 @@ Hooks.Timer = {
       if (this.seconds >= 0) {
         this.updateTimer()
       }
+      if (this.seconds === 0) {
+        // Play alert sound when timer reaches 0
+        const audio = new Audio('/sounds/alert.wav')
+        audio.play().catch(err => console.error('Failed to play alert:', err))
+      }
     }, 1000)
   },
   updated() {
@@ -65,6 +101,29 @@ Hooks.Timer = {
     const minutes = Math.floor(this.seconds / 60)
     const secs = this.seconds % 60
     this.el.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`
+  }
+}
+
+Hooks.RequestWakeLock = {
+  mounted() {
+    ensureWakeLock()
+  }
+}
+
+Hooks.MaintainWakeLock = {
+  mounted() {
+    ensureWakeLock()
+  },
+  updated() {
+    ensureWakeLock()
+  }
+}
+
+Hooks.ReleaseWakeLock = {
+  mounted() {
+    this.el.addEventListener("click", () => {
+      releaseWakeLock()
+    })
   }
 }
 

@@ -152,7 +152,12 @@ defmodule SocialPomodoroWeb.SessionLive do
     <div class="card bg-base-200">
       <div class="card-body text-center relative">
         <!-- Leave Button -->
-        <button phx-click="leave_room" class="btn btn-ghost btn-sm absolute top-4 left-4 text-error">
+        <button
+          phx-click="leave_room"
+          phx-hook="ReleaseWakeLock"
+          id="leave-room-waiting"
+          class="btn btn-ghost btn-sm absolute top-4 left-4 text-error"
+        >
           <Icons.leave class="w-4 h-4 fill-error" />
           <span class="text-error">Leave</span>
         </button>
@@ -205,7 +210,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     assigns = assign(assigns, :current_participant, current_participant)
 
     ~H"""
-    <div>
+    <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
         <div class="card-body text-center">
           <!-- Timer Display -->
@@ -252,6 +257,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             <button
               phx-click="set_status"
               phx-value-emoji="1F636"
+              phx-hook="MaintainWakeLock"
+              id="emoji-1F636"
               class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F636", do: "btn-active"}"}
             >
               <img src="/images/emojis/1F636.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😶" />
@@ -259,6 +266,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             <button
               phx-click="set_status"
               phx-value-emoji="1FAE0"
+              phx-hook="MaintainWakeLock"
+              id="emoji-1FAE0"
               class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1FAE0", do: "btn-active"}"}
             >
               <img src="/images/emojis/1FAE0.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🫠" />
@@ -266,6 +275,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             <button
               phx-click="set_status"
               phx-value-emoji="1F914"
+              phx-hook="MaintainWakeLock"
+              id="emoji-1F914"
               class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F914", do: "btn-active"}"}
             >
               <img src="/images/emojis/1F914.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🤔" />
@@ -273,6 +284,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             <button
               phx-click="set_status"
               phx-value-emoji="1F604"
+              phx-hook="MaintainWakeLock"
+              id="emoji-1F604"
               class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F604", do: "btn-active"}"}
             >
               <img src="/images/emojis/1F604.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😄" />
@@ -280,6 +293,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             <button
               phx-click="set_status"
               phx-value-emoji="1F60E"
+              phx-hook="MaintainWakeLock"
+              id="emoji-1F60E"
               class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F60E", do: "btn-active"}"}
             >
               <img src="/images/emojis/1F60E.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😎" />
@@ -297,7 +312,12 @@ defmodule SocialPomodoroWeb.SessionLive do
                   class="input input-bordered w-full max-w-md"
                   required
                 />
-                <button type="submit" class="btn btn-square btn-primary">
+                <button
+                  type="submit"
+                  phx-hook="MaintainWakeLock"
+                  id="submit-working-on"
+                  class="btn btn-square btn-primary"
+                >
                   <Icons.submit class="w-6 h-6 fill-current" />
                 </button>
               </form>
@@ -308,7 +328,12 @@ defmodule SocialPomodoroWeb.SessionLive do
       
     <!-- Leave Button -->
       <div class="flex justify-center mt-4">
-        <button phx-click="leave_room" class="btn btn-ghost btn-sm text-error">
+        <button
+          phx-click="leave_room"
+          phx-hook="ReleaseWakeLock"
+          id="leave-room-active"
+          class="btn btn-ghost btn-sm text-error"
+        >
           <Icons.leave class="w-4 h-4 fill-error" />
           <span class="text-error">Leave</span>
         </button>
@@ -363,6 +388,8 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
           <button
             phx-click="leave_room"
+            phx-hook="ReleaseWakeLock"
+            id="leave-room-break"
             class="btn btn-lg text-error"
           >
             <Icons.leave class="w-5 h-5 fill-error" />
