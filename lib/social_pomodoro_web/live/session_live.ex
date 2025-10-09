@@ -278,7 +278,12 @@ defmodule SocialPomodoroWeb.SessionLive do
           {completion_message(@room_state.duration_minutes, length(@room_state.participants))}
         </p>
 
-        <div class="text-5xl font-bold text-primary mb-2">
+        <div
+          id="break-timer-display"
+          class="text-5xl font-bold text-primary mb-2"
+          phx-hook="Timer"
+          data-seconds-remaining={@room_state.seconds_remaining}
+        >
           {format_time(@room_state.seconds_remaining)}
         </div>
         <p class="text-lg opacity-70 mb-12">Break time remaining</p>
