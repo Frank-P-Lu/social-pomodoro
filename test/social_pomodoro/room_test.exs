@@ -269,6 +269,236 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
+  describe "working_on functionality" do
+    test "user can set working_on during active session" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set working_on
+      assert :ok = Room.set_working_on(room_name, creator_id, "Building tests")
+
+      # Verify it was set (via serialized state since that's how LiveView sees it)
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert participant.working_on == "Building tests"
+    end
+
+    test "user cannot set working_on when not in active session" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      # Try to set working_on in waiting state
+      assert {:error, :not_active} = Room.set_working_on(room_name, creator_id, "Building tests")
+    end
+
+    test "working_on persists when user leaves and rejoins" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Join another user
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set working_on
+      assert :ok = Room.set_working_on(room_name, participant_id, "Important task")
+
+      # Verify it was set
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+      assert participant.working_on == "Important task"
+
+      # Leave and rejoin
+      assert :ok = Room.leave(room_name, participant_id)
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify working_on persisted
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+      assert participant.working_on == "Important task"
+    end
+
+    test "working_on is reset when session starts" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+
+      # Join another user
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set working_on for both
+      assert :ok = Room.set_working_on(room_name, creator_id, "Task 1")
+      assert :ok = Room.set_working_on(room_name, participant_id, "Task 2")
+
+      # Complete session and go to break
+      tick(room_pid)
+      tick(room_pid)
+
+      # Mark both ready and start new session
+      assert :ok = Room.go_again(room_name, creator_id)
+      assert :ok = Room.go_again(room_name, participant_id)
+
+      # Verify working_on was reset
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+
+      assert is_nil(creator.working_on)
+      assert is_nil(participant.working_on)
+    end
+  end
+
+  describe "status emoji functionality" do
+    test "user can set status emoji during active session" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status emoji
+      assert :ok = Room.set_status(room_name, creator_id, "🔥")
+
+      # Verify it was set (via serialized state)
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert participant.status_emoji == "🔥"
+    end
+
+    test "user can toggle status emoji off by clicking same emoji" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status emoji
+      assert :ok = Room.set_status(room_name, creator_id, "🔥")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert participant.status_emoji == "🔥"
+
+      # Click same emoji again to toggle off
+      assert :ok = Room.set_status(room_name, creator_id, "🔥")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert is_nil(participant.status_emoji)
+    end
+
+    test "user can switch to different status emoji" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status emoji
+      assert :ok = Room.set_status(room_name, creator_id, "🔥")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert participant.status_emoji == "🔥"
+
+      # Switch to different emoji
+      assert :ok = Room.set_status(room_name, creator_id, "💪")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert participant.status_emoji == "💪"
+    end
+
+    test "user cannot set status when not in active session" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      # Try to set status in waiting state
+      assert {:error, :not_active} = Room.set_status(room_name, creator_id, "🔥")
+    end
+
+    test "status emoji persists when user leaves and rejoins" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      # Join another user
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status
+      assert :ok = Room.set_status(room_name, participant_id, "💪")
+
+      # Verify it was set
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+      assert participant.status_emoji == "💪"
+
+      # Leave and rejoin
+      assert :ok = Room.leave(room_name, participant_id)
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify status persisted
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+      assert participant.status_emoji == "💪"
+    end
+
+    test "status emoji is reset when session starts" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+
+      # Join another user
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status for both
+      assert :ok = Room.set_status(room_name, creator_id, "🔥")
+      assert :ok = Room.set_status(room_name, participant_id, "💪")
+
+      # Complete session and go to break
+      tick(room_pid)
+      tick(room_pid)
+
+      # Mark both ready and start new session
+      assert :ok = Room.go_again(room_name, creator_id)
+      assert :ok = Room.go_again(room_name, participant_id)
+
+      # Verify status_emoji was reset
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+
+      assert is_nil(creator.status_emoji)
+      assert is_nil(participant.status_emoji)
+    end
+  end
+
   describe "empty room filtering" do
     test "empty rooms are hidden from non-original participants before session starts" do
       # Setup: Create a room with a creator

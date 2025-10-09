@@ -308,7 +308,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     bg-[size:20px_20px]
     " <>
       if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
-      <div class="card-body p-4 gap-0 flex flex-col justify-between">
+      <div class="card-body p-4 gap-0 flex flex-col justify-between min-h-48">
         <div>
           <div class="flex items-start justify-between gap-2">
             <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>

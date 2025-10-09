@@ -61,8 +61,19 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
-  def handle_event("send_reaction", %{"emoji" => emoji}, socket) do
-    SocialPomodoro.Room.add_reaction(
+  def handle_event("set_working_on", %{"text" => text}, socket) do
+    SocialPomodoro.Room.set_working_on(
+      socket.assigns.name,
+      socket.assigns.user_id,
+      text
+    )
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("set_status", %{"emoji" => emoji}, socket) do
+    SocialPomodoro.Room.set_status(
       socket.assigns.name,
       socket.assigns.user_id,
       emoji
@@ -122,7 +133,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           <% end %>
 
           <%= if @room_state.status == :active do %>
-            <.active_session_view room_state={@room_state} />
+            <.active_session_view room_state={@room_state} user_id={@user_id} />
           <% end %>
 
           <%= if @room_state.status == :break do %>
@@ -186,6 +197,12 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp active_session_view(assigns) do
+    # Helper to find current user's participant
+    current_participant =
+      Enum.find(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
+
+    assigns = assign(assigns, :current_participant, current_participant)
+
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
@@ -200,65 +217,83 @@ defmodule SocialPomodoroWeb.SessionLive do
         </div>
         <p class="text-xl mb-8">Focus time remaining</p>
         
-    <!-- Participants -->
-        <div class="avatar-group -space-x-6 justify-center mb-8">
+    <!-- What are you working on? -->
+        <%= if is_nil(@current_participant.working_on) do %>
+          <div class="mb-8">
+            <form phx-submit="set_working_on" class="flex gap-2 justify-center">
+              <input
+                type="text"
+                name="text"
+                placeholder="What are you working on?"
+                class="input input-bordered w-full max-w-md"
+                required
+              />
+              <button type="submit" class="btn btn-primary">
+                Submit
+              </button>
+            </form>
+          </div>
+        <% end %>
+        
+    <!-- Participants with status and working_on -->
+        <div class="flex flex-col gap-4 mb-8">
           <%= for participant <- @room_state.participants do %>
-            <div class="avatar">
-              <div class="w-12">
-                <img
-                  src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                  alt={participant.username}
-                />
+            <div class="flex items-center gap-3 justify-center">
+              <div class="avatar">
+                <div class="w-12 rounded-full">
+                  <img
+                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
+                    alt={participant.username}
+                  />
+                </div>
+              </div>
+              <div class="text-left flex-1 max-w-md">
+                <div class="flex items-center gap-2">
+                  <p class="font-semibold">{participant.username}</p>
+                  <%= if participant.status_emoji do %>
+                    <span class="text-2xl">{participant.status_emoji}</span>
+                  <% end %>
+                </div>
+                <%= if participant.working_on do %>
+                  <p class="text-sm opacity-70">{participant.working_on}</p>
+                <% end %>
               </div>
             </div>
           <% end %>
         </div>
         
-    <!-- Reaction Buttons -->
+    <!-- Status Emoji Buttons -->
+        <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
         <div class="join mb-8">
           <button
-            phx-click="send_reaction"
+            phx-click="set_status"
             phx-value-emoji="🔥"
-            class="join-item btn btn-lg text-4xl"
+            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "🔥", do: "btn-active"}"}
           >
             🔥
           </button>
           <button
-            phx-click="send_reaction"
+            phx-click="set_status"
             phx-value-emoji="💪"
-            class="join-item btn btn-lg text-4xl"
+            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "💪", do: "btn-active"}"}
           >
             💪
           </button>
           <button
-            phx-click="send_reaction"
+            phx-click="set_status"
             phx-value-emoji="⚡"
-            class="join-item btn btn-lg text-4xl"
+            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "⚡", do: "btn-active"}"}
           >
             ⚡
           </button>
           <button
-            phx-click="send_reaction"
+            phx-click="set_status"
             phx-value-emoji="🎯"
-            class="join-item btn btn-lg text-4xl"
+            class={"join-item btn btn-lg text-4xl #{if @current_participant.status_emoji == "🎯", do: "btn-active"}"}
           >
             🎯
           </button>
         </div>
-        
-    <!-- Recent Reactions -->
-        <%= if !Enum.empty?(@room_state.reactions) do %>
-          <div class="bg-base-300 rounded-lg p-4 max-h-32 overflow-y-auto">
-            <div class="flex flex-wrap gap-2 justify-center">
-              <%= for reaction <- Enum.take(@room_state.reactions, 20) do %>
-                <div class="badge badge-lg gap-1">
-                  <span>{reaction.emoji}</span>
-                  <span>{reaction.username}</span>
-                </div>
-              <% end %>
-            </div>
-          </div>
-        <% end %>
 
         <button phx-click="leave_room" class="link link-hover text-sm mt-6">
           Leave Session

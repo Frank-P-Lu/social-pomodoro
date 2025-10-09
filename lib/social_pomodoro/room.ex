@@ -17,10 +17,11 @@ defmodule SocialPomodoro.Room do
     :original_participants,
     :timer_ref,
     :seconds_remaining,
-    :reactions,
     :break_duration_seconds,
     :created_at,
-    :tick_interval
+    :tick_interval,
+    :working_on,
+    :status_emoji
   ]
 
   def start_link(opts) do
@@ -59,9 +60,16 @@ defmodule SocialPomodoro.Room do
     end
   end
 
-  def add_reaction(name, user_id, emoji) do
+  def set_working_on(name, user_id, text) do
     case SocialPomodoro.RoomRegistry.get_room(name) do
-      {:ok, pid} -> GenServer.cast(pid, {:add_reaction, user_id, emoji})
+      {:ok, pid} -> GenServer.call(pid, {:set_working_on, user_id, text})
+      error -> error
+    end
+  end
+
+  def set_status(name, user_id, emoji) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
+      {:ok, pid} -> GenServer.call(pid, {:set_status, user_id, emoji})
       error -> error
     end
   end
@@ -92,10 +100,11 @@ defmodule SocialPomodoro.Room do
       original_participants: [],
       timer_ref: nil,
       seconds_remaining: nil,
-      reactions: [],
       break_duration_seconds: break_duration_seconds,
       created_at: System.system_time(:second),
-      tick_interval: tick_interval
+      tick_interval: tick_interval,
+      working_on: %{},
+      status_emoji: %{}
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -171,8 +180,9 @@ defmodule SocialPomodoro.Room do
         | status: :active,
           seconds_remaining: seconds,
           timer_ref: timer_ref,
-          reactions: [],
-          original_participants: original_participant_ids
+          original_participants: original_participant_ids,
+          working_on: %{},
+          status_emoji: %{}
       }
 
       # Emit telemetry event for session start
@@ -233,8 +243,9 @@ defmodule SocialPomodoro.Room do
           | status: :active,
             seconds_remaining: seconds,
             timer_ref: timer_ref,
-            reactions: [],
-            participants: Enum.map(new_participants, &%{&1 | ready_for_next: false})
+            participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
+            working_on: %{},
+            status_emoji: %{}
         }
 
         # Emit telemetry event for session restart (restarted after break)
@@ -262,14 +273,33 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_cast({:add_reaction, user_id, emoji}, state) do
+  def handle_call({:set_working_on, user_id, text}, _from, state) do
     if state.status == :active do
-      reaction = %{user_id: user_id, emoji: emoji, timestamp: System.system_time(:second)}
-      new_state = %{state | reactions: [reaction | state.reactions]}
+      new_working_on = Map.put(state.working_on, user_id, text)
+      new_state = %{state | working_on: new_working_on}
       broadcast_room_update(new_state)
-      {:noreply, new_state}
+      {:reply, :ok, new_state}
     else
-      {:noreply, state}
+      {:reply, {:error, :not_active}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:set_status, user_id, emoji}, _from, state) do
+    if state.status == :active do
+      # Toggle: if same emoji, remove from map; otherwise set to new emoji
+      new_status_emoji =
+        if state.status_emoji[user_id] == emoji do
+          Map.delete(state.status_emoji, user_id)
+        else
+          Map.put(state.status_emoji, user_id, emoji)
+        end
+
+      new_state = %{state | status_emoji: new_status_emoji}
+      broadcast_room_update(new_state)
+      {:reply, :ok, new_state}
+    else
+      {:reply, {:error, :not_active}, state}
     end
   end
 
@@ -294,8 +324,7 @@ defmodule SocialPomodoro.Room do
       state
       | status: :break,
         seconds_remaining: seconds,
-        timer_ref: timer_ref,
-        reactions: []
+        timer_ref: timer_ref
     }
 
     broadcast_room_update(new_state)
@@ -356,18 +385,17 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
-    # Add usernames to participants for display
+    # Add usernames, working_on, and status_emoji to participants for display
     participants_with_usernames =
       Enum.map(state.participants, fn p ->
         username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
-        Map.put(p, :username, username)
-      end)
+        working_on = Map.get(state.working_on, p.user_id)
+        status_emoji = Map.get(state.status_emoji, p.user_id)
 
-    # Add usernames to reactions for display
-    reactions_with_usernames =
-      Enum.map(state.reactions, fn r ->
-        username = SocialPomodoro.UserRegistry.get_username(r.user_id) || "Unknown User"
-        Map.put(r, :username, username)
+        p
+        |> Map.put(:username, username)
+        |> Map.put(:working_on, working_on)
+        |> Map.put(:status_emoji, status_emoji)
       end)
 
     # Get creator username
@@ -382,8 +410,6 @@ defmodule SocialPomodoro.Room do
       participants: participants_with_usernames,
       original_participants: state.original_participants,
       seconds_remaining: state.seconds_remaining,
-      # Latest 50 reactions
-      reactions: reactions_with_usernames |> Enum.take(50) |> Enum.reverse(),
       break_duration_minutes: div(state.break_duration_seconds, 60)
     }
   end
