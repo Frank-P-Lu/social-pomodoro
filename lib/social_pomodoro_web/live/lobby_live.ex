@@ -245,9 +245,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   Create a room, set your timer, and get things done together.
                 </p>
                 <div>
-                  <div class="badge badge-primary badge-dash badge-lg p-4">No webcam</div>
-                  <div class="badge badge-secondary badge-dash badge-lg p-4">No chat</div>
-                  <div class="badge badge-accent badge-dash badge-lg p-4">Just work</div>
+                  <div class="badge badge-primary badge-dash badge-md lg:badge-lg p-4">No webcam</div>
+                  <div class="badge badge-secondary badge-dash badge-md lg:badge-lg p-4">No chat</div>
+                  <div class="badge badge-accent badge-dash badge-md lg:badge-lg p-4">Just work</div>
                 </div>
               </div>
             </div>
@@ -304,6 +304,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
     is_original and not is_currently_in_room
   end
+
+  attr :room, :map, required: true
+  attr :user_id, :string, required: true
+  attr :my_room_name, :string, default: nil
 
   defp room_card(assigns) do
     ~H"""
@@ -431,6 +435,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
     </div>
     """
   end
+
+  attr :user_id, :string, required: true
+  attr :username, :string, required: true
+  attr :my_room_name, :string, default: nil
+  attr :duration_minutes, :integer, required: true
 
   defp user_card(assigns) do
     ~H"""
@@ -576,12 +585,17 @@ defmodule SocialPomodoroWeb.LobbyLive do
     "#{minutes}:#{String.pad_leading(Integer.to_string(secs), 2, "0")}"
   end
 
+  attr :user_id, :string, required: true
+  attr :username, :string, required: true
+  attr :current_user_id, :string, required: true
+  attr :size, :string, default: "w-16"
+
   defp participant_avatar(assigns) do
     ~H"""
     <.avatar
       user_id={@user_id}
       username={@username}
-      size={assigns[:size] || "w-16"}
+      size={@size}
       class={
         if @user_id == @current_user_id do
           "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"

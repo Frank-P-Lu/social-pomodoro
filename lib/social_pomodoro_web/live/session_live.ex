@@ -426,12 +426,17 @@ defmodule SocialPomodoroWeb.SessionLive do
     """
   end
 
+  attr :user_id, :string, required: true
+  attr :username, :string, required: true
+  attr :current_user_id, :string, required: true
+  attr :size, :string, default: "w-16"
+
   defp participant_avatar(assigns) do
     ~H"""
     <.avatar
       user_id={@user_id}
       username={@username}
-      size={assigns[:size] || "w-16"}
+      size={@size}
       class={
         if @user_id == @current_user_id do
           "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
