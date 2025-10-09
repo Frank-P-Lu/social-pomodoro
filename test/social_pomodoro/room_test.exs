@@ -176,6 +176,87 @@ defmodule SocialPomodoro.RoomTest do
 
   describe "room lifecycle with timer" do
     @tag :sync
+    test "timer is cancelled when transitioning between states to prevent multiple ticks" do
+      # This test verifies the bug fix where timers were not cancelled
+      # when transitioning from active->break or break->active, causing erratic ticking
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 2, break_duration_seconds: 2)
+
+      # Add another participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start the session
+      assert :ok = Room.start_session(room_name)
+
+      # Verify room is in active state
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.seconds_remaining == 2
+
+      # Tick to countdown: 2 -> 1
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.seconds_remaining == 1
+
+      # Tick to countdown: 1 -> 0
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.seconds_remaining == 0
+
+      # Tick to transition to break (0, :active -> :break)
+      # This is where the old timer should be cancelled
+      tick(room_pid)
+
+      # Verify room transitioned to break
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.seconds_remaining == 2
+
+        # Now both users mark ready to go again
+        assert :ok = Room.go_again(room_name, creator_id)
+
+        # Before the second user marks ready, verify we're still in break
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+
+        # Second user marks ready - this should cancel break timer and start new session
+        assert :ok = Room.go_again(room_name, participant_id)
+
+        # Give it a moment to process
+        Process.sleep(10)
+
+        # Verify we transitioned back to active
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.seconds_remaining == 2
+
+        # Now tick once and verify we only decremented by 1
+        # If the bug existed, we'd see multiple decrements or erratic behavior
+        tick(room_pid)
+
+        state = Room.get_state(room_pid)
+        assert state.seconds_remaining == 1
+
+        # Tick again to verify consistent behavior
+        tick(room_pid)
+
+        state = Room.get_state(room_pid)
+        assert state.seconds_remaining == 0
+
+        # The timer should tick exactly once per tick message
+        # proving that old timers were properly cancelled
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+
+    @tag :sync
     test "room terminates when break timer completes" do
       # Create a room with 1 second session and 1 second break
       # Use manual ticks instead of waiting for real time

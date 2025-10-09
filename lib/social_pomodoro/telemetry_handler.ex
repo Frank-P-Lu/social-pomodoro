@@ -65,22 +65,27 @@ defmodule SocialPomodoro.TelemetryHandler do
   end
 
   defp send_analytics(event_type, data) do
-    webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
-
-    Logger.debug("Analytics webhook URL: #{inspect(webhook_url)}")
-
-    if is_nil(webhook_url) or webhook_url == "" do
-      Logger.warning(
-        "Discord analytics webhook URL not configured. Analytics not sent for: #{event_type}"
-      )
-
+    # Only send analytics in production
+    unless Mix.env() == :prod do
       :ok
     else
-      Logger.info("Sending analytics event to Discord: #{event_type}")
-      payload = build_analytics_payload(event_type, data)
-      # Send webhook asynchronously to avoid blocking the caller
-      Task.start(fn -> send_webhook(webhook_url, payload) end)
-      :ok
+      webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
+
+      Logger.debug("Analytics webhook URL: #{inspect(webhook_url)}")
+
+      if is_nil(webhook_url) or webhook_url == "" do
+        Logger.warning(
+          "Discord analytics webhook URL not configured. Analytics not sent for: #{event_type}"
+        )
+
+        :ok
+      else
+        Logger.info("Sending analytics event to Discord: #{event_type}")
+        payload = build_analytics_payload(event_type, data)
+        # Send webhook asynchronously to avoid blocking the caller
+        Task.start(fn -> send_webhook(webhook_url, payload) end)
+        :ok
+      end
     end
   end
 

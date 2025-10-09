@@ -249,6 +249,9 @@ defmodule SocialPomodoro.Room do
 
       if all_ready do
         # Start new session
+        # Cancel existing timer before creating new one
+        if new_state.timer_ref, do: Process.cancel_timer(new_state.timer_ref)
+
         seconds = state.duration_seconds
         timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
@@ -332,6 +335,9 @@ defmodule SocialPomodoro.Room do
   @impl true
   def handle_info(:tick, %{seconds_remaining: 0, status: :active} = state) do
     # Session complete, start break
+    # Cancel existing timer before creating new one
+    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+
     seconds = state.break_duration_seconds
     timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 

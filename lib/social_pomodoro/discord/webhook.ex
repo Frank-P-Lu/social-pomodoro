@@ -18,17 +18,22 @@ defmodule SocialPomodoro.Discord.Webhook do
     - {:error, reason} on failure
   """
   def send_feedback(message, email \\ nil, username \\ nil) do
-    webhook_url = Application.get_env(:social_pomodoro, :discord_feedback_webhook_url)
-
-    Logger.debug("Feedback webhook URL: #{inspect(webhook_url)}")
-
-    if is_nil(webhook_url) or webhook_url == "" do
-      Logger.warning("Discord feedback webhook URL not configured. Feedback not sent.")
-      {:error, :webhook_not_configured}
+    # Only send feedback in production
+    unless Mix.env() == :prod do
+      {:ok, :skipped_non_prod}
     else
-      Logger.info("Sending feedback to Discord")
-      payload = build_feedback_payload(message, email, username)
-      send_webhook(webhook_url, payload)
+      webhook_url = Application.get_env(:social_pomodoro, :discord_feedback_webhook_url)
+
+      Logger.debug("Feedback webhook URL: #{inspect(webhook_url)}")
+
+      if is_nil(webhook_url) or webhook_url == "" do
+        Logger.warning("Discord feedback webhook URL not configured. Feedback not sent.")
+        {:error, :webhook_not_configured}
+      else
+        Logger.info("Sending feedback to Discord")
+        payload = build_feedback_payload(message, email, username)
+        send_webhook(webhook_url, payload)
+      end
     end
   end
 

@@ -60,27 +60,31 @@ defmodule SocialPomodoro.RoomRegistry do
     name = SocialPomodoro.RoomNameGenerator.generate()
     duration_seconds = duration_minutes * 60
 
-    {:ok, pid} =
-      SocialPomodoro.Room.start_link(
-        name: name,
-        creator: creator_user_id,
-        duration_seconds: duration_seconds
-      )
+    case SocialPomodoro.Room.start_link(
+           name: name,
+           creator: creator_user_id,
+           duration_seconds: duration_seconds
+         ) do
+      {:ok, pid} ->
+        :ets.insert(@table_name, {name, pid})
 
-    :ets.insert(@table_name, {name, pid})
+        # Emit telemetry event for room creation
+        :telemetry.execute(
+          [:pomodoro, :room, :created],
+          %{count: 1},
+          %{
+            room_name: name,
+            user_id: creator_user_id,
+            duration_minutes: duration_minutes
+          }
+        )
 
-    # Emit telemetry event for room creation
-    :telemetry.execute(
-      [:pomodoro, :room, :created],
-      %{count: 1},
-      %{
-        room_name: name,
-        user_id: creator_user_id,
-        duration_minutes: duration_minutes
-      }
-    )
+        {:reply, {:ok, name}, state}
 
-    {:reply, {:ok, name}, state}
+      {:error, {:already_started, _pid}} ->
+        # Room name collision - retry with a new name
+        handle_call({:create_room, creator_user_id, duration_minutes}, self(), state)
+    end
   end
 
   @impl true

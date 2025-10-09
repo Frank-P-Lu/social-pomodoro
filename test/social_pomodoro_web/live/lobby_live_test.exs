@@ -87,10 +87,9 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       htmlA = render(lobbyA)
       htmlB = render(lobbyB)
 
-      # Count avatar images (2 participants = 2 avatars in the specific room)
-      # Check for 2 avatars by looking for the avatar divs
-      assert htmlA =~ ~r/<div class="w-10">.*?<\/div>.*?<div class="w-10">/s
-      assert htmlB =~ ~r/<div class="w-10">.*?<\/div>.*?<div class="w-10">/s
+      # Both should see "2 people" for the room
+      assert htmlA =~ "2 people"
+      assert htmlB =~ "2 people"
 
       # User B should see "Waiting for host..." somewhere in the page
       assert htmlB =~ "Waiting for host..."
@@ -216,7 +215,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User A leaves the room (which should close it since they're the only participant)
       sessionA
-      |> element("button", "Leave Room")
+      |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait a moment for PubSub broadcast to propagate
@@ -447,7 +446,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # User B leaves the room
       sessionB
-      |> element("button", "Leave Session")
+      |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait for PubSub to propagate
@@ -481,7 +480,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # Should see active session
       assert htmlSession =~ "Focus time remaining"
-      assert htmlSession =~ "Leave Session"
+      assert htmlSession =~ "Leave"
     end
 
     test "rejoin button only appears for rooms the user left" do

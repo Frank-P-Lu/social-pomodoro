@@ -2,8 +2,6 @@ defmodule SocialPomodoro.TelemetryHandlerTest do
   use ExUnit.Case, async: true
   alias SocialPomodoro.TelemetryHandler
 
-  import ExUnit.CaptureLog
-
   describe "non-blocking behavior" do
     test "handle_event returns immediately even with webhook configured" do
       # Temporarily configure a webhook URL (won't actually send)
