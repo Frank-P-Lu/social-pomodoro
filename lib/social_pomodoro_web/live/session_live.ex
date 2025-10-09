@@ -155,14 +155,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="flex justify-center gap-4 mb-8">
           <%= for participant <- @room_state.participants do %>
             <div class="text-center">
-              <div class="avatar">
-                <div class="w-16 rounded-full">
-                  <img
-                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                    alt={participant.username}
-                  />
-                </div>
-              </div>
+              <.avatar user_id={participant.user_id} username={participant.username} />
               <p class="text-sm mt-2">{participant.username}</p>
             </div>
           <% end %>
@@ -215,7 +208,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         >
           {format_time(@room_state.seconds_remaining)}
         </div>
-        <p class="text-xl mb-8">Focus time remaining</p>
+        <p class="text-content mb-8">Focus time remaining</p>
         
     <!-- What are you working on? -->
         <%= if is_nil(@current_participant.working_on) do %>
@@ -238,26 +231,31 @@ defmodule SocialPomodoroWeb.SessionLive do
     <!-- Participants with status and working_on -->
         <div class="flex flex-col gap-4 mb-8">
           <%= for participant <- @room_state.participants do %>
-            <div class="flex items-center gap-3 justify-center">
-              <div class="avatar">
-                <div class="w-12 rounded-full">
-                  <img
-                    src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                    alt={participant.username}
+            <div class="flex items-center gap-2 justify-center">
+              <div class="flex flex-col items-center gap-2">
+                <div class="relative">
+                  <.avatar
+                    user_id={participant.user_id}
+                    username={participant.username}
+                    size="w-12"
+                    class="border-2 border-primary"
                   />
-                </div>
-              </div>
-              <div class="text-left flex-1 max-w-md">
-                <div class="flex items-center gap-2">
-                  <p class="font-semibold">{participant.username}</p>
                   <%= if participant.status_emoji do %>
-                    <span class="text-2xl">{participant.status_emoji}</span>
+                    <span class="absolute -bottom-2 -right-2 text-xl bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
+                      {participant.status_emoji}
+                    </span>
                   <% end %>
                 </div>
-                <%= if participant.working_on do %>
-                  <p class="text-sm opacity-70">{participant.working_on}</p>
-                <% end %>
+                <p class="font-semibold text-center">{participant.username}</p>
               </div>
+              <%= if participant.working_on do %>
+                <p
+                  class="text-sm opacity-70 max-w-xs"
+                  style="transform: rotate(-45deg); transform-origin: left center;"
+                >
+                  {participant.working_on}
+                </p>
+              <% end %>
             </div>
           <% end %>
         </div>
@@ -331,14 +329,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                 <%= if participant.ready_for_next do %>
                   <span class="indicator-item badge badge-success badge-sm">✓</span>
                 <% end %>
-                <div class="avatar">
-                  <div class="w-16 rounded-full">
-                    <img
-                      src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                      alt={participant.username}
-                    />
-                  </div>
-                </div>
+                <.avatar user_id={participant.user_id} username={participant.username} />
               </div>
               <%= if participant.ready_for_next do %>
                 <p class="text-xs text-success font-semibold mt-1">Ready!</p>

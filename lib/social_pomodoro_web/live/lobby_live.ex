@@ -240,11 +240,15 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <h1 class="card-title text-4xl mb-4">Fancy a Pomodoro?</h1>
               <div class="space-y-4 text-lg">
                 <p class="leading-relaxed">Focus with strangers. Or friends.</p>
-                <div class="badge badge-primary badge-lg p-4">No webcam. No chat. Just work.</div>
 
                 <p class="leading-relaxed">
                   Create a room, set your timer, and get things done together.
                 </p>
+                <div>
+                  <div class="badge badge-primary badge-dash badge-lg p-4">No webcam</div>
+                  <div class="badge badge-secondary badge-dash badge-lg p-4">No chat</div>
+                  <div class="badge badge-accent badge-dash badge-lg p-4">Just work</div>
+                </div>
               </div>
             </div>
           </div>
@@ -267,7 +271,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <%= if Enum.empty?(@rooms) do %>
                 <div class="text-center py-12">
                   <p class="text-lg">
-                    No one is here yet 🥺. That's okay! You can focus with yourself!
+                    No one is here yet 🥺 <br /> That's okay! You can focus solo!
                   </p>
                 </div>
               <% else %>
@@ -337,14 +341,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <div class="flex items-center justify-center min-h-16">
             <div class="avatar-group -space-x-6">
               <%= for participant <- @room.participants do %>
-                <div class="avatar">
-                  <div class="w-10">
-                    <img
-                      src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{participant.user_id}"}
-                      alt={participant.username}
-                    />
-                  </div>
-                </div>
+                <.avatar user_id={participant.user_id} username={participant.username} size="w-10" />
               <% end %>
             </div>
           </div>
@@ -439,14 +436,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="pb-4 border-b border-base-300">
           <!-- Avatar + username -->
           <div class="flex gap-2">
-            <div class="avatar">
-              <div class="w-12 rounded-full">
-                <img
-                  src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
-                  alt={@username}
-                />
-              </div>
-            </div>
+            <.avatar user_id={@user_id} username={@username} size="w-12" />
             <div>
               <span class="label label-text">Look, it's you!</span>
 

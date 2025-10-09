@@ -636,4 +636,30 @@ defmodule SocialPomodoroWeb.CoreComponents do
     |> JS.remove_class("overflow-hidden", to: "body")
     |> JS.pop_focus()
   end
+
+  @doc """
+  Renders a user avatar using DiceBear API.
+
+  ## Examples
+
+      <.avatar user_id={@user_id} username={@username} />
+      <.avatar user_id={@user_id} username={@username} size="w-12" />
+  """
+  attr :user_id, :string, required: true
+  attr :username, :string, required: true
+  attr :size, :string, default: "w-16"
+  attr :class, :string, default: nil
+
+  def avatar(assigns) do
+    ~H"""
+    <div class={["avatar", @class]}>
+      <div class={[@size, "rounded-full"]}>
+        <img
+          src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
+          alt={@username}
+        />
+      </div>
+    </div>
+    """
+  end
 end
