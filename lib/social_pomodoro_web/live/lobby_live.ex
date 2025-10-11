@@ -219,7 +219,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <.flash kind={:error} flash={@flash} />
     <div class="navbar bg-base-300 text-neutral-content">
       <div class="flex-1">
-        <a href="/" class="btn btn-ghost text-xl">Focus with Strangers</a>
+        <a href="/" class="btn btn-ghost text-xl">focus with strangers</a>
       </div>
       <div class="flex-none">
         <button

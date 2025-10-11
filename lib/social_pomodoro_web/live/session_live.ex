@@ -115,6 +115,12 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_info({:session_started, _room_name}, socket) do
+    # Ignore if already on session page
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info(:countdown, socket) do
     case socket.assigns.redirect_countdown do
       1 ->
@@ -124,6 +130,18 @@ defmodule SocialPomodoroWeb.SessionLive do
         Process.send_after(self(), :countdown, 1000)
         {:noreply, assign(socket, :redirect_countdown, n - 1)}
     end
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    # TODO: edit when we add spectator mode
+    # Leave room when LiveView process terminates (e.g., navigation away)
+    # Only if user was actually in the room (not on redirect screen)
+    if !socket.assigns[:redirect_countdown] do
+      SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
+    end
+
+    :ok
   end
 
   @impl true
