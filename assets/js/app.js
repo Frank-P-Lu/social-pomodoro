@@ -73,9 +73,12 @@ Hooks.CopyToClipboard = {
   }
 }
 
+const APP_TITLE = 'focus with strangers'
+
 Hooks.Timer = {
   mounted() {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
+    this.isBreak = this.el.id === 'break-timer-display'
     this.updateTimer()
     this.interval = setInterval(() => {
       this.seconds--
@@ -92,15 +95,26 @@ Hooks.Timer = {
   updated() {
     // Reset timer on update from server
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
+    this.isBreak = this.el.id === 'break-timer-display'
     this.updateTimer()
   },
   destroyed() {
     clearInterval(this.interval)
+    // Reset title when leaving the page
+    document.title = APP_TITLE
   },
   updateTimer() {
     const minutes = Math.floor(this.seconds / 60)
     const secs = this.seconds % 60
-    this.el.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`
+    const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`
+    this.el.textContent = timeStr
+    
+    // Update tab title
+    if (this.isBreak) {
+      document.title = `BREAK ${timeStr} | ${APP_TITLE}`
+    } else {
+      document.title = `${timeStr} | ${APP_TITLE}`
+    }
   }
 }
 
