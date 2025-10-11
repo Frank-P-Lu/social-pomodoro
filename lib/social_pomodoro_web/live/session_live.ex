@@ -332,7 +332,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                   type="text"
                   name="text"
                   placeholder="What are you working on?"
-                  class="input input-bordered w-full max-w-md"
+                  class="input input-bordered w-full max-w-md text-base"
                   required
                 />
                 <button
