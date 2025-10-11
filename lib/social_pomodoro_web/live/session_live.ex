@@ -97,7 +97,12 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   @impl true
   def handle_info({:room_state, room_state}, socket) do
-    {:noreply, assign(socket, :room_state, room_state)}
+    socket =
+      socket
+      |> assign(:room_state, room_state)
+      |> maybe_show_break_ending_flash(room_state)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -505,5 +510,18 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp emoji_to_openmoji(unicode_code) do
     "/images/emojis/#{unicode_code}.svg"
+  end
+
+  defp maybe_show_break_ending_flash(socket, room_state) do
+    cond do
+      room_state.status == :break && room_state.seconds_remaining == 10 ->
+        put_flash(socket, :info, "Break ending soon! Returning to lobby in 10 seconds...")
+
+      room_state.status == :break && room_state.seconds_remaining <= 0 ->
+        push_navigate(socket, to: ~p"/")
+
+      true ->
+        socket
+    end
   end
 end
