@@ -4,6 +4,7 @@ defmodule SocialPomodoro.Discord.Webhook do
   """
 
   require Logger
+  alias SocialPomodoro.Utils
 
   @doc """
   Sends a feedback message to Discord.
@@ -19,7 +20,7 @@ defmodule SocialPomodoro.Discord.Webhook do
   """
   def send_feedback(message, email \\ nil, username \\ nil) do
     # Only send feedback in production
-    if Mix.env() == :prod do
+    if Utils.prod?() do
       webhook_url = Application.get_env(:social_pomodoro, :discord_feedback_webhook_url)
       payload = build_feedback_payload(message, email, username)
       send(webhook_url, payload, "Feedback")
@@ -40,7 +41,7 @@ defmodule SocialPomodoro.Discord.Webhook do
   """
   def send_analytics(event_type, data) do
     # Only send analytics in production
-    if Mix.env() == :prod do
+    if Utils.prod?() do
       webhook_url = Application.get_env(:social_pomodoro, :discord_analytics_webhook_url)
       payload = build_analytics_payload(event_type, data)
       # Send asynchronously to avoid blocking the caller

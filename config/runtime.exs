@@ -29,6 +29,10 @@ config :social_pomodoro,
        :discord_analytics_webhook_url,
        System.get_env("DISCORD_ANALYTICS_WEBHOOK_URL")
 
+config :social_pomodoro,
+       :env,
+       config_env()
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
