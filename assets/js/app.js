@@ -143,9 +143,15 @@ Hooks.AutostartTimer = {
     }, 1000)
   },
   updated() {
-    // Sync with server updates (every 10 seconds)
-    this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
-    this.updateDisplay()
+    // Sync with server updates (every 10 seconds) but only if drift is significant
+    const serverSeconds = parseInt(this.el.dataset.secondsRemaining, 10)
+    const drift = Math.abs(this.seconds - serverSeconds)
+
+    // Only resync if drift is more than 2 seconds (accounts for network latency)
+    if (drift > 2) {
+      this.seconds = serverSeconds
+      this.updateDisplay()
+    }
   },
   destroyed() {
     clearInterval(this.interval)
