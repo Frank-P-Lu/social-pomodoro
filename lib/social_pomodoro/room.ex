@@ -17,7 +17,8 @@ defmodule SocialPomodoro.Room do
     :creator,
     :status,
     :participants,
-    :original_participants,
+    :session_participants,
+    :spectators,
     :timer_ref,
     :timer,
     :work_duration_seconds,
@@ -41,6 +42,10 @@ defmodule SocialPomodoro.Room do
 
   def get_state(pid) do
     GenServer.call(pid, :get_state)
+  end
+
+  def get_raw_state(pid) do
+    GenServer.call(pid, :get_raw_state)
   end
 
   def join(name, user_id) do
@@ -106,7 +111,8 @@ defmodule SocialPomodoro.Room do
       work_duration_seconds: duration_seconds,
       status: :autostart,
       participants: [%{user_id: creator, ready_for_next: false}],
-      original_participants: [],
+      session_participants: [],
+      spectators: [],
       timer_ref: timer_ref,
       timer: timer,
       break_duration_seconds: break_duration_seconds,
@@ -131,26 +137,46 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
+  def handle_call(:get_raw_state, _from, state) do
+    {:reply, state, state}
+  end
+
+  @impl true
   def handle_call({:join, user_id}, _from, state) do
     is_already_participant = Enum.any?(state.participants, &(&1.user_id == user_id))
-    is_original_participant = Enum.member?(state.original_participants, user_id)
-    is_session_in_progress = state.status in [:active, :break]
+    is_already_spectator = Enum.member?(state.spectators, user_id)
+    is_session_participant = Enum.member?(state.session_participants, user_id)
 
     cond do
       is_already_participant ->
         {:reply, {:error, :already_joined}, state}
 
-      is_session_in_progress and not is_original_participant ->
-        # Session in progress and user was not an original participant - can't join
-        {:reply, {:error, :session_in_progress}, state}
+      is_already_spectator ->
+        {:reply, {:error, :already_spectator}, state}
+
+      state.status == :active and not is_session_participant ->
+        # Session in progress and user was not a session participant - join as spectator
+        new_state = %{state | spectators: [user_id | state.spectators]}
+
+        :telemetry.execute(
+          [:pomodoro, :spectator, :joined],
+          %{count: 1},
+          %{
+            room_name: state.name,
+            user_id: user_id
+          }
+        )
+
+        broadcast_room_update(new_state)
+        {:reply, :ok, new_state}
 
       true ->
-        # Either waiting room, or rejoining as an original participant
+        # Either autostart, break, or rejoining as a session participant
         new_participant = %{user_id: user_id, ready_for_next: false}
         new_state = %{state | participants: [new_participant | state.participants]}
 
         # Track rejoin analytics if this is a rejoin during an active session
-        if is_session_in_progress and is_original_participant do
+        if state.status in [:active, :break] and is_session_participant do
           :telemetry.execute(
             [:pomodoro, :user, :rejoined],
             %{count: 1},
@@ -169,21 +195,42 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def handle_call({:leave, user_id}, _from, state) do
-    new_participants = Enum.reject(state.participants, &(&1.user_id == user_id))
+    was_spectator = Enum.member?(state.spectators, user_id)
 
-    # Check if the leaving user is the creator
-    new_creator =
-      if state.creator == user_id && not Enum.empty?(new_participants) do
-        # Assign a random remaining participant as the new creator
-        random_participant = Enum.random(new_participants)
-        random_participant.user_id
-      else
-        state.creator
-      end
+    if was_spectator do
+      # Remove from spectators
+      new_spectators = List.delete(state.spectators, user_id)
+      new_state = %{state | spectators: new_spectators}
 
-    new_state = %{state | participants: new_participants, creator: new_creator}
-    broadcast_room_update(new_state)
-    {:reply, :ok, new_state}
+      :telemetry.execute(
+        [:pomodoro, :spectator, :left],
+        %{count: 1},
+        %{
+          room_name: state.name,
+          user_id: user_id
+        }
+      )
+
+      broadcast_room_update(new_state)
+      {:reply, :ok, new_state}
+    else
+      # Remove from participants
+      new_participants = Enum.reject(state.participants, &(&1.user_id == user_id))
+
+      # Check if the leaving user is the creator
+      new_creator =
+        if state.creator == user_id && not Enum.empty?(new_participants) do
+          # Assign a random remaining participant as the new creator
+          random_participant = Enum.random(new_participants)
+          random_participant.user_id
+        else
+          state.creator
+        end
+
+      new_state = %{state | participants: new_participants, creator: new_creator}
+      broadcast_room_update(new_state)
+      {:reply, :ok, new_state}
+    end
   end
 
   @impl true
@@ -365,11 +412,32 @@ defmodule SocialPomodoro.Room do
       }
     )
 
+    # Promote spectators to participants during break
+    promoted_participants =
+      Enum.map(state.spectators, fn user_id ->
+        %{user_id: user_id, ready_for_next: false}
+      end)
+
+    # Emit telemetry for each spectator promotion
+    Enum.each(state.spectators, fn user_id ->
+      :telemetry.execute(
+        [:pomodoro, :spectator, :promoted],
+        %{count: 1},
+        %{
+          room_name: state.name,
+          user_id: user_id,
+          spectator_count: length(state.spectators)
+        }
+      )
+    end)
+
     new_state = %{
       state
       | status: :break,
         timer: timer,
-        timer_ref: timer_ref
+        timer_ref: timer_ref,
+        participants: state.participants ++ promoted_participants,
+        spectators: []
     }
 
     broadcast_room_update(new_state)
@@ -406,15 +474,15 @@ defmodule SocialPomodoro.Room do
     # Calculate wait time (time between room creation and session start)
     wait_time_seconds = System.system_time(:second) - state.created_at
 
-    # Capture original participants (who were in the room when it started)
-    original_participant_ids = Enum.map(state.participants, & &1.user_id)
+    # Capture session participants (who were in the room when it started)
+    session_participant_ids = Enum.map(state.participants, & &1.user_id)
 
     new_state = %{
       state
       | status: :active,
         timer: timer,
         timer_ref: timer_ref,
-        original_participants: original_participant_ids,
+        session_participants: session_participant_ids,
         working_on: %{},
         status_emoji: %{}
     }
@@ -492,7 +560,8 @@ defmodule SocialPomodoro.Room do
       duration_minutes: div(state.work_duration_seconds, 60),
       status: state.status,
       participants: participants_with_usernames,
-      original_participants: state.original_participants,
+      session_participants: state.session_participants,
+      spectators_count: length(state.spectators),
       seconds_remaining: state.timer.remaining,
       break_duration_minutes: div(state.break_duration_seconds, 60)
     }

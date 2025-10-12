@@ -13,30 +13,21 @@ defmodule SocialPomodoroWeb.SessionLive do
         if connected?(socket) do
           Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "room:#{name}")
           Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
+
+          # Join the room when connected (handles refreshes and direct navigation)
+          SocialPomodoro.Room.join(name, user_id)
         end
 
-        # Get initial room state
+        # Get room state after joining
         {:ok, pid} = SocialPomodoro.RoomRegistry.get_room(name)
         room_state = SocialPomodoro.Room.get_state(pid)
 
-        # Check if user is already in the room, if not, try to join
-        user_in_room = Enum.any?(room_state.participants, &(&1.user_id == user_id))
-
-        if user_in_room do
-          # User is already in the room, let them in
-          socket =
-            socket
-            |> assign(:name, name)
-            |> assign(:room_state, room_state)
-            |> assign(:user_id, user_id)
-            |> assign(:username, username)
-            |> assign(:selected_emoji, nil)
-            |> assign(:redirect_countdown, nil)
-
-          {:ok, socket}
+        # If room is in autostart, redirect to lobby
+        if room_state.status == :autostart do
+          {:ok, push_navigate(socket, to: ~p"/")}
         else
-          # User not in room, show redirect screen
-          Process.send_after(self(), :countdown, 1000)
+          # Check if user is a spectator
+          is_spectator = is_spectator?(room_state, user_id)
 
           socket =
             socket
@@ -45,7 +36,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             |> assign(:user_id, user_id)
             |> assign(:username, username)
             |> assign(:selected_emoji, nil)
-            |> assign(:redirect_countdown, 5)
+            |> assign(:is_spectator, is_spectator)
 
           {:ok, socket}
         end
@@ -97,9 +88,14 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   @impl true
   def handle_info({:room_state, room_state}, socket) do
+    # Update spectator status
+    is_spectator = is_spectator?(room_state, socket.assigns.user_id)
+
     socket =
       socket
       |> assign(:room_state, room_state)
+      |> assign(:is_spectator, is_spectator)
+      |> maybe_show_spectator_joining_flash(room_state, is_spectator)
       |> maybe_show_break_ending_flash(room_state)
 
     {:noreply, socket}
@@ -121,26 +117,9 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
-  def handle_info(:countdown, socket) do
-    case socket.assigns.redirect_countdown do
-      1 ->
-        {:noreply, push_navigate(socket, to: ~p"/")}
-
-      n ->
-        Process.send_after(self(), :countdown, 1000)
-        {:noreply, assign(socket, :redirect_countdown, n - 1)}
-    end
-  end
-
-  @impl true
   def terminate(_reason, socket) do
-    # TODO: edit when we add spectator mode
     # Leave room when LiveView process terminates (e.g., navigation away)
-    # Only if user was actually in the room (not on redirect screen)
-    if !socket.assigns[:redirect_countdown] do
-      SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
-    end
-
+    SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     :ok
   end
 
@@ -149,13 +128,9 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div class="min-h-screen bg-base-100 flex items-center justify-center p-8">
       <div class="max-w-4xl w-full">
-        <%= if @redirect_countdown do %>
-          <.redirect_view countdown={@redirect_countdown} />
+        <%= if @is_spectator do %>
+          <.spectator_view room_state={@room_state} />
         <% else %>
-          <%= if @room_state.status == :autostart do %>
-            <.waiting_view room_state={@room_state} user_id={@user_id} />
-          <% end %>
-
           <%= if @room_state.status == :active do %>
             <.active_session_view room_state={@room_state} user_id={@user_id} />
           <% end %>
@@ -169,57 +144,51 @@ defmodule SocialPomodoroWeb.SessionLive do
     """
   end
 
-  defp waiting_view(assigns) do
+  attr :room_state, :map, required: true
+
+  def spectator_view(assigns) do
     ~H"""
     <div class="card bg-base-200">
-      <div class="card-body text-center relative">
-        <!-- Leave Button -->
-        <button
-          phx-click="leave_room"
-          phx-hook="ReleaseWakeLock"
-          id="leave-room-waiting"
-          class="btn btn-ghost btn-sm absolute top-4 left-4 text-error"
-        >
-          <Icons.leave class="w-4 h-4 fill-error" />
-          <span class="text-error">Leave</span>
-        </button>
-
-        <h1 class="card-title text-3xl justify-center mb-8">Waiting to Start</h1>
-        
-    <!-- Participants -->
-        <div class="flex justify-center gap-4 mb-8">
-          <%= for participant <- @room_state.participants do %>
-            <div class="text-center">
-              <.participant_avatar
-                user_id={participant.user_id}
-                username={participant.username}
-                current_user_id={@user_id}
-              />
-              <p class="text-sm mt-2">{participant.username}</p>
-            </div>
-          <% end %>
+      <div class="card-body text-center">
+        <div class="text-6xl mb-6">
+          <Icons.ghost class="w-24 h-24 mx-auto fill-base-content opacity-50" />
         </div>
-
-        <p class="text-lg mb-8">
-          {length(@room_state.participants)} {if length(@room_state.participants) == 1,
-            do: "person",
-            else: "people"} in room
-          · {@room_state.duration_minutes} minute session
+        <h1 class="card-title text-3xl justify-center mb-4">You're a spectator</h1>
+        <p class="text-xl mb-8">
+          Watch the session in progress. You'll be able to join during the break.
         </p>
 
-        <div class="card-actions justify-center">
-          <%= if @room_state.creator == @user_id do %>
-            <button
-              phx-click="start_session"
-              class="btn btn-primary btn-lg"
-            >
-              Start Session
-            </button>
-          <% else %>
-            <p class="opacity-50">Waiting for {@room_state.creator_username} to start...</p>
+        <.timer_display
+          id="spectator-timer-display"
+          seconds_remaining={@room_state.seconds_remaining}
+          label={
+            if @room_state.status == :active, do: "Focus time remaining", else: "Break time remaining"
+          }
+        />
+        
+    <!-- Participants with status and working_on (read-only) -->
+        <div class="flex flex-wrap justify-center gap-6 mb-8">
+          <%= for participant <- @room_state.participants do %>
+            <.participant_display participant={participant} />
           <% end %>
         </div>
+
+        <p class="text-sm opacity-70">
+          Interactions are disabled while spectating
+        </p>
       </div>
+    </div>
+    <!-- Leave Button for Spectator -->
+    <div class="flex justify-center mt-4">
+      <button
+        phx-click="leave_room"
+        phx-hook="ReleaseWakeLock"
+        id="leave-room-spectator"
+        class="btn btn-ghost btn-sm text-error"
+      >
+        <Icons.leave class="w-4 h-4 fill-error" />
+        <span class="text-error">Leave</span>
+      </button>
     </div>
     """
   end
@@ -235,7 +204,22 @@ defmodule SocialPomodoroWeb.SessionLive do
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
         <div class="card-body text-center">
-          <!-- Timer Display -->
+          <%= if @room_state.spectators_count > 0 do %>
+            <!-- Spectator Badge -->
+            <div class="flex justify-center mb-4">
+              <div
+                class="tooltip tooltip-bottom"
+                data-tip={"#{@room_state.spectators_count} spectator#{if @room_state.spectators_count > 1, do: "s", else: ""}. They will join when the current session ends."}
+              >
+                <div class="badge badge-ghost gap-2">
+                  <Icons.ghost class="w-4 h-4 fill-current" />
+                  <span>{@room_state.spectators_count}</span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+          
+    <!-- Timer Display -->
           <.timer_display
             id="timer-display"
             seconds_remaining={@room_state.seconds_remaining}
@@ -245,31 +229,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     <!-- Participants with status and working_on -->
           <div class="flex flex-wrap justify-center gap-6 mb-8">
             <%= for participant <- @room_state.participants do %>
-              <div class="flex flex-col items-center gap-2 max-w-xs">
-                <div class="relative">
-                  <.participant_avatar
-                    user_id={participant.user_id}
-                    username={participant.username}
-                    current_user_id={@user_id}
-                    size="w-16"
-                  />
-                  <%= if participant.status_emoji do %>
-                    <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
-                      <img
-                        src={emoji_to_openmoji(participant.status_emoji)}
-                        class="w-8 h-8"
-                        alt={participant.status_emoji}
-                      />
-                    </span>
-                  <% end %>
-                </div>
-                <p class="font-semibold text-center text-sm">{participant.username}</p>
-                <%= if participant.working_on do %>
-                  <p class="text-xs opacity-70 text-center break-words w-full">
-                    {participant.working_on}
-                  </p>
-                <% end %>
-              </div>
+              <.participant_display participant={participant} current_user_id={@user_id} />
             <% end %>
           </div>
           
@@ -368,6 +328,21 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
+        <%= if @room_state.spectators_count > 0 do %>
+          <!-- Spectator Badge -->
+          <div class="flex justify-center mb-4">
+            <div
+              class="tooltip tooltip-bottom"
+              data-tip={"#{@room_state.spectators_count} spectator#{if @room_state.spectators_count > 1, do: "s", else: ""}. They will join when the current session ends."}
+            >
+              <div class="badge badge-ghost gap-2">
+                <Icons.ghost class="w-4 h-4 fill-current" />
+                <span>{@room_state.spectators_count}</span>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
         <div class="text-6xl mb-6">🎉</div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
         <p class="text-xl mb-8">
@@ -456,33 +431,6 @@ defmodule SocialPomodoroWeb.SessionLive do
     end
   end
 
-  # TODO: remove this
-  defp redirect_view(assigns) do
-    ~H"""
-    <div class="card bg-base-200">
-      <div class="card-body text-center">
-        <div class="text-6xl mb-6">👋</div>
-        <h1 class="card-title text-3xl justify-center mb-4">Oops! You're not in this room</h1>
-        <p class="text-xl mb-8">
-          This session is only for participants who joined from the lobby.
-        </p>
-        <p class="text-lg mb-8">
-          Heading back to the lobby in <span class="font-bold text-primary">{@countdown}</span>
-          {if @countdown == 1, do: "second", else: "seconds"}...
-        </p>
-        <div class="card-actions justify-center">
-          <a
-            href="/"
-            class="btn btn-primary btn-lg"
-          >
-            Go to Lobby Now
-          </a>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
   attr :user_id, :string, required: true
   attr :username, :string, required: true
   attr :current_user_id, :string, required: true
@@ -540,5 +488,56 @@ defmodule SocialPomodoroWeb.SessionLive do
       true ->
         socket
     end
+  end
+
+  defp maybe_show_spectator_joining_flash(socket, room_state, is_spectator) do
+    if is_spectator and room_state.status == :active and room_state.seconds_remaining == 10 do
+      put_flash(socket, :info, "You'll join the room during the break")
+    else
+      socket
+    end
+  end
+
+  defp is_spectator?(room_state, user_id) do
+    not Enum.any?(room_state.session_participants, &(&1 == user_id))
+  end
+
+  attr :participant, :map, required: true
+  attr :current_user_id, :string, default: nil
+
+  defp participant_display(assigns) do
+    ~H"""
+    <div class="flex flex-col items-center gap-2 max-w-xs">
+      <div class="relative">
+        <.avatar
+          user_id={@participant.user_id}
+          username={@participant.username}
+          size="w-16"
+          class={
+            if @current_user_id && @participant.user_id == @current_user_id do
+              "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+            else
+              ""
+            end
+          }
+        />
+        <%= if @participant.status_emoji do %>
+          <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
+            <img
+              src={emoji_to_openmoji(@participant.status_emoji)}
+              class="w-8 h-8"
+              alt={@participant.status_emoji}
+            />
+          </span>
+        <% end %>
+      </div>
+      <p class="font-semibold text-center text-sm">{@participant.username}</p>
+      <%= if @participant.working_on do %>
+        <p class="text-xs opacity-70 text-center break-words w-full">
+          {@participant.working_on}
+        </p>
+      <% end %>
+    </div>
+    """
   end
 end

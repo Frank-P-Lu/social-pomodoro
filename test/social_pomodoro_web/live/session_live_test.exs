@@ -19,12 +19,21 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
   end
 
-  describe "non-participant redirect" do
-    test "non-participant sees redirect screen with countdown" do
+  # Helper to set shorter durations for faster testing
+  defp set_short_durations(room_pid, work_seconds \\ 10, break_seconds \\ 5) do
+    :sys.replace_state(room_pid, fn state ->
+      %{state | work_duration_seconds: work_seconds, break_duration_seconds: break_seconds}
+    end)
+  end
+
+  describe "spectator mode" do
+    test "spectator sees read-only view with ghost message" do
       connA = setup_user_conn("userA")
       connB = setup_user_conn("userB")
 
-      # User A creates room
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
       {:ok, lobbyA, _html} = live(connA, "/")
 
       lobbyA
@@ -33,30 +42,44 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       htmlA = render(lobbyA)
 
-      # Extract room_name
       room_name =
         case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
           [_, room_name] -> room_name
           _ -> nil
         end
 
-      # User B tries to access room URL directly without joining
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator
+      SocialPomodoro.Room.join(room_name, user_id_b)
+
+      # User B views the session
       {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
 
-      # Should see redirect screen (apostrophes are HTML-encoded)
-      assert htmlB =~ "Oops"
-      assert htmlB =~ "not in this room"
-      assert htmlB =~ "Heading back to the lobby"
-      assert htmlB =~ "Go to Lobby Now"
+      # Should see spectator message
+      assert htmlB =~ "You&#39;re a spectator"
+      assert htmlB =~ "Watch the session in progress"
+      assert htmlB =~ "Interactions are disabled while spectating"
 
-      # Should show countdown starting at 5
-      assert htmlB =~ "5"
+      # Should not see interactive elements (no emoji buttons, no working_on form)
+      refute htmlB =~ "phx-click=\"set_status\""
+      refute htmlB =~ "What are you working on?"
     end
 
-    test "participant does not see redirect screen" do
+    test "spectator automatically becomes participant during break" do
       connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
 
-      # User A creates room
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
       {:ok, lobbyA, _html} = live(connA, "/")
 
       lobbyA
@@ -65,20 +88,131 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       htmlA = render(lobbyA)
 
-      # Extract room_name
       room_name =
         case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
           [_, room_name] -> room_name
           _ -> nil
         end
 
-      # User A accesses their own room
-      {:ok, _sessionA, htmlA_session} = live(connA, "/room/#{room_name}")
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
 
-      # Should NOT see redirect screen
-      refute htmlA_session =~ "Oops! You're not in this room"
-      # Should see waiting room instead
-      assert htmlA_session =~ "Waiting to Start"
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator
+      SocialPomodoro.Room.join(room_name, user_id_b)
+
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      assert Enum.member?(room_state.spectators, user_id_b)
+
+      # Advance time to trigger break
+      tick_room(room_pid, 2)
+      Process.sleep(50)
+
+      # Check room state - B should now be a participant
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      refute Enum.member?(room_state.spectators, user_id_b)
+      assert Enum.any?(room_state.participants, &(&1.user_id == user_id_b))
+      assert room_state.status == :break
+    end
+
+    test "spectator badge shows correct count" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # Now navigate to session page
+      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+
+      # Initially no spectators
+      room_state = SocialPomodoro.Room.get_state(room_pid)
+      assert room_state.spectators_count == 0
+
+      # User B joins as spectator
+      SocialPomodoro.Room.join(room_name, user_id_b)
+      Process.sleep(50)
+
+      # Check spectator count
+      room_state = SocialPomodoro.Room.get_state(room_pid)
+      assert room_state.spectators_count == 1
+
+      # Render and check badge appears
+      htmlA = render(sessionA)
+      assert htmlA =~ "1"
+    end
+
+    test "spectator can leave room" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator
+      SocialPomodoro.Room.join(room_name, user_id_b)
+
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      assert Enum.member?(room_state.spectators, user_id_b)
+
+      # User B leaves
+      SocialPomodoro.Room.leave(room_name, user_id_b)
+      Process.sleep(50)
+
+      # Should be removed from spectators
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      refute Enum.member?(room_state.spectators, user_id_b)
     end
   end
 
@@ -102,21 +236,21 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
           _ -> nil
         end
 
-      # Get room pid and modify its state for faster testing
+      # Get room pid and set shorter durations for faster testing
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-
-      # Manually update the room to use shorter durations
-      :sys.replace_state(room_pid, fn state ->
-        %{state | work_duration_seconds: 1, break_duration_seconds: 2}
-      end)
-
-      # Join the room and start session
-      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
+      set_short_durations(room_pid, 1, 2)
 
       # Start the session
-      session_view
-      |> element("button[phx-click='start_session']")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
       |> render_click()
+
+      Process.sleep(50)
+
+      # Join the room
+      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
 
       # Advance time for active session to complete (1 second duration + 1 tick to transition)
       tick_room(room_pid, 2)
@@ -155,21 +289,21 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
           _ -> nil
         end
 
-      # Get room pid and modify its state for faster testing
+      # Get room pid and set shorter durations for faster testing
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-
-      # Manually update the room to use shorter durations
-      :sys.replace_state(room_pid, fn state ->
-        %{state | work_duration_seconds: 1, break_duration_seconds: 3}
-      end)
-
-      # Join the room and start session
-      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
+      set_short_durations(room_pid, 1, 3)
 
       # Start the session
-      session_view
-      |> element("button[phx-click='start_session']")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
       |> render_click()
+
+      Process.sleep(50)
+
+      # Join the room
+      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
 
       # Advance time for active session to complete (1 second duration + 1 tick to transition)
       tick_room(room_pid, 2)
@@ -219,6 +353,15 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       room_state = SocialPomodoro.Room.get_state(room_pid)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id))
 
+      # Start the session from lobby
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
       # User A navigates to session page
       {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
 
@@ -237,7 +380,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       refute Enum.any?(room_state.participants, &(&1.user_id == user_id))
     end
 
-    test "user is not removed when on redirect screen and navigates away" do
+    test "spectator is removed when navigating away" do
       connA = setup_user_conn("userA")
       connB = setup_user_conn("userB")
 
@@ -265,22 +408,34 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       room_state = SocialPomodoro.Room.get_state(room_pid)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id_a))
 
-      # User B tries to access room URL directly (shows redirect screen)
-      {:ok, session_view_b, htmlB} = live(connB, "/room/#{room_name}")
-      assert htmlB =~ "not in this room"
+      # Start session so B can join as spectator
+      set_short_durations(room_pid)
 
-      # User B was never in the room
-      room_state = SocialPomodoro.Room.get_state(room_pid)
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator
+      SocialPomodoro.Room.join(room_name, user_id_b)
+
+      {:ok, session_view_b, htmlB} = live(connB, "/room/#{room_name}")
+      assert htmlB =~ "You&#39;re a spectator"
+
+      # User B is a spectator
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      assert Enum.member?(room_state.spectators, user_id_b)
       refute Enum.any?(room_state.participants, &(&1.user_id == user_id_b))
 
       # User B navigates away
       GenServer.stop(session_view_b.pid)
       Process.sleep(50)
 
-      # User A should still be in room (B was never there, so nothing should change)
-      room_state = SocialPomodoro.Room.get_state(room_pid)
+      # User B should be removed from spectators
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      refute Enum.member?(room_state.spectators, user_id_b)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id_a))
-      refute Enum.any?(room_state.participants, &(&1.user_id == user_id_b))
     end
   end
 end

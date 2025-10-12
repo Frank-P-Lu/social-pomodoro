@@ -210,7 +210,15 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       {:ok, lobbyB, htmlB} = live(connB, "/")
       assert htmlB =~ room_name
 
-      # User A navigates to the room page
+      # User A starts the session from the lobby
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      # Wait for session to start
+      Process.sleep(50)
+
+      # User A should be navigated to the session page
       {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
 
       # User A leaves the room (which should close it since they're the only participant)

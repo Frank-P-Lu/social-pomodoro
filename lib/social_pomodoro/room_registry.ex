@@ -102,9 +102,9 @@ defmodule SocialPomodoro.RoomRegistry do
       |> Enum.filter(fn room ->
         # Show room if:
         # - It has participants (for discovery of waiting/active rooms)
-        # - User is an original participant (so they can see rooms to rejoin)
+        # - User is a session participant (so they can see rooms to rejoin)
         not Enum.empty?(room.participants) or
-          Enum.member?(room.original_participants, user_id)
+          Enum.member?(room.session_participants, user_id)
       end)
 
     {:reply, rooms, state}
@@ -132,9 +132,10 @@ defmodule SocialPomodoro.RoomRegistry do
       :ets.tab2list(@table_name)
       |> Enum.find_value(fn {name, pid} ->
         if Process.alive?(pid) do
-          room_state = SocialPomodoro.Room.get_state(pid)
+          room_state = SocialPomodoro.Room.get_raw_state(pid)
 
-          if Enum.any?(room_state.participants, &(&1.user_id == user_id)) do
+          if Enum.any?(room_state.participants, &(&1.user_id == user_id)) or
+               Enum.member?(room_state.spectators, user_id) do
             name
           end
         end

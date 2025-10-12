@@ -50,9 +50,30 @@ defmodule SocialPomodoroWeb.LobbyLive do
       {:ok, socket} ->
         display_name = String.replace(room_name, "-", " ")
 
-        socket
-        |> put_flash(:info, "Joined #{display_name}")
-        |> push_navigate(to: ~p"/")
+        # Check room status to determine where to navigate
+        case SocialPomodoro.RoomRegistry.get_room(room_name) do
+          {:ok, pid} ->
+            room_state = SocialPomodoro.Room.get_state(pid)
+
+            case room_state.status do
+              :autostart ->
+                # Room is waiting, go to lobby
+                socket
+                |> put_flash(:info, "Joined #{display_name}")
+                |> push_navigate(to: ~p"/")
+
+              _ ->
+                # Room is active or in break, go to session page
+                socket
+                |> put_flash(:info, "Joined #{display_name}")
+                |> push_navigate(to: ~p"/room/#{room_name}")
+            end
+
+          {:error, _} ->
+            socket
+            |> put_flash(:error, "Room not found")
+            |> push_navigate(to: ~p"/")
+        end
 
       {:error, socket} ->
         Logger.error("Failed to join room #{room_name}")
@@ -308,11 +329,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   defp can_rejoin?(room, user_id) do
-    # User can rejoin if they're an original participant but not currently in the room
-    is_original = Enum.member?(room.original_participants, user_id)
+    # User can rejoin if they're a session participant but not currently in the room
+    is_session_participant = Enum.member?(room.session_participants, user_id)
     is_currently_in_room = Enum.any?(room.participants, &(&1.user_id == user_id))
 
-    is_original and not is_currently_in_room
+    is_session_participant and not is_currently_in_room
   end
 
   attr :room, :map, required: true
@@ -367,7 +388,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <!-- Action Button -->
         <div class="flex items-center justify-between gap-4">
           <!-- Status -->
-          <div>
+          <div class="flex gap-2 items-center">
             <%= if @room.status == :autostart do %>
               <div class="badge badge-soft badge-warning gap-2">
                 <div class="status status-warning animate-pulse"></div>
@@ -390,6 +411,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   />
                 </svg>
                 In Progress
+              </div>
+            <% end %>
+
+            <%!-- Show spectator badge for in-progress rooms --%>
+            <%= if @room.status in [:active, :break] && @room.spectators_count > 0 do %>
+              <div class="badge badge-ghost gap-1">
+                <Icons.ghost class="w-3 h-3 fill-current" />
+                <span class="text-xs">{@room.spectators_count}</span>
               </div>
             <% end %>
           </div>
