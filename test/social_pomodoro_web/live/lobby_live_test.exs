@@ -91,8 +91,8 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert htmlA =~ "2 people"
       assert htmlB =~ "2 people"
 
-      # User B should see "Waiting for host..." somewhere in the page
-      assert htmlB =~ "Waiting for host..."
+      # User B should see "Starting in" countdown somewhere in the page
+      assert htmlB =~ "Starting in"
       # And the room_name should exist in a button (no longer Join for this room)
       refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-name="#{room_name}"/
 
@@ -154,13 +154,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       html1 = render(lobbyB1)
-      assert html1 =~ "Waiting for host..."
+      assert html1 =~ "Starting in"
 
       # User B refreshes
       {:ok, _lobbyB2, html2} = live(connB, "/")
 
-      # Should still see "Waiting for host..." (not "Join")
-      assert html2 =~ "Waiting for host..."
+      # Should still see "Starting in" countdown (not "Join")
+      assert html2 =~ "Starting in"
       refute html2 =~ ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>Join<\/button>/
     end
 
@@ -393,14 +393,14 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert (htmlB_after =~ room_name and htmlB_after =~ "2 people") or
                (htmlC_after =~ room_name and htmlC_after =~ "2 people")
 
-      # One of User B or User C should now see the Start button (indicating they're the new creator)
+      # One of User B or User C should now see the Start Now button (indicating they're the new creator)
       has_start_button_B =
         htmlB_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
 
       has_start_button_C =
         htmlC_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
 
       # Exactly one of them should be the new creator
       assert has_start_button_B or has_start_button_C
@@ -546,8 +546,8 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Follow the redirect
       {:ok, _lobbyB, htmlB} = live(connB, "/")
 
-      # User B should now be in the room
-      assert htmlB =~ "Waiting for host..."
+      # User B should now be in the room with autostart countdown
+      assert htmlB =~ "Starting in"
 
       # Both users should see 2 participants
       htmlA_after = render(lobbyA)

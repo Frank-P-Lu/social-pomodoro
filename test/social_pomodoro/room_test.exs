@@ -775,4 +775,69 @@ defmodule SocialPomodoro.RoomTest do
       assert room.name == room_name
     end
   end
+
+  describe "autostart countdown" do
+    test "session timer starts at correct duration after autostart countdown completes" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      duration_seconds = 25 * 60
+
+      # Create room with manual ticking (very large tick_interval to prevent auto-ticking)
+      {:ok, _room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: duration_seconds,
+          tick_interval: 999_999_999
+        )
+
+      # Room should start in autostart status with 180 seconds
+      state = Room.get_state(room_pid)
+      assert state.status == :autostart
+      assert state.seconds_remaining == 180
+
+      # Tick down the autostart countdown: 180 -> 179 -> 178 -> ... -> 1 -> 0
+      # We need 180 ticks to get to 0, then 1 more tick to trigger the transition
+      for _i <- 1..181 do
+        tick(room_pid)
+      end
+
+      # After autostart completes, room should transition to :active
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+
+      # Session timer should start at the ORIGINAL duration_seconds, not the countdown value!
+      assert state.seconds_remaining == duration_seconds
+    end
+
+    test "manual start during autostart countdown resets timer to full duration" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      duration_seconds = 25 * 60
+
+      # Create room with manual ticking
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: duration_seconds,
+          tick_interval: 999_999_999
+        )
+
+      # Verify autostart countdown
+      state = Room.get_state(room_pid)
+      assert state.status == :autostart
+      assert state.seconds_remaining == 180
+
+      # Tick down partway: 180 -> 179 -> 178 -> ... -> 170
+      for _i <- 1..10 do
+        tick(room_pid)
+      end
+
+      state = Room.get_state(room_pid)
+      assert state.seconds_remaining == 170
+
+      # Creator manually starts the session
+      Room.start_session(room_name)
+
+      # Session should start at FULL duration, not the countdown value
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.seconds_remaining == duration_seconds
+    end
+  end
 end

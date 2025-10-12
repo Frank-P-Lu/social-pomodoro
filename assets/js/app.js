@@ -41,6 +41,17 @@ async function ensureWakeLock() {
   }
 }
 
+// Audio context for alert sounds
+let alertAudio = null
+
+function initializeAudio() {
+  if (!alertAudio) {
+    alertAudio = new Audio('/sounds/alert.wav')
+    // Load the audio file during user interaction to unlock it in Safari
+    alertAudio.load()
+  }
+}
+
 function releaseWakeLock() {
   if (wakeLock && !wakeLock.released) {
     wakeLock.release()
@@ -87,8 +98,10 @@ Hooks.Timer = {
       }
       if (this.seconds === 0) {
         // Play alert sound when timer reaches 0
-        const audio = new Audio('/sounds/alert.wav')
-        audio.play().catch(err => console.error('Failed to play alert:', err))
+        if (alertAudio) {
+          alertAudio.currentTime = 0
+          alertAudio.play().catch(err => console.error('Failed to play alert:', err))
+        }
       }
     }, 1000)
   },
@@ -108,7 +121,7 @@ Hooks.Timer = {
     const secs = this.seconds % 60
     const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`
     this.el.textContent = timeStr
-    
+
     // Update tab title
     if (this.isBreak) {
       document.title = `BREAK ${timeStr} | ${APP_TITLE}`
@@ -118,9 +131,37 @@ Hooks.Timer = {
   }
 }
 
+Hooks.AutostartTimer = {
+  mounted() {
+    this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
+    this.updateDisplay()
+    this.interval = setInterval(() => {
+      this.seconds--
+      if (this.seconds >= 0) {
+        this.updateDisplay()
+      }
+    }, 1000)
+  },
+  updated() {
+    // Sync with server updates (every 5 seconds)
+    this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
+    this.updateDisplay()
+  },
+  destroyed() {
+    clearInterval(this.interval)
+  },
+  updateDisplay() {
+    const minutes = Math.floor(this.seconds / 60)
+    const secs = this.seconds % 60
+    const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`
+    this.el.textContent = timeStr
+  }
+}
+
 Hooks.RequestWakeLock = {
   mounted() {
     ensureWakeLock()
+    initializeAudio()
   }
 }
 

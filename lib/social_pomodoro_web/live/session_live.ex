@@ -152,8 +152,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <%= if @redirect_countdown do %>
           <.redirect_view countdown={@redirect_countdown} />
         <% else %>
-          <%= if @room_state.status == :waiting do %>
-            <%!-- TODO: remove waiting view --%>
+          <%= if @room_state.status == :autostart do %>
             <.waiting_view room_state={@room_state} user_id={@user_id} />
           <% end %>
 

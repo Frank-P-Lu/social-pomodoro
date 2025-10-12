@@ -107,7 +107,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Manually update the room to use shorter durations
       :sys.replace_state(room_pid, fn state ->
-        %{state | duration_seconds: 1, break_duration_seconds: 2}
+        %{state | work_duration_seconds: 1, break_duration_seconds: 2}
       end)
 
       # Join the room and start session
@@ -160,7 +160,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Manually update the room to use shorter durations
       :sys.replace_state(room_pid, fn state ->
-        %{state | duration_seconds: 1, break_duration_seconds: 3}
+        %{state | work_duration_seconds: 1, break_duration_seconds: 3}
       end)
 
       # Join the room and start session

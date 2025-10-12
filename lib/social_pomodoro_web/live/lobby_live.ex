@@ -340,9 +340,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
             {length(@room.participants)} {if length(@room.participants) == 1,
               do: "person",
               else: "people"} waiting · {@room.duration_minutes} min
-            <%= if @room.status != :waiting do %>
-              · {format_time_remaining(@room.seconds_remaining)} remaining
-            <% end %>
           </div>
         </div>
         
@@ -365,22 +362,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="flex items-center justify-between gap-4">
           <!-- Status -->
           <div>
-            <%= if @room.status == :waiting do %>
-              <%= if @room.name == @my_room_name do %>
-                <%= if @room.creator == @user_id do %>
-                  <div class="badge badge-soft badge-success">
-                    <div class="status status-success "></div>
-                    Ready
-                  </div>
-                <% else %>
-                  <div class="badge badge-soft badge-warning gap-2">
-                    <div class="status status-warning animate-bounce"></div>
-                    Waiting for host...
-                  </div>
-                <% end %>
-              <% else %>
-                <div class="badge badge-soft badge-info">Waiting</div>
-              <% end %>
+            <%= if @room.status == :autostart do %>
+              <div class="badge badge-soft badge-warning gap-2">
+                <div class="status status-warning animate-pulse"></div>
+                Starting in
+                <span
+                  phx-hook="AutostartTimer"
+                  id={"autostart-timer-#{@room.name}"}
+                  data-seconds-remaining={@room.seconds_remaining}
+                >
+                  {format_time_remaining(@room.seconds_remaining)}
+                </span>
+              </div>
             <% else %>
               <div class="badge badge-soft badge-neutral gap-2">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -397,7 +390,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
           
     <!-- Actions -->
           <div class="card-actions">
-            <%= if @room.status == :waiting do %>
+            <%= if @room.status == :autostart do %>
               <%= if @room.name == @my_room_name do %>
                 <button
                   phx-click="leave_room"
@@ -413,7 +406,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     id={"start-room-btn-#{@room.name}"}
                     class="btn btn-primary btn-sm"
                   >
-                    Start
+                    Start Now
                   </button>
                 <% end %>
               <% else %>

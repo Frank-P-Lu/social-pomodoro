@@ -5,18 +5,22 @@ defmodule SocialPomodoro.Room do
   use GenServer
   require Logger
 
+  alias SocialPomodoro.Timer
+
   # 1 second
   @tick_interval 1000
+
+  @type status :: :autostart | :active | :break
 
   defstruct [
     :name,
     :creator,
-    :duration_seconds,
     :status,
     :participants,
     :original_participants,
     :timer_ref,
-    :seconds_remaining,
+    :timer,
+    :work_duration_seconds,
     :break_duration_seconds,
     :created_at,
     :tick_interval,
@@ -91,15 +95,20 @@ defmodule SocialPomodoro.Room do
     tick_interval = Keyword.get(opts, :tick_interval, @tick_interval)
     break_duration_seconds = Keyword.get(opts, :break_duration_seconds, 5 * 60)
 
+    # Start 3-minute autostart countdown
+    autostart_seconds = 3 * 60
+    timer_ref = Process.send_after(self(), :tick, tick_interval)
+    timer = Timer.new(autostart_seconds) |> Timer.start()
+
     state = %__MODULE__{
       name: name,
       creator: creator,
-      duration_seconds: duration_seconds,
-      status: :waiting,
+      work_duration_seconds: duration_seconds,
+      status: :autostart,
       participants: [%{user_id: creator, ready_for_next: false}],
       original_participants: [],
-      timer_ref: nil,
-      seconds_remaining: nil,
+      timer_ref: timer_ref,
+      timer: timer,
       break_duration_seconds: break_duration_seconds,
       created_at: System.system_time(:second),
       tick_interval: tick_interval,
@@ -179,49 +188,8 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def handle_call(:start_session, _from, state) do
-    if state.status == :waiting do
-      seconds = state.duration_seconds
-      timer_ref = Process.send_after(self(), :tick, state.tick_interval)
-
-      # Calculate wait time (time between room creation and session start)
-      wait_time_seconds = System.system_time(:second) - state.created_at
-
-      # Capture original participants (who were in the room when it started)
-      original_participant_ids = Enum.map(state.participants, & &1.user_id)
-
-      new_state = %{
-        state
-        | status: :active,
-          seconds_remaining: seconds,
-          timer_ref: timer_ref,
-          original_participants: original_participant_ids,
-          working_on: %{},
-          status_emoji: %{}
-      }
-
-      # Emit telemetry event for session start
-      participant_user_ids = Enum.map(state.participants, & &1.user_id)
-
-      :telemetry.execute(
-        [:pomodoro, :session, :started],
-        %{count: 1},
-        %{
-          room_name: state.name,
-          participant_user_ids: participant_user_ids,
-          participant_count: length(state.participants),
-          wait_time_seconds: wait_time_seconds
-        }
-      )
-
-      # Broadcast to all participants to navigate to session page
-      Enum.each(state.participants, fn participant ->
-        Phoenix.PubSub.broadcast(
-          SocialPomodoro.PubSub,
-          "user:#{participant.user_id}",
-          {:session_started, state.name}
-        )
-      end)
-
+    if state.status == :autostart do
+      new_state = do_start_session(state, manual_start: true)
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else
@@ -252,13 +220,13 @@ defmodule SocialPomodoro.Room do
         # Cancel existing timer before creating new one
         if new_state.timer_ref, do: Process.cancel_timer(new_state.timer_ref)
 
-        seconds = state.duration_seconds
+        timer = Timer.new(state.work_duration_seconds) |> Timer.start()
         timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
         final_state = %{
           new_state
           | status: :active,
-            seconds_remaining: seconds,
+            timer: timer,
             timer_ref: timer_ref,
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
             working_on: %{},
@@ -333,12 +301,46 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_info(:tick, %{seconds_remaining: 0, status: :active} = state) do
+  def handle_info(:tick, state) do
+    case Timer.tick(state.timer) do
+      {:ok, updated_timer} ->
+        # Timer still running
+        timer_ref = Process.send_after(self(), :tick, state.tick_interval)
+        new_state = %{state | timer: updated_timer, timer_ref: timer_ref}
+
+        # Only broadcast every 5 seconds to reduce network spam
+        should_broadcast = rem(updated_timer.remaining, 5) == 0 || updated_timer.remaining <= 10
+
+        if should_broadcast do
+          broadcast_room_update(new_state)
+        end
+
+        {:noreply, new_state}
+
+      {:done, _timer} ->
+        # Timer completed, handle transition
+        handle_timer_complete(state)
+    end
+  end
+
+  defp handle_timer_complete(%{status: :autostart} = state) do
+    # Autostart countdown complete
+    if Enum.empty?(state.participants) do
+      # No participants, terminate the room
+      {:stop, :normal, state}
+    else
+      # Has participants, auto-start the session
+      new_state = do_start_session(state, autostart: true)
+      broadcast_room_update(new_state)
+      {:noreply, new_state}
+    end
+  end
+
+  defp handle_timer_complete(%{status: :active} = state) do
     # Session complete, start break
-    # Cancel existing timer before creating new one
     if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
 
-    seconds = state.break_duration_seconds
+    timer = Timer.new(state.break_duration_seconds) |> Timer.start()
     timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
     # Emit telemetry event for session completion
@@ -348,14 +350,14 @@ defmodule SocialPomodoro.Room do
       %{
         room_name: state.name,
         participant_count: length(state.participants),
-        duration_minutes: div(state.duration_seconds, 60)
+        duration_minutes: div(state.work_duration_seconds, 60)
       }
     )
 
     new_state = %{
       state
       | status: :break,
-        seconds_remaining: seconds,
+        timer: timer,
         timer_ref: timer_ref
     }
 
@@ -363,28 +365,9 @@ defmodule SocialPomodoro.Room do
     {:noreply, new_state}
   end
 
-  @impl true
-  def handle_info(:tick, %{seconds_remaining: 0, status: :break} = state) do
+  defp handle_timer_complete(%{status: :break} = state) do
     # Break complete, terminate the room
     {:stop, :normal, state}
-  end
-
-  @impl true
-  def handle_info(:tick, state) do
-    new_seconds = state.seconds_remaining - 1
-    timer_ref = Process.send_after(self(), :tick, state.tick_interval)
-
-    new_state = %{state | seconds_remaining: new_seconds, timer_ref: timer_ref}
-
-    # Only broadcast every 5 seconds to reduce network spam
-    # Still broadcast on important moments (last 10 seconds, every minute, etc)
-    should_broadcast = rem(new_seconds, 5) == 0 || new_seconds <= 10
-
-    if should_broadcast do
-      broadcast_room_update(new_state)
-    end
-
-    {:noreply, new_state}
   end
 
   @impl true
@@ -402,6 +385,64 @@ defmodule SocialPomodoro.Room do
 
   ## Private Helpers
 
+  defp do_start_session(state, opts) do
+    # Cancel existing timer before creating new one
+    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+
+    timer = Timer.new(state.work_duration_seconds) |> Timer.start()
+    timer_ref = Process.send_after(self(), :tick, state.tick_interval)
+
+    # Calculate wait time (time between room creation and session start)
+    wait_time_seconds = System.system_time(:second) - state.created_at
+
+    # Capture original participants (who were in the room when it started)
+    original_participant_ids = Enum.map(state.participants, & &1.user_id)
+
+    new_state = %{
+      state
+      | status: :active,
+        timer: timer,
+        timer_ref: timer_ref,
+        original_participants: original_participant_ids,
+        working_on: %{},
+        status_emoji: %{}
+    }
+
+    # Emit telemetry event for session start
+    participant_user_ids = Enum.map(state.participants, & &1.user_id)
+
+    telemetry_metadata = %{
+      room_name: state.name,
+      participant_user_ids: participant_user_ids,
+      participant_count: length(state.participants),
+      wait_time_seconds: wait_time_seconds
+    }
+
+    # Add optional metadata
+    telemetry_metadata =
+      Enum.reduce(opts, telemetry_metadata, fn {key, value}, acc ->
+        Map.put(acc, key, value)
+      end)
+
+    :telemetry.execute(
+      [:pomodoro, :session, :started],
+      %{count: 1},
+      telemetry_metadata
+    )
+
+    # Broadcast to all participants to navigate to session page
+    Enum.each(state.participants, fn participant ->
+      Phoenix.PubSub.broadcast(
+        SocialPomodoro.PubSub,
+        "user:#{participant.user_id}",
+        {:session_started, state.name}
+      )
+    end)
+
+    new_state
+  end
+
+  # TODO: optimise when this is called
   defp broadcast_room_update(state) do
     Phoenix.PubSub.broadcast(
       SocialPomodoro.PubSub,
@@ -437,11 +478,11 @@ defmodule SocialPomodoro.Room do
       name: state.name,
       creator: state.creator,
       creator_username: creator_username,
-      duration_minutes: div(state.duration_seconds, 60),
+      duration_minutes: div(state.work_duration_seconds, 60),
       status: state.status,
       participants: participants_with_usernames,
       original_participants: state.original_participants,
-      seconds_remaining: state.seconds_remaining,
+      seconds_remaining: state.timer.remaining,
       break_duration_minutes: div(state.break_duration_seconds, 60)
     }
   end
