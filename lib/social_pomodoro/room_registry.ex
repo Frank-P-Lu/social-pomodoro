@@ -100,7 +100,9 @@ defmodule SocialPomodoro.RoomRegistry do
       end)
       |> Enum.reject(&is_nil/1)
       |> Enum.filter(fn room ->
-        # Show room if it has participants OR if user is an original participant
+        # Show room if:
+        # - It has participants (for discovery of waiting/active rooms)
+        # - User is an original participant (so they can see rooms to rejoin)
         not Enum.empty?(room.participants) or
           Enum.member?(room.original_participants, user_id)
       end)

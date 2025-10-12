@@ -330,15 +330,17 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div>
           <div class="flex items-start justify-between gap-2">
             <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
-            <button
-              id={"share-btn-#{@room.name}"}
-              phx-hook="CopyToClipboard"
-              data-room-name={@room.name}
-              class="btn btn-ghost btn-xs btn-square"
-              title="Share room"
-            >
-              <Icons.share class="w-4 h-4 fill-current" />
-            </button>
+            <%= if @room.creator == @user_id or @room.name == @my_room_name do %>
+              <button
+                id={"share-btn-#{@room.name}"}
+                phx-hook="CopyToClipboard"
+                data-room-name={@room.name}
+                class="btn btn-ghost btn-xs btn-square"
+                title="Share room"
+              >
+                <Icons.share class="w-4 h-4 fill-current" />
+              </button>
+            <% end %>
           </div>
           <div class="text-sm opacity-70">
             {length(@room.participants)} {if length(@room.participants) == 1,

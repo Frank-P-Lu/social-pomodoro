@@ -486,7 +486,6 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     test "rejoin button only appears for rooms the user left" do
       connA = setup_user_conn("userA")
       connB = setup_user_conn("userB")
-      connC = setup_user_conn("userC")
 
       # User A creates room
       {:ok, lobbyA, _html} = live(connA, "/")
@@ -511,16 +510,26 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for room to start
+      Process.sleep(100)
+
+      # User B navigates to the room
+      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
+
+      # User B leaves the room
+      sessionB
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
       Process.sleep(50)
 
-      # User C loads lobby (never joined this room)
-      {:ok, _lobbyC, htmlC} = live(connC, "/")
+      # User B loads lobby again
+      {:ok, _lobbyB2, htmlB2} = live(connB, "/")
 
-      # User C should see the room as "In Progress" but NO button to join/rejoin
-      assert htmlC =~ room_name
-      assert htmlC =~ "In Progress"
-      refute htmlC =~ "Rejoin"
-      refute htmlC =~ ~r/<button[^>]*phx-value-room-name="#{room_name}"/
+      # User B should see the room with "Rejoin" button (was an original participant)
+      assert htmlB2 =~ room_name
+      assert htmlB2 =~ "In Progress"
+      assert htmlB2 =~ "Rejoin"
     end
   end
 
@@ -581,6 +590,92 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert html =~ ~r/id="share-btn-#{room_name}"/
       assert html =~ ~r/data-room-name="#{Regex.escape(room_name)}"/
       assert html =~ ~r/phx-hook="CopyToClipboard"/
+    end
+
+    test "share button only visible to creator" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name(htmlA)
+
+      # User A (creator) should see share button
+      assert htmlA =~ ~r/id="share-btn-#{room_name}"/
+
+      # User B loads lobby (not in room)
+      {:ok, _lobbyB, htmlB} = live(connB, "/")
+
+      # User B should NOT see share button for User A's room
+      refute htmlB =~ ~r/id="share-btn-#{room_name}"/
+    end
+
+    test "share button visible to participants" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name(htmlA)
+
+      # User B joins the room
+      {:ok, lobbyB, _html} = live(connB, "/")
+
+      lobbyB
+      |> element("button[phx-value-room-name='#{room_name}']")
+      |> render_click()
+
+      htmlB_after = render(lobbyB)
+
+      # User B (now a participant) should see share button
+      assert htmlB_after =~ ~r/id="share-btn-#{room_name}"/
+    end
+
+    test "share button hidden from non-participants after user leaves" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name(htmlA)
+
+      # User B joins the room
+      {:ok, lobbyB, _html} = live(connB, "/")
+
+      lobbyB
+      |> element("button[phx-value-room-name='#{room_name}']")
+      |> render_click()
+
+      htmlB_joined = render(lobbyB)
+      # User B should see share button while in room
+      assert htmlB_joined =~ ~r/id="share-btn-#{room_name}"/
+
+      # User B leaves the room
+      lobbyB
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      htmlB_left = render(lobbyB)
+      # User B should NOT see share button after leaving
+      refute htmlB_left =~ ~r/id="share-btn-#{room_name}"/
     end
   end
 
