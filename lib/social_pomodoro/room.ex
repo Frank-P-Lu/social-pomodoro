@@ -95,8 +95,8 @@ defmodule SocialPomodoro.Room do
     tick_interval = Keyword.get(opts, :tick_interval, @tick_interval)
     break_duration_seconds = Keyword.get(opts, :break_duration_seconds, 5 * 60)
 
-    # Start 3-minute autostart countdown
-    autostart_seconds = 3 * 60
+    # Start autostart countdown (configurable in SocialPomodoro.Config)
+    autostart_seconds = SocialPomodoro.Config.autostart_countdown_seconds()
     timer_ref = Process.send_after(self(), :tick, tick_interval)
     timer = Timer.new(autostart_seconds) |> Timer.start()
 
@@ -308,8 +308,19 @@ defmodule SocialPomodoro.Room do
         timer_ref = Process.send_after(self(), :tick, state.tick_interval)
         new_state = %{state | timer: updated_timer, timer_ref: timer_ref}
 
-        # Only broadcast every 5 seconds to reduce network spam
-        should_broadcast = rem(updated_timer.remaining, 5) == 0 || updated_timer.remaining <= 10
+        # Broadcast strategy depends on status:
+        # - autostart: only broadcast every 10 seconds (client handles countdown independently)
+        # - active/break: broadcast every 10 seconds or in final 10 seconds
+        should_broadcast =
+          case state.status do
+            :autostart ->
+              # During autostart, broadcast every 10 seconds for sync only
+              rem(updated_timer.remaining, 10) == 0
+
+            _ ->
+              # During session/break, broadcast every 10 seconds or in final 10 seconds
+              rem(updated_timer.remaining, 10) == 0 || updated_timer.remaining <= 10
+          end
 
         if should_broadcast do
           broadcast_room_update(new_state)

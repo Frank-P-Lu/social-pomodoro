@@ -143,7 +143,7 @@ Hooks.AutostartTimer = {
     }, 1000)
   },
   updated() {
-    // Sync with server updates (every 5 seconds)
+    // Sync with server updates (every 10 seconds)
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.updateDisplay()
   },

@@ -212,6 +212,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
     end)
   end
 
+  defp min_timer_minutes do
+    SocialPomodoro.Config.min_timer_minutes()
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -538,7 +542,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 <input
                   type="range"
                   id="duration-slider"
-                  min="5"
+                  min={min_timer_minutes()}
                   max="180"
                   value={@duration_minutes}
                   name="minutes"
@@ -547,7 +551,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 />
               </form>
               <div class="flex justify-between text-xs opacity-50 mt-1">
-                <span>5 min</span>
+                <span>{min_timer_minutes()} min</span>
                 <span>3 hours</span>
               </div>
               <label for="duration-slider" class="label w-full">
