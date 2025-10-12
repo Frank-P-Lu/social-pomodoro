@@ -29,6 +29,14 @@ defmodule SocialPomodoroWeb.SessionLive do
           # Check if user is a spectator
           is_spectator = is_spectator?(room_state, user_id)
 
+          # Set completion message if room is already in break
+          completion_msg =
+            if room_state.status == :break do
+              completion_message(room_state.duration_minutes, length(room_state.participants))
+            else
+              nil
+            end
+
           socket =
             socket
             |> assign(:name, name)
@@ -37,6 +45,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             |> assign(:username, username)
             |> assign(:selected_emoji, nil)
             |> assign(:is_spectator, is_spectator)
+            |> assign(:completion_message, completion_msg)
 
           {:ok, socket}
         end
@@ -53,8 +62,8 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
-  def handle_event("set_working_on", %{"text" => text}, socket) do
-    SocialPomodoro.Room.set_working_on(
+  def handle_event("set_status_message", %{"text" => text}, socket) do
+    SocialPomodoro.Room.set_status_message(
       socket.assigns.name,
       socket.assigns.user_id,
       text
@@ -81,6 +90,19 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_event("set_break_feedback", %{"emoji" => emoji}, socket) do
+    SocialPomodoro.Room.set_break_feedback(
+      socket.assigns.name,
+      socket.assigns.user_id,
+      emoji
+    )
+
+    {:noreply, socket}
+  end
+
+
+
+  @impl true
   def handle_event("leave_room", _params, socket) do
     SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     {:noreply, push_navigate(socket, to: ~p"/")}
@@ -90,6 +112,19 @@ defmodule SocialPomodoroWeb.SessionLive do
   def handle_info({:room_state, room_state}, socket) do
     # Update spectator status
     is_spectator = is_spectator?(room_state, socket.assigns.user_id)
+
+    # Save completion message when transitioning to break (only once)
+    old_status = socket.assigns.room_state.status
+    
+    socket =
+      if room_state.status == :break && old_status != :break do
+        completion_msg =
+          completion_message(room_state.duration_minutes, length(room_state.participants))
+
+        assign(socket, :completion_message, completion_msg)
+      else
+        socket
+      end
 
     socket =
       socket
@@ -166,7 +201,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           }
         />
         
-    <!-- Participants with status and working_on (read-only) -->
+    <!-- Participants with status and status_message (read-only) -->
         <div class="flex flex-wrap justify-center gap-6 mb-8">
           <%= for participant <- @room_state.participants do %>
             <.participant_display participant={participant} />
@@ -226,7 +261,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             label="Focus time remaining"
           />
           
-    <!-- Participants with status and working_on -->
+    <!-- Participants with status and status_message -->
           <div class="flex flex-wrap justify-center gap-6 mb-8">
             <%= for participant <- @room_state.participants do %>
               <.participant_display participant={participant} current_user_id={@user_id} />
@@ -284,9 +319,9 @@ defmodule SocialPomodoroWeb.SessionLive do
           </div>
           
     <!-- What are you working on? -->
-          <%= if is_nil(@current_participant.working_on) do %>
+          <%= if is_nil(@current_participant.status_message) do %>
             <div class="mb-8">
-              <form phx-submit="set_working_on" class="flex gap-2 justify-center">
+              <form phx-submit="set_status_message" class="flex gap-2 justify-center">
                 <input
                   type="text"
                   name="text"
@@ -297,7 +332,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                 <button
                   type="submit"
                   phx-hook="MaintainWakeLock"
-                  id="submit-working-on"
+                  id="submit-status-message"
                   class="btn btn-square btn-primary"
                 >
                   <Icons.submit class="w-6 h-6 fill-current" />
@@ -325,6 +360,12 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp break_view(assigns) do
+    # Helper to find current user's participant
+    current_participant =
+      Enum.find(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
+
+    assigns = assign(assigns, :current_participant, current_participant)
+
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
@@ -346,7 +387,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="text-6xl mb-6">🎉</div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
         <p class="text-xl mb-8">
-          {completion_message(@room_state.duration_minutes, length(@room_state.participants))}
+          {@completion_message || completion_message(@room_state.duration_minutes, length(@room_state.participants))}
         </p>
 
         <.timer_display
@@ -355,26 +396,113 @@ defmodule SocialPomodoroWeb.SessionLive do
           label="Break time remaining"
         />
         
-    <!-- Participants with ready status -->
-        <div class="flex justify-center gap-4 mb-8">
+    <!-- Participants with ready status and break feedback -->
+        <div class="flex flex-wrap justify-center gap-6 mb-8">
           <%= for participant <- @room_state.participants do %>
-            <div class="text-center">
-              <div class="indicator">
-                <%= if participant.ready_for_next do %>
-                  <span class="indicator-item badge badge-success badge-sm">✓</span>
+            <div class="flex flex-col items-center gap-2">
+              <div class="relative">
+                <div class="indicator">
+                  <%= if participant.ready_for_next do %>
+                    <span class="indicator-item badge badge-success badge-sm">✓</span>
+                  <% end %>
+                  <.participant_avatar
+                    user_id={participant.user_id}
+                    username={participant.username}
+                    current_user_id={@user_id}
+                  />
+                </div>
+                <%= if participant.break_feedback do %>
+                  <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
+                    <img
+                      src={emoji_to_openmoji(participant.break_feedback)}
+                      class="w-8 h-8"
+                      alt={participant.break_feedback}
+                    />
+                  </span>
                 <% end %>
-                <.participant_avatar
-                  user_id={participant.user_id}
-                  username={participant.username}
-                  current_user_id={@user_id}
-                />
               </div>
+              <p class="font-semibold text-center text-sm">{participant.username}</p>
               <%= if participant.ready_for_next do %>
-                <p class="text-xs text-success font-semibold mt-1">Ready!</p>
+                <p class="text-xs text-success font-semibold">Ready!</p>
               <% end %>
             </div>
           <% end %>
         </div>
+        
+    <!-- Break Feedback Emoji Buttons -->
+        <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
+        <div class="join mb-8 mx-auto">
+          <button
+            phx-click="set_break_feedback"
+            phx-value-emoji="1F635-200D-1F4AB"
+            id="break-emoji-1F635-200D-1F4AB"
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F635-200D-1F4AB", do: "btn-active"}"}
+          >
+            <img
+              src="/images/emojis/1F635-200D-1F4AB.svg"
+              class="w-8 h-8 md:w-12 md:h-12"
+              alt="😵‍💫"
+            />
+          </button>
+          <button
+            phx-click="set_break_feedback"
+            phx-value-emoji="1F62E-200D-1F4A8"
+            id="break-emoji-1F62E-200D-1F4A8"
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F62E-200D-1F4A8", do: "btn-active"}"}
+          >
+            <img
+              src="/images/emojis/1F62E-200D-1F4A8.svg"
+              class="w-8 h-8 md:w-12 md:h-12"
+              alt="😮‍💨"
+            />
+          </button>
+          <button
+            phx-click="set_break_feedback"
+            phx-value-emoji="1F60C"
+            id="break-emoji-1F60C"
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F60C", do: "btn-active"}"}
+          >
+            <img src="/images/emojis/1F60C.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😌" />
+          </button>
+          <button
+            phx-click="set_break_feedback"
+            phx-value-emoji="2615"
+            id="break-emoji-2615"
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "2615", do: "btn-active"}"}
+          >
+            <img src="/images/emojis/2615.svg" class="w-8 h-8 md:w-12 md:h-12" alt="☕" />
+          </button>
+          <button
+            phx-click="set_break_feedback"
+            phx-value-emoji="1F4AA"
+            id="break-emoji-1F4AA"
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F4AA", do: "btn-active"}"}
+          >
+            <img src="/images/emojis/1F4AA.svg" class="w-8 h-8 md:w-12 md:h-12" alt="💪" />
+          </button>
+        </div>
+
+        <!-- What was your session? -->
+        <%= if is_nil(@current_participant.status_message) do %>
+          <div class="mb-8">
+            <form phx-submit="set_status_message" class="flex gap-2 justify-center">
+              <input
+                type="text"
+                name="text"
+                placeholder="How was your session?"
+                class="input input-bordered w-full max-w-md text-base"
+                required
+              />
+              <button
+                type="submit"
+                id="submit-session-feedback"
+                class="btn btn-square btn-primary"
+              >
+                <Icons.submit class="w-6 h-6 fill-current" />
+              </button>
+            </form>
+          </div>
+        <% end %>
 
         <div class="card-actions justify-center gap-4">
           <button
@@ -532,9 +660,9 @@ defmodule SocialPomodoroWeb.SessionLive do
         <% end %>
       </div>
       <p class="font-semibold text-center text-sm">{@participant.username}</p>
-      <%= if @participant.working_on do %>
+      <%= if @participant.status_message do %>
         <p class="text-xs opacity-70 text-center break-words w-full">
-          {@participant.working_on}
+          {@participant.status_message}
         </p>
       <% end %>
     </div>
