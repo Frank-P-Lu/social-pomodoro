@@ -26,8 +26,7 @@ defmodule SocialPomodoro.Room do
     :created_at,
     :tick_interval,
     :status_message,
-    :status_emoji,
-    :break_feedback
+    :status_emoji
   ]
 
   def start_link(opts) do
@@ -91,15 +90,6 @@ defmodule SocialPomodoro.Room do
     end
   end
 
-  def set_break_feedback(name, user_id, emoji) do
-    case SocialPomodoro.RoomRegistry.get_room(name) do
-      {:ok, pid} -> GenServer.call(pid, {:set_break_feedback, user_id, emoji})
-      error -> error
-    end
-  end
-
-
-
   ## Callbacks
 
   @impl true
@@ -129,8 +119,7 @@ defmodule SocialPomodoro.Room do
       created_at: System.system_time(:second),
       tick_interval: tick_interval,
       status_message: %{},
-      status_emoji: %{},
-      break_feedback: %{}
+      status_emoji: %{}
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -288,8 +277,7 @@ defmodule SocialPomodoro.Room do
             timer_ref: timer_ref,
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
             status_message: %{},
-            status_emoji: %{},
-            break_feedback: %{}
+            status_emoji: %{}
         }
 
         # Emit telemetry event for session restart (restarted after break)
@@ -343,7 +331,7 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def handle_call({:set_status, user_id, emoji}, _from, state) do
-    if state.status == :active do
+    if state.status in [:active, :break] do
       # Toggle: if same emoji, remove from map; otherwise set to new emoji
       new_status_emoji =
         if state.status_emoji[user_id] == emoji do
@@ -356,42 +344,9 @@ defmodule SocialPomodoro.Room do
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else
-      {:reply, {:error, :not_active}, state}
+      {:reply, {:error, :invalid_status}, state}
     end
   end
-
-  @impl true
-  def handle_call({:set_break_feedback, user_id, emoji}, _from, state) do
-    if state.status == :break do
-      # Toggle: if same emoji, remove from map; otherwise set to new emoji
-      new_break_feedback =
-        if state.break_feedback[user_id] == emoji do
-          Map.delete(state.break_feedback, user_id)
-        else
-          Map.put(state.break_feedback, user_id, emoji)
-        end
-
-      new_state = %{state | break_feedback: new_break_feedback}
-
-      # Track break feedback analytics
-      :telemetry.execute(
-        [:pomodoro, :user, :set_break_feedback],
-        %{count: 1},
-        %{
-          room_name: state.name,
-          user_id: user_id,
-          emoji: emoji
-        }
-      )
-
-      broadcast_room_update(new_state)
-      {:reply, :ok, new_state}
-    else
-      {:reply, {:error, :not_in_break}, state}
-    end
-  end
-
-
 
   @impl true
   def handle_info(:tick, state) do
@@ -483,7 +438,9 @@ defmodule SocialPomodoro.Room do
         timer: timer,
         timer_ref: timer_ref,
         participants: state.participants ++ promoted_participants,
-        spectators: []
+        spectators: [],
+        status_message: %{},
+        status_emoji: %{}
     }
 
     broadcast_room_update(new_state)
@@ -583,19 +540,17 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
-    # Add usernames, status_message, status_emoji, and break_feedback to participants for display
+    # Add usernames, status_message, and status_emoji to participants for display
     participants_with_usernames =
       Enum.map(state.participants, fn p ->
         username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
         status_message = Map.get(state.status_message, p.user_id)
         status_emoji = Map.get(state.status_emoji, p.user_id)
-        break_feedback = Map.get(state.break_feedback, p.user_id)
 
         p
         |> Map.put(:username, username)
         |> Map.put(:status_message, status_message)
         |> Map.put(:status_emoji, status_emoji)
-        |> Map.put(:break_feedback, break_feedback)
       end)
 
     # Get creator username

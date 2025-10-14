@@ -90,19 +90,6 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
-  def handle_event("set_break_feedback", %{"emoji" => emoji}, socket) do
-    SocialPomodoro.Room.set_break_feedback(
-      socket.assigns.name,
-      socket.assigns.user_id,
-      emoji
-    )
-
-    {:noreply, socket}
-  end
-
-
-
-  @impl true
   def handle_event("leave_room", _params, socket) do
     SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     {:noreply, push_navigate(socket, to: ~p"/")}
@@ -114,8 +101,8 @@ defmodule SocialPomodoroWeb.SessionLive do
     is_spectator = is_spectator?(room_state, socket.assigns.user_id)
 
     # Save completion message when transitioning to break (only once)
-    old_status = socket.assigns.room_state.status
-    
+    old_status = Map.get(socket.assigns, :room_state) |> then(&if &1, do: &1.status)
+
     socket =
       if room_state.status == :break && old_status != :break do
         completion_msg =
@@ -123,7 +110,12 @@ defmodule SocialPomodoroWeb.SessionLive do
 
         assign(socket, :completion_message, completion_msg)
       else
-        socket
+        # Ensure completion_message is always present, even if nil
+        if Map.has_key?(socket.assigns, :completion_message) do
+          socket
+        else
+          assign(socket, :completion_message, nil)
+        end
       end
 
     socket =
@@ -364,7 +356,18 @@ defmodule SocialPomodoroWeb.SessionLive do
     current_participant =
       Enum.find(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
 
-    assigns = assign(assigns, :current_participant, current_participant)
+    # Ensure completion_message is always present
+    completion_msg =
+      Map.get(assigns, :completion_message) ||
+        completion_message(
+          assigns.room_state.duration_minutes,
+          length(assigns.room_state.participants)
+        )
+
+    assigns =
+      assigns
+      |> assign(:current_participant, current_participant)
+      |> assign(:completion_message, completion_msg)
 
     ~H"""
     <div class="card bg-base-200">
@@ -387,7 +390,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="text-6xl mb-6">🎉</div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
         <p class="text-xl mb-8">
-          {@completion_message || completion_message(@room_state.duration_minutes, length(@room_state.participants))}
+          {@completion_message}
         </p>
 
         <.timer_display
@@ -411,12 +414,12 @@ defmodule SocialPomodoroWeb.SessionLive do
                     current_user_id={@user_id}
                   />
                 </div>
-                <%= if participant.break_feedback do %>
+                <%= if participant.status_emoji do %>
                   <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
                     <img
-                      src={emoji_to_openmoji(participant.break_feedback)}
+                      src={emoji_to_openmoji(participant.status_emoji)}
                       class="w-8 h-8"
-                      alt={participant.break_feedback}
+                      alt={participant.status_emoji}
                     />
                   </span>
                 <% end %>
@@ -433,10 +436,11 @@ defmodule SocialPomodoroWeb.SessionLive do
         <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
         <div class="join mb-8 mx-auto">
           <button
-            phx-click="set_break_feedback"
+            phx-click="set_status"
             phx-value-emoji="1F635-200D-1F4AB"
+            phx-hook="MaintainWakeLock"
             id="break-emoji-1F635-200D-1F4AB"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F635-200D-1F4AB", do: "btn-active"}"}
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F635-200D-1F4AB", do: "btn-active"}"}
           >
             <img
               src="/images/emojis/1F635-200D-1F4AB.svg"
@@ -445,10 +449,11 @@ defmodule SocialPomodoroWeb.SessionLive do
             />
           </button>
           <button
-            phx-click="set_break_feedback"
+            phx-click="set_status"
             phx-value-emoji="1F62E-200D-1F4A8"
+            phx-hook="MaintainWakeLock"
             id="break-emoji-1F62E-200D-1F4A8"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F62E-200D-1F4A8", do: "btn-active"}"}
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F62E-200D-1F4A8", do: "btn-active"}"}
           >
             <img
               src="/images/emojis/1F62E-200D-1F4A8.svg"
@@ -457,32 +462,35 @@ defmodule SocialPomodoroWeb.SessionLive do
             />
           </button>
           <button
-            phx-click="set_break_feedback"
+            phx-click="set_status"
             phx-value-emoji="1F60C"
+            phx-hook="MaintainWakeLock"
             id="break-emoji-1F60C"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F60C", do: "btn-active"}"}
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F60C", do: "btn-active"}"}
           >
             <img src="/images/emojis/1F60C.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😌" />
           </button>
           <button
-            phx-click="set_break_feedback"
+            phx-click="set_status"
             phx-value-emoji="2615"
+            phx-hook="MaintainWakeLock"
             id="break-emoji-2615"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "2615", do: "btn-active"}"}
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "2615", do: "btn-active"}"}
           >
             <img src="/images/emojis/2615.svg" class="w-8 h-8 md:w-12 md:h-12" alt="☕" />
           </button>
           <button
-            phx-click="set_break_feedback"
+            phx-click="set_status"
             phx-value-emoji="1F4AA"
+            phx-hook="MaintainWakeLock"
             id="break-emoji-1F4AA"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.break_feedback == "1F4AA", do: "btn-active"}"}
+            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F4AA", do: "btn-active"}"}
           >
             <img src="/images/emojis/1F4AA.svg" class="w-8 h-8 md:w-12 md:h-12" alt="💪" />
           </button>
         </div>
-
-        <!-- What was your session? -->
+        
+    <!-- What was your session? -->
         <%= if is_nil(@current_participant.status_message) do %>
           <div class="mb-8">
             <form phx-submit="set_status_message" class="flex gap-2 justify-center">
@@ -555,7 +563,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         # Message for group sessions
         other_count = participant_count - 1
 
-        "You focused with #{other_count} #{if other_count == 1, do: "other person", else: "other people"} for #{duration_minutes} minutes!"
+        "You focused with #{if other_count == 1, do: "someone else", else: "#{other_count} other people"} for #{duration_minutes} minutes!"
     end
   end
 
