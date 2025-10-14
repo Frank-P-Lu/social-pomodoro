@@ -876,4 +876,69 @@ defmodule SocialPomodoro.RoomTest do
       assert state.seconds_remaining == duration_seconds
     end
   end
+
+  describe "spectator promotion after go_again" do
+    @tag :sync
+    test "spectator who joined during active session becomes full participant after go_again" do
+      # A creates a room
+      user_a_id = "userA_#{System.unique_integer([:positive])}"
+      user_b_id = "userB_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(user_a_id, duration_seconds: 2, break_duration_seconds: 2)
+
+      # A starts the timer
+      assert :ok = Room.start_session(room_name)
+
+      # Verify room is in active state and A is a session participant
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.seconds_remaining == 2
+      assert user_a_id in state.session_participants
+
+      # B joins as a spectator (since session is already active)
+      assert :ok = Room.join(room_name, user_b_id)
+
+      # Verify B is a spectator (not in participants yet, but in spectators)
+      raw_state = Room.get_raw_state(room_pid)
+      assert length(raw_state.participants) == 1
+      assert user_b_id in raw_state.spectators
+      assert user_a_id in raw_state.session_participants
+      refute user_b_id in raw_state.session_participants
+
+      # Timer finishes: 2 -> 1 -> 0 -> transition to break
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify room transitioned to break
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.seconds_remaining == 2
+
+        # During break, B should now be a participant (spectators are promoted)
+        assert length(state.participants) == 2
+
+        # Both A and B hit go_again
+        assert :ok = Room.go_again(room_name, user_a_id)
+        assert :ok = Room.go_again(room_name, user_b_id)
+
+        # Give it a moment to process
+        Process.sleep(10)
+
+        # Verify room transitioned back to active
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.seconds_remaining == 2
+
+        # B should NOT be a spectator anymore - both should be session participants
+        assert user_a_id in state.session_participants
+        assert user_b_id in state.session_participants
+        assert length(state.session_participants) == 2
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+  end
 end

@@ -270,12 +270,16 @@ defmodule SocialPomodoro.Room do
         timer = Timer.new(state.work_duration_seconds) |> Timer.start()
         timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
+        # Capture current participants as session participants (includes promoted spectators)
+        session_participant_ids = Enum.map(new_participants, & &1.user_id)
+
         final_state = %{
           new_state
           | status: :active,
             timer: timer,
             timer_ref: timer_ref,
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
+            session_participants: session_participant_ids,
             status_message: %{},
             status_emoji: %{}
         }

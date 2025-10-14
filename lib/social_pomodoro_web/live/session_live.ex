@@ -474,7 +474,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <div class="card-actions justify-center gap-4">
           <button
             phx-click="go_again"
-            class="btn btn-primary btn-lg"
+            class="btn btn-primary"
           >
             Go Again Together
           </button>
@@ -482,7 +482,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             phx-click="leave_room"
             phx-hook="ReleaseWakeLock"
             id="leave-room-break"
-            class="btn btn-lg text-error"
+            class="btn text-error"
           >
             <Icons.leave class="w-5 h-5 fill-error" />
             <span class="text-error">Return to Lobby</span>
