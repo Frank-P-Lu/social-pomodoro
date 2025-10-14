@@ -437,5 +437,106 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       refute Enum.member?(room_state.spectators, user_id_b)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id_a))
     end
+
+    test "spectator joins as participant when timer finishes" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      _user_id_a = get_session(connA, "user_id")
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator during active session
+      SocialPomodoro.Room.join(room_name, user_id_b)
+      {:ok, sessionB, htmlB} = live(connB, "/room/#{room_name}")
+
+      # User B should be a spectator during active session
+      assert htmlB =~ "You&#39;re a spectator"
+
+      # Wait for timer to finish and transition to break
+      tick_room(room_pid, 2)
+      Process.sleep(100)
+
+      # User B should now see participant view (not spectator view)
+      htmlB = render(sessionB)
+      refute htmlB =~ "You&#39;re a spectator"
+      assert htmlB =~ "Great Work!"
+      assert htmlB =~ "Go Again Together"
+
+      # Verify in room state that B is now a participant
+      room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+      assert room_state.status == :break
+      refute Enum.member?(room_state.spectators, user_id_b)
+      assert Enum.any?(room_state.participants, &(&1.user_id == user_id_b))
+    end
+
+    test "completion message does not count spectators who joined during break" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      _user_id_a = get_session(connA, "user_id")
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B joins as spectator during active session
+      SocialPomodoro.Room.join(room_name, user_id_b)
+      {:ok, sessionA, _htmlA} = live(connA, "/room/#{room_name}")
+
+      # Wait for timer to finish and transition to break
+      tick_room(room_pid, 2)
+      Process.sleep(100)
+
+      # Check completion message for User A
+      # Should say "solo" not "with someone else" since B was a spectator
+      htmlA = render(sessionA)
+      assert htmlA =~ ~r/(You focused solo|Flying solo|Solo focus|You stayed focused)/
+      refute htmlA =~ "You focused with"
+    end
   end
 end

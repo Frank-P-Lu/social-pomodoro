@@ -32,7 +32,10 @@ defmodule SocialPomodoroWeb.SessionLive do
           # Set completion message if room is already in break
           completion_msg =
             if room_state.status == :break do
-              completion_message(room_state.duration_minutes, length(room_state.participants))
+              completion_message(
+                room_state.duration_minutes,
+                length(room_state.session_participants)
+              )
             else
               nil
             end
@@ -109,7 +112,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     # Update completion message if in break (recompute in case participants changed)
     completion_msg =
       if room_state.status == :break do
-        completion_message(room_state.duration_minutes, length(room_state.participants))
+        completion_message(room_state.duration_minutes, length(room_state.session_participants))
       else
         nil
       end
@@ -323,7 +326,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                   type="text"
                   name="text"
                   placeholder="What are you working on?"
-                  class="input input-bordered w-full max-w-md text-base"
+                  class="input input-bordered w-full max-w-xs text-base"
                   maxlength="30"
                   required
                 />
@@ -361,20 +364,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
-        <%= if @room_state.spectators_count > 0 do %>
-          <!-- Spectator Badge -->
-          <div class="flex justify-center mb-4">
-            <div
-              class="tooltip tooltip-bottom"
-              data-tip={"#{@room_state.spectators_count} spectator#{if @room_state.spectators_count > 1, do: "s", else: ""}. They will join when the current session ends."}
-            >
-              <div class="badge badge-ghost gap-2">
-                <Icons.ghost class="w-4 h-4 fill-current" />
-                <span>{@room_state.spectators_count}</span>
-              </div>
-            </div>
-          </div>
-        <% end %>
+        <!-- No spectator badge during break since all spectators are promoted to participants -->
 
         <div class="text-6xl mb-6">🎉</div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
@@ -465,7 +455,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                 type="text"
                 name="text"
                 placeholder="How was your session?"
-                class="input input-bordered w-full max-w-md text-base"
+                class="input input-bordered w-full max-w-xs text-base"
                 maxlength="30"
                 required
               />
@@ -603,7 +593,15 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp is_spectator?(room_state, user_id) do
-    not Enum.any?(room_state.session_participants, &(&1 == user_id))
+    case room_state.status do
+      :break ->
+        # During break, all participants are non-spectators
+        false
+
+      _ ->
+        # For other statuses, check session participants
+        not Enum.any?(room_state.session_participants, &(&1 == user_id))
+    end
   end
 
   defp sort_participants_current_user_first(participants, current_user_id) do
