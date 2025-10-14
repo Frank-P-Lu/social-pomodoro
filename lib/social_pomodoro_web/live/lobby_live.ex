@@ -2,6 +2,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   use SocialPomodoroWeb, :live_view
   require Logger
   alias SocialPomodoroWeb.Icons
+  alias SocialPomodoro.Utils
 
   @impl true
   def mount(params, session, socket) do
@@ -45,41 +46,48 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   defp handle_direct_room_join(socket, room_name, user_id) do
-    # Room name is the identifier, so we can directly try to join
-    case join_room_and_update_state(socket, room_name, user_id) do
-      {:ok, socket} ->
-        display_name = String.replace(room_name, "-", " ")
+    display_name = String.replace(room_name, "-", " ")
 
-        # Check room status to determine where to navigate
-        case SocialPomodoro.RoomRegistry.get_room(room_name) do
-          {:ok, pid} ->
-            room_state = SocialPomodoro.Room.get_state(pid)
+    # Check room status first to determine navigation path
+    case SocialPomodoro.RoomRegistry.get_room(room_name) do
+      {:ok, pid} ->
+        room_state = SocialPomodoro.Room.get_state(pid)
 
-            case room_state.status do
-              :autostart ->
-                # Room is waiting, go to lobby
+        case room_state.status do
+          :autostart ->
+            # Room is waiting, join without setting my_room_name to avoid terminate callback
+            case SocialPomodoro.Room.join(room_name, user_id) do
+              :ok ->
                 socket
                 |> put_flash(:info, "Joined #{display_name}")
                 |> push_navigate(to: ~p"/")
 
-              _ ->
-                # Room is active or in break, go to session page
+              {:error, reason} ->
+                Logger.error("Failed to join room #{room_name}: #{inspect(reason)}")
+
+                socket
+                |> put_flash(:error, "Could not join room")
+                |> push_navigate(to: ~p"/")
+            end
+
+          _ ->
+            # Room is active or in break, use helper to set my_room_name
+            case join_room_and_update_state(socket, room_name, user_id) do
+              {:ok, socket} ->
                 socket
                 |> put_flash(:info, "Joined #{display_name}")
                 |> push_navigate(to: ~p"/room/#{room_name}")
-            end
 
-          {:error, _} ->
-            socket
-            |> put_flash(:error, "Room not found")
-            |> push_navigate(to: ~p"/")
+              {:error, socket} ->
+                socket
+                |> put_flash(:error, "Could not join room")
+                |> push_navigate(to: ~p"/")
+            end
         end
 
-      {:error, socket} ->
-        Logger.error("Failed to join room #{room_name}")
-
+      {:error, _} ->
         socket
-        |> put_flash(:error, "Could not join room")
+        |> put_flash(:error, "Room not found")
         |> push_navigate(to: ~p"/")
     end
   end
@@ -238,6 +246,28 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def terminate(_reason, socket) do
+    # Leave room when LiveView process terminates (e.g., navigation away)
+    # But only if the room is still in autostart status (haven't started session yet)
+    if socket.assigns[:my_room_name] do
+      case SocialPomodoro.RoomRegistry.get_room(socket.assigns.my_room_name) do
+        {:ok, pid} ->
+          room_state = SocialPomodoro.Room.get_state(pid)
+
+          if room_state.status == :autostart do
+            SocialPomodoro.Room.leave(socket.assigns.my_room_name, socket.assigns.user_id)
+          end
+
+        {:error, _} ->
+          # Room doesn't exist anymore, nothing to do
+          :ok
+      end
+    end
+
+    :ok
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <.flash kind={:info} flash={@flash} />
@@ -347,9 +377,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
     bg-[size:20px_20px]
     " <>
       if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
-      <div class="card-body p-4 gap-0 flex flex-col justify-between min-h-48">
+      <div class="card-body p-4 gap-3 flex flex-col justify-between min-h-48">
         <div>
-          <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center justify-between gap-2">
             <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
             <%= if @room.creator == @user_id or @room.name == @my_room_name do %>
               <button
@@ -362,11 +392,21 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 <Icons.share class="w-4 h-4 fill-current" />
               </button>
             <% end %>
+            <%!-- Show spectator badge for in-progress rooms --%>
+            <%= if @room.status in [:active, :break] && @room.spectators_count > 0 do %>
+              <div
+                class="tooltip tooltip-left"
+                data-tip={Utils.count_with_word(@room.spectators_count, "spectator")}
+              >
+                <div class="badge badge-ghost gap-1">
+                  <Icons.ghost class="w-3 h-3 fill-current" />
+                  <span class="text-xs">{@room.spectators_count}</span>
+                </div>
+              </div>
+            <% end %>
           </div>
           <div class="text-sm opacity-70">
-            {length(@room.participants)} {if length(@room.participants) == 1,
-              do: "person",
-              else: "people"} waiting · {@room.duration_minutes} min
+            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting · {@room.duration_minutes} min
           </div>
         </div>
         
@@ -386,45 +426,40 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <% end %>
         
     <!-- Action Button -->
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center justify-between gap-4 w-full">
           <!-- Status -->
           <div class="flex gap-2 items-center">
             <%= if @room.status == :autostart do %>
-              <div class="badge badge-soft badge-warning gap-2">
-                <div class="status status-warning animate-pulse"></div>
-                Starting in
-                <span
-                  phx-hook="AutostartTimer"
-                  id={"autostart-timer-#{@room.name}"}
-                  data-seconds-remaining={@room.seconds_remaining}
-                >
-                  {format_time_remaining(@room.seconds_remaining)}
-                </span>
+              <div class="badge badge-soft badge-warning gap-2 text-xs h-auto py-2">
+                <div class="status status-warning animate-pulse flex-shrink-0"></div>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-0 sm:gap-1 leading-tight">
+                  <span class="text-xs">Starting</span>
+                  <span
+                    phx-hook="AutostartTimer"
+                    id={"autostart-timer-#{@room.name}"}
+                    data-seconds-remaining={@room.seconds_remaining}
+                    class="font-mono font-semibold"
+                  >
+                    {format_time_remaining(@room.seconds_remaining)}
+                  </span>
+                </div>
               </div>
             <% else %>
-              <div class="badge badge-soft badge-neutral gap-2">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <div class="badge badge-soft badge-neutral gap-2 h-auto py-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fill-rule="evenodd"
                     d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
                     clip-rule="evenodd"
                   />
                 </svg>
-                In Progress
-              </div>
-            <% end %>
-
-            <%!-- Show spectator badge for in-progress rooms --%>
-            <%= if @room.status in [:active, :break] && @room.spectators_count > 0 do %>
-              <div class="badge badge-ghost gap-1">
-                <Icons.ghost class="w-3 h-3 fill-current" />
-                <span class="text-xs">{@room.spectators_count}</span>
+                <span class="text-xs">In Progress</span>
               </div>
             <% end %>
           </div>
           
     <!-- Actions -->
-          <div class="card-actions">
+          <div class="card-actions flex-shrink-0">
             <%= if @room.status == :autostart do %>
               <%= if @room.name == @my_room_name do %>
                 <button

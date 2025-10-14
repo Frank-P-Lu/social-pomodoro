@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.SessionLive do
   use SocialPomodoroWeb, :live_view
   alias SocialPomodoroWeb.Icons
+  alias SocialPomodoro.Utils
 
   @impl true
   def mount(params, session, socket) do
@@ -319,7 +320,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           </div>
           
     <!-- What are you working on? -->
-          <%= if @current_participant && is_nil(@current_participant.status_message) do %>
+          <%= if is_nil(@current_participant.status_message) do %>
             <div class="mb-8">
               <form phx-submit="set_status_message" class="flex gap-2 justify-center">
                 <input
@@ -448,7 +449,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         </div>
         
     <!-- What was your session? -->
-        <%= if @current_participant && is_nil(@current_participant.status_message) do %>
+        <%= if is_nil(@current_participant.status_message) do %>
           <div class="mb-8">
             <form phx-submit="set_status_message" class="flex gap-2 justify-center">
               <input
@@ -521,7 +522,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         # Message for group sessions
         other_count = participant_count - 1
 
-        "You focused with #{if other_count == 1, do: "someone else", else: "#{other_count} other people"} for #{duration_minutes} minutes!"
+        "You focused with #{Utils.other_people(other_count)} for #{duration_minutes} minutes!"
     end
   end
 

@@ -91,8 +91,8 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert htmlA =~ "2 people"
       assert htmlB =~ "2 people"
 
-      # User B should see "Starting in" countdown somewhere in the page
-      assert htmlB =~ "Starting in"
+      # User B should see "Starting" countdown somewhere in the page
+      assert htmlB =~ "Starting"
       # And the room_name should exist in a button (no longer Join for this room)
       refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-name="#{room_name}"/
 
@@ -154,13 +154,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       html1 = render(lobbyB1)
-      assert html1 =~ "Starting in"
+      assert html1 =~ "Starting"
 
       # User B refreshes
       {:ok, _lobbyB2, html2} = live(connB, "/")
 
-      # Should still see "Starting in" countdown (not "Join")
-      assert html2 =~ "Starting in"
+      # Should still see "Starting" countdown (not "Join")
+      assert html2 =~ "Starting"
       refute html2 =~ ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>Join<\/button>/
     end
 
@@ -561,16 +561,20 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert {:error, {:live_redirect, %{to: "/"}}} = live(connB, "/at/#{room_name}")
 
       # Follow the redirect
-      {:ok, _lobbyB, htmlB} = live(connB, "/")
+      {:ok, lobbyB, htmlB} = live(connB, "/")
+
+      # Wait for PubSub to propagate
+      Process.sleep(100)
 
       # User B should now be in the room with autostart countdown
-      assert htmlB =~ "Starting in"
+      assert htmlB =~ "Starting"
 
       # Both users should see 2 participants
       htmlA_after = render(lobbyA)
+      htmlB_after = render(lobbyB)
 
       assert htmlA_after =~ "2 people"
-      assert htmlB =~ "2 people"
+      assert htmlB_after =~ "2 people"
     end
 
     test "visiting non-existent room link shows error message" do
