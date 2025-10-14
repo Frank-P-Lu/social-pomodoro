@@ -441,6 +441,41 @@ defmodule SocialPomodoro.RoomTest do
       assert is_nil(creator.status_message)
       assert is_nil(participant.status_message)
     end
+
+    test "can set status_message during break after it was cleared" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status_message during active session
+      assert :ok = Room.set_status_message(room_name, creator_id, "Working on feature X")
+
+      # Verify it was set
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert creator.status_message == "Working on feature X"
+
+      # Complete session and go to break
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify status_message was cleared when transitioning to break
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert is_nil(creator.status_message)
+
+      # Now set a new status_message during break
+      assert :ok = Room.set_status_message(room_name, creator_id, "Great session!")
+
+      # Verify the new message was set
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert creator.status_message == "Great session!"
+    end
   end
 
   describe "status emoji functionality" do

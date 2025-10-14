@@ -7,7 +7,7 @@ defmodule SocialPomodoro.Config do
   @doc """
   Minimum timer length in minutes (shown in lobby slider).
   """
-  def min_timer_minutes, do: 5
+  def min_timer_minutes, do: 1
 
   @spec autostart_countdown_seconds() :: 180
   @doc """
