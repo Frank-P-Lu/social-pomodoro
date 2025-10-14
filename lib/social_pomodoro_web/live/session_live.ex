@@ -101,6 +101,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  # TODO: major refactor needed. Most of these are not necessary. Only tick is necessary?
   def handle_info({:room_state, room_state}, socket) do
     # Update spectator status
     is_spectator = is_spectator?(room_state, socket.assigns.user_id)
