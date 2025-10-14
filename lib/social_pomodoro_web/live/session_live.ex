@@ -255,7 +255,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           
     <!-- Participants with status and status_message -->
           <div class="flex flex-wrap justify-center gap-6 mb-8">
-            <%= for participant <- @room_state.participants do %>
+            <%= for participant <- sort_participants_current_user_first(@room_state.participants, @user_id) do %>
               <.participant_display participant={participant} current_user_id={@user_id} />
             <% end %>
           </div>
@@ -319,6 +319,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                   name="text"
                   placeholder="What are you working on?"
                   class="input input-bordered w-full max-w-md text-base"
+                  maxlength="30"
                   required
                 />
                 <button
@@ -401,7 +402,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         
     <!-- Participants with ready status and status -->
         <div class="flex flex-wrap justify-center gap-6 mb-8">
-          <%= for participant <- @room_state.participants do %>
+          <%= for participant <- sort_participants_current_user_first(@room_state.participants, @user_id) do %>
             <.participant_display
               participant={participant}
               current_user_id={@user_id}
@@ -477,6 +478,7 @@ defmodule SocialPomodoroWeb.SessionLive do
                 name="text"
                 placeholder="How was your session?"
                 class="input input-bordered w-full max-w-md text-base"
+                maxlength="30"
                 required
               />
               <button
@@ -614,6 +616,12 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp is_spectator?(room_state, user_id) do
     not Enum.any?(room_state.session_participants, &(&1 == user_id))
+  end
+
+  defp sort_participants_current_user_first(participants, current_user_id) do
+    Enum.sort_by(participants, fn p ->
+      if p.user_id == current_user_id, do: 0, else: 1
+    end)
   end
 
   attr :participant, :map, required: true
