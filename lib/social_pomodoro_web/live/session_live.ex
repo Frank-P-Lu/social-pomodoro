@@ -311,7 +311,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           </div>
           
     <!-- What are you working on? -->
-          <%= if is_nil(@current_participant.status_message) do %>
+          <%= if @current_participant && is_nil(@current_participant.status_message) do %>
             <div class="mb-8">
               <form phx-submit="set_status_message" class="flex gap-2 justify-center">
                 <input
@@ -399,36 +399,14 @@ defmodule SocialPomodoroWeb.SessionLive do
           label="Break time remaining"
         />
         
-    <!-- Participants with ready status and break feedback -->
+    <!-- Participants with ready status and status -->
         <div class="flex flex-wrap justify-center gap-6 mb-8">
           <%= for participant <- @room_state.participants do %>
-            <div class="flex flex-col items-center gap-2">
-              <div class="relative">
-                <div class="indicator">
-                  <%= if participant.ready_for_next do %>
-                    <span class="indicator-item badge badge-success badge-sm">✓</span>
-                  <% end %>
-                  <.participant_avatar
-                    user_id={participant.user_id}
-                    username={participant.username}
-                    current_user_id={@user_id}
-                  />
-                </div>
-                <%= if participant.status_emoji do %>
-                  <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
-                    <img
-                      src={emoji_to_openmoji(participant.status_emoji)}
-                      class="w-8 h-8"
-                      alt={participant.status_emoji}
-                    />
-                  </span>
-                <% end %>
-              </div>
-              <p class="font-semibold text-center text-sm">{participant.username}</p>
-              <%= if participant.ready_for_next do %>
-                <p class="text-xs text-success font-semibold">Ready!</p>
-              <% end %>
-            </div>
+            <.participant_display
+              participant={participant}
+              current_user_id={@user_id}
+              show_ready={true}
+            />
           <% end %>
         </div>
         
@@ -491,7 +469,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         </div>
         
     <!-- What was your session? -->
-        <%= if is_nil(@current_participant.status_message) do %>
+        <%= if @current_participant && is_nil(@current_participant.status_message) do %>
           <div class="mb-8">
             <form phx-submit="set_status_message" class="flex gap-2 justify-center">
               <input
@@ -640,23 +618,29 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   attr :participant, :map, required: true
   attr :current_user_id, :string, default: nil
+  attr :show_ready, :boolean, default: false
 
   defp participant_display(assigns) do
     ~H"""
     <div class="flex flex-col items-center gap-2 max-w-xs">
       <div class="relative">
-        <.avatar
-          user_id={@participant.user_id}
-          username={@participant.username}
-          size="w-16"
-          class={
-            if @current_user_id && @participant.user_id == @current_user_id do
-              "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
-            else
-              ""
-            end
-          }
-        />
+        <div class={if @show_ready, do: "indicator", else: ""}>
+          <%= if @show_ready && @participant.ready_for_next do %>
+            <span class="indicator-item badge badge-success badge-sm">✓</span>
+          <% end %>
+          <.avatar
+            user_id={@participant.user_id}
+            username={@participant.username}
+            size="w-16"
+            class={
+              if @current_user_id && @participant.user_id == @current_user_id do
+                "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+              else
+                ""
+              end
+            }
+          />
+        </div>
         <%= if @participant.status_emoji do %>
           <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
             <img
@@ -672,6 +656,9 @@ defmodule SocialPomodoroWeb.SessionLive do
         <p class="text-xs opacity-70 text-center break-words w-full">
           {@participant.status_message}
         </p>
+      <% end %>
+      <%= if @show_ready && @participant.ready_for_next do %>
+        <p class="text-xs text-success font-semibold">Ready!</p>
       <% end %>
     </div>
     """
