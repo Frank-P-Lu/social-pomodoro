@@ -97,8 +97,8 @@ Hooks.Timer = {
         this.updateTimer()
       }
       if (this.seconds === 0) {
-        // Play alert sound when timer reaches 0
-        if (alertAudio) {
+        // Play alert sound only when transitioning from active session (not from break)
+        if (alertAudio && !this.isBreak) {
           alertAudio.currentTime = 0
           alertAudio.play().catch(err => console.error('Failed to play alert:', err))
         }
