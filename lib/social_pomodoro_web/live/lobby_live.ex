@@ -236,8 +236,15 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   defp sort_rooms(rooms, user_id) do
     Enum.sort_by(rooms, fn room ->
-      # false (my rooms) sorts before true (others)
-      room.creator != user_id
+      # Sort by:
+      # 1. User-created rooms first (creator == user_id)
+      # 2. Then open rooms (status == :autostart)
+      # 3. Then in-progress rooms (status == :active or :break)
+      cond do
+        room.creator == user_id -> {0, room.created_at}
+        room.status == :autostart -> {1, room.created_at}
+        true -> {2, room.created_at}
+      end
     end)
   end
 
