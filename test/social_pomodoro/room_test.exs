@@ -350,8 +350,8 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
-  describe "working_on functionality" do
-    test "user can set working_on during active session" do
+  describe "status_message functionality" do
+    test "user can set status_message during active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
       {:ok, room_pid} = RoomRegistry.get_room(room_name)
@@ -359,24 +359,25 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set working_on
-      assert :ok = Room.set_working_on(room_name, creator_id, "Building tests")
+      # Set status_message
+      assert :ok = Room.set_status_message(room_name, creator_id, "Building tests")
 
       # Verify it was set (via serialized state since that's how LiveView sees it)
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert participant.working_on == "Building tests"
+      assert participant.status_message == "Building tests"
     end
 
-    test "user cannot set working_on when not in active session" do
+    test "user cannot set status_message when not in active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
-      # Try to set working_on in waiting state
-      assert {:error, :not_active} = Room.set_working_on(room_name, creator_id, "Building tests")
+      # Try to set status_message in waiting state
+      assert {:error, :invalid_status} =
+               Room.set_status_message(room_name, creator_id, "Building tests")
     end
 
-    test "working_on persists when user leaves and rejoins" do
+    test "status_message persists when user leaves and rejoins" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
@@ -389,25 +390,25 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set working_on
-      assert :ok = Room.set_working_on(room_name, participant_id, "Important task")
+      # Set status_message
+      assert :ok = Room.set_status_message(room_name, participant_id, "Important task")
 
       # Verify it was set
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.working_on == "Important task"
+      assert participant.status_message == "Important task"
 
       # Leave and rejoin
       assert :ok = Room.leave(room_name, participant_id)
       assert :ok = Room.join(room_name, participant_id)
 
-      # Verify working_on persisted
+      # Verify status_message persisted
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.working_on == "Important task"
+      assert participant.status_message == "Important task"
     end
 
-    test "working_on is reset when session starts" do
+    test "status_message is reset when session starts" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
@@ -420,9 +421,9 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set working_on for both
-      assert :ok = Room.set_working_on(room_name, creator_id, "Task 1")
-      assert :ok = Room.set_working_on(room_name, participant_id, "Task 2")
+      # Set status_message for both
+      assert :ok = Room.set_status_message(room_name, creator_id, "Task 1")
+      assert :ok = Room.set_status_message(room_name, participant_id, "Task 2")
 
       # Complete session and go to break
       tick(room_pid)
@@ -432,13 +433,48 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      # Verify working_on was reset
+      # Verify status_message was reset
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
 
-      assert is_nil(creator.working_on)
-      assert is_nil(participant.working_on)
+      assert is_nil(creator.status_message)
+      assert is_nil(participant.status_message)
+    end
+
+    test "can set status_message during break after it was cleared" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Set status_message during active session
+      assert :ok = Room.set_status_message(room_name, creator_id, "Working on feature X")
+
+      # Verify it was set
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert creator.status_message == "Working on feature X"
+
+      # Complete session and go to break
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify status_message was cleared when transitioning to break
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert is_nil(creator.status_message)
+
+      # Now set a new status_message during break
+      assert :ok = Room.set_status_message(room_name, creator_id, "Great session!")
+
+      # Verify the new message was set
+      state = Room.get_state(room_pid)
+      creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert creator.status_message == "Great session!"
     end
   end
 
@@ -506,12 +542,12 @@ defmodule SocialPomodoro.RoomTest do
       assert participant.status_emoji == "💪"
     end
 
-    test "user cannot set status when not in active session" do
+    test "user cannot set status when not in active or break session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
-      # Try to set status in waiting state
-      assert {:error, :not_active} = Room.set_status(room_name, creator_id, "🔥")
+      # Try to set status in autostart state
+      assert {:error, :invalid_status} = Room.set_status(room_name, creator_id, "🔥")
     end
 
     test "status emoji persists when user leaves and rejoins" do
@@ -622,7 +658,7 @@ defmodule SocialPomodoro.RoomTest do
       :telemetry.detach("test-rejoin")
     end
 
-    test "emits telemetry event when working_on is set" do
+    test "emits telemetry event when status_message is set" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
@@ -633,28 +669,28 @@ defmodule SocialPomodoro.RoomTest do
       test_pid = self()
 
       :telemetry.attach(
-        "test-working-on",
-        [:pomodoro, :user, :set_working_on],
+        "test-status-message",
+        [:pomodoro, :user, :set_status_message],
         fn event, measurements, metadata, _config ->
           send(test_pid, {:telemetry_event, event, measurements, metadata})
         end,
         nil
       )
 
-      # Set working_on (should trigger telemetry)
-      working_on_text = "Building cool features"
-      assert :ok = Room.set_working_on(room_name, creator_id, working_on_text)
+      # Set status_message (should trigger telemetry)
+      status_message_text = "Building cool features"
+      assert :ok = Room.set_status_message(room_name, creator_id, status_message_text)
 
       # Assert telemetry event was emitted
-      assert_receive {:telemetry_event, [:pomodoro, :user, :set_working_on], %{count: 1},
+      assert_receive {:telemetry_event, [:pomodoro, :user, :set_status_message], %{count: 1},
                       metadata}
 
       assert metadata.room_name == room_name
       assert metadata.user_id == creator_id
-      assert metadata.text_length == String.length(working_on_text)
+      assert metadata.text_length == String.length(status_message_text)
 
       # Clean up
-      :telemetry.detach("test-working-on")
+      :telemetry.detach("test-status-message")
     end
 
     test "does not emit rejoin telemetry when user first joins" do

@@ -25,7 +25,7 @@ defmodule SocialPomodoro.Room do
     :break_duration_seconds,
     :created_at,
     :tick_interval,
-    :working_on,
+    :status_message,
     :status_emoji
   ]
 
@@ -69,9 +69,9 @@ defmodule SocialPomodoro.Room do
     end
   end
 
-  def set_working_on(name, user_id, text) do
+  def set_status_message(name, user_id, text) do
     case SocialPomodoro.RoomRegistry.get_room(name) do
-      {:ok, pid} -> GenServer.call(pid, {:set_working_on, user_id, text})
+      {:ok, pid} -> GenServer.call(pid, {:set_status_message, user_id, text})
       error -> error
     end
   end
@@ -118,7 +118,7 @@ defmodule SocialPomodoro.Room do
       break_duration_seconds: break_duration_seconds,
       created_at: System.system_time(:second),
       tick_interval: tick_interval,
-      working_on: %{},
+      status_message: %{},
       status_emoji: %{}
     }
 
@@ -276,7 +276,7 @@ defmodule SocialPomodoro.Room do
             timer: timer,
             timer_ref: timer_ref,
             participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
-            working_on: %{},
+            status_message: %{},
             status_emoji: %{}
         }
 
@@ -305,32 +305,33 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_call({:set_working_on, user_id, text}, _from, state) do
-    if state.status == :active do
-      new_working_on = Map.put(state.working_on, user_id, text)
-      new_state = %{state | working_on: new_working_on}
+  def handle_call({:set_status_message, user_id, text}, _from, state) do
+    if state.status in [:active, :break] do
+      new_status_message = Map.put(state.status_message, user_id, text)
+      new_state = %{state | status_message: new_status_message}
 
-      # Track working_on analytics
+      # Track status_message analytics
       :telemetry.execute(
-        [:pomodoro, :user, :set_working_on],
+        [:pomodoro, :user, :set_status_message],
         %{count: 1},
         %{
           room_name: state.name,
           user_id: user_id,
-          text_length: String.length(text)
+          text_length: String.length(text),
+          status: state.status
         }
       )
 
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else
-      {:reply, {:error, :not_active}, state}
+      {:reply, {:error, :invalid_status}, state}
     end
   end
 
   @impl true
   def handle_call({:set_status, user_id, emoji}, _from, state) do
-    if state.status == :active do
+    if state.status in [:active, :break] do
       # Toggle: if same emoji, remove from map; otherwise set to new emoji
       new_status_emoji =
         if state.status_emoji[user_id] == emoji do
@@ -343,7 +344,7 @@ defmodule SocialPomodoro.Room do
       broadcast_room_update(new_state)
       {:reply, :ok, new_state}
     else
-      {:reply, {:error, :not_active}, state}
+      {:reply, {:error, :invalid_status}, state}
     end
   end
 
@@ -437,7 +438,9 @@ defmodule SocialPomodoro.Room do
         timer: timer,
         timer_ref: timer_ref,
         participants: state.participants ++ promoted_participants,
-        spectators: []
+        spectators: [],
+        status_message: %{},
+        status_emoji: %{}
     }
 
     broadcast_room_update(new_state)
@@ -483,7 +486,7 @@ defmodule SocialPomodoro.Room do
         timer: timer,
         timer_ref: timer_ref,
         session_participants: session_participant_ids,
-        working_on: %{},
+        status_message: %{},
         status_emoji: %{}
     }
 
@@ -537,16 +540,16 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
-    # Add usernames, working_on, and status_emoji to participants for display
+    # Add usernames, status_message, and status_emoji to participants for display
     participants_with_usernames =
       Enum.map(state.participants, fn p ->
         username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
-        working_on = Map.get(state.working_on, p.user_id)
+        status_message = Map.get(state.status_message, p.user_id)
         status_emoji = Map.get(state.status_emoji, p.user_id)
 
         p
         |> Map.put(:username, username)
-        |> Map.put(:working_on, working_on)
+        |> Map.put(:status_message, status_message)
         |> Map.put(:status_emoji, status_emoji)
       end)
 
