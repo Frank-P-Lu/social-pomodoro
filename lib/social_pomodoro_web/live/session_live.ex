@@ -37,6 +37,10 @@ defmodule SocialPomodoroWeb.SessionLive do
               nil
             end
 
+          # Find current participant
+          current_participant =
+            Enum.find(room_state.participants, &(&1.user_id == user_id))
+
           socket =
             socket
             |> assign(:name, name)
@@ -46,6 +50,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             |> assign(:selected_emoji, nil)
             |> assign(:is_spectator, is_spectator)
             |> assign(:completion_message, completion_msg)
+            |> assign(:current_participant, current_participant)
 
           {:ok, socket}
         end
@@ -100,28 +105,24 @@ defmodule SocialPomodoroWeb.SessionLive do
     # Update spectator status
     is_spectator = is_spectator?(room_state, socket.assigns.user_id)
 
-    # Save completion message when transitioning to break (only once)
-    old_status = Map.get(socket.assigns, :room_state) |> then(&if &1, do: &1.status)
-
-    socket =
-      if room_state.status == :break && old_status != :break do
-        completion_msg =
-          completion_message(room_state.duration_minutes, length(room_state.participants))
-
-        assign(socket, :completion_message, completion_msg)
+    # Update completion message if in break (recompute in case participants changed)
+    completion_msg =
+      if room_state.status == :break do
+        completion_message(room_state.duration_minutes, length(room_state.participants))
       else
-        # Ensure completion_message is always present, even if nil
-        if Map.has_key?(socket.assigns, :completion_message) do
-          socket
-        else
-          assign(socket, :completion_message, nil)
-        end
+        nil
       end
+
+    # Find current participant
+    current_participant =
+      Enum.find(room_state.participants, &(&1.user_id == socket.assigns.user_id))
 
     socket =
       socket
       |> assign(:room_state, room_state)
       |> assign(:is_spectator, is_spectator)
+      |> assign(:completion_message, completion_msg)
+      |> assign(:current_participant, current_participant)
       |> maybe_show_spectator_joining_flash(room_state, is_spectator)
       |> maybe_show_break_ending_flash(room_state)
 
@@ -159,11 +160,20 @@ defmodule SocialPomodoroWeb.SessionLive do
           <.spectator_view room_state={@room_state} />
         <% else %>
           <%= if @room_state.status == :active do %>
-            <.active_session_view room_state={@room_state} user_id={@user_id} />
+            <.active_session_view
+              room_state={@room_state}
+              user_id={@user_id}
+              current_participant={@current_participant}
+            />
           <% end %>
 
           <%= if @room_state.status == :break do %>
-            <.break_view room_state={@room_state} user_id={@user_id} />
+            <.break_view
+              room_state={@room_state}
+              user_id={@user_id}
+              completion_message={@completion_message}
+              current_participant={@current_participant}
+            />
           <% end %>
         <% end %>
       </div>
@@ -221,12 +231,6 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp active_session_view(assigns) do
-    # Helper to find current user's participant
-    current_participant =
-      Enum.find(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
-
-    assigns = assign(assigns, :current_participant, current_participant)
-
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
@@ -353,23 +357,6 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp break_view(assigns) do
-    # Helper to find current user's participant
-    current_participant =
-      Enum.find(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
-
-    # Ensure completion_message is always present
-    completion_msg =
-      Map.get(assigns, :completion_message) ||
-        completion_message(
-          assigns.room_state.duration_minutes,
-          length(assigns.room_state.participants)
-        )
-
-    assigns =
-      assigns
-      |> assign(:current_participant, current_participant)
-      |> assign(:completion_message, completion_msg)
-
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
