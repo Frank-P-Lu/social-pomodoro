@@ -28,6 +28,7 @@ defmodule SocialPomodoro.TelemetryHandler do
       room_name: metadata[:room_name],
       participant_user_ids: metadata[:participant_user_ids],
       participant_count: metadata[:participant_count],
+      bot_count: metadata[:bot_count],
       wait_time_seconds: metadata[:wait_time_seconds]
     })
   end
@@ -36,7 +37,8 @@ defmodule SocialPomodoro.TelemetryHandler do
     send_analytics("Session Restarted", %{
       room_name: metadata[:room_name],
       participant_user_ids: metadata[:participant_user_ids],
-      participant_count: metadata[:participant_count]
+      participant_count: metadata[:participant_count],
+      bot_count: metadata[:bot_count]
     })
   end
 
@@ -44,6 +46,7 @@ defmodule SocialPomodoro.TelemetryHandler do
     send_analytics("Session Completed", %{
       room_name: metadata[:room_name],
       participant_count: metadata[:participant_count],
+      bot_count: metadata[:bot_count],
       duration_minutes: metadata[:duration_minutes]
     })
   end
