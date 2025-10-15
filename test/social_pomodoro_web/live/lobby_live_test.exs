@@ -736,4 +736,110 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       refute html =~ "No one is here yet"
     end
   end
+
+  describe "room sorting" do
+    test "rooms are sorted by: user-created, open, then in-progress" do
+      # Set up three users
+      conn_creator = setup_user_conn("creator")
+      conn_other1 = setup_user_conn("other1")
+      conn_other2 = setup_user_conn("other2")
+
+      # User other1 creates an open room (autostart)
+      {:ok, lobby_other1, _html} = live(conn_other1, "/")
+
+      lobby_other1
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html_other1 = render(lobby_other1)
+      room_other1 = extract_room_name_from_button(html_other1)
+
+      # User other2 creates a room and starts it (in-progress)
+      {:ok, lobby_other2, _html} = live(conn_other2, "/")
+
+      lobby_other2
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html_other2 = render(lobby_other2)
+      room_other2 = extract_room_name_from_button(html_other2)
+
+      # Start the second room to make it in-progress
+      lobby_other2
+      |> element("button[phx-value-room-name='#{room_other2}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      Process.sleep(50)
+
+      # Now creator creates their own room
+      {:ok, lobby_creator, _html} = live(conn_creator, "/")
+
+      lobby_creator
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      Process.sleep(100)
+
+      html_creator = render(lobby_creator)
+      room_creator = extract_room_name_from_button(html_creator)
+
+      # Extract all room names in order from the HTML
+      # The HTML should show rooms in this order:
+      # 1. room_creator (user-created room)
+      # 2. room_other1 (open/autostart room)
+      # 3. room_other2 (in-progress room)
+
+      # Find positions of each room name in the HTML
+      pos_creator = :binary.match(html_creator, room_creator) |> elem(0)
+      pos_other1 = :binary.match(html_creator, room_other1) |> elem(0)
+      pos_other2 = :binary.match(html_creator, room_other2) |> elem(0)
+
+      # Assert that creator's room appears first
+      assert pos_creator < pos_other1,
+             "User-created room should appear before open rooms"
+
+      # Assert that open room appears before in-progress room
+      assert pos_other1 < pos_other2,
+             "Open rooms should appear before in-progress rooms"
+    end
+
+    test "multiple user-created rooms are sorted by creation time" do
+      conn = setup_user_conn("user1")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      # Create first room
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html1 = render(lobby)
+      room1 = extract_room_name_from_button(html1)
+
+      # Leave the first room
+      lobby
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait a moment to ensure different creation timestamp
+      Process.sleep(50)
+
+      # Create second room
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html2 = render(lobby)
+      room2 = extract_room_name_from_button(html2)
+
+      # Both rooms should be visible (user created both)
+      # The first room should appear before the second (sorted by creation time)
+      pos1 = :binary.match(html2, room1) |> elem(0)
+      pos2 = :binary.match(html2, room2) |> elem(0)
+
+      assert pos1 < pos2,
+             "Older user-created rooms should appear before newer ones"
+    end
+  end
 end
