@@ -122,6 +122,9 @@ defmodule SocialPomodoro.Room do
       status_emoji: %{}
     }
 
+    # Notify BotManager about new room
+    SocialPomodoro.BotManager.schedule_bot_join(name)
+
     {:ok, state, {:continue, :broadcast_update}}
   end
 
@@ -286,6 +289,7 @@ defmodule SocialPomodoro.Room do
 
         # Emit telemetry event for session restart (restarted after break)
         participant_user_ids = Enum.map(new_participants, & &1.user_id)
+        bot_count = Enum.count(participant_user_ids, &SocialPomodoro.BotPersonality.bot?/1)
 
         :telemetry.execute(
           [:pomodoro, :session, :restarted],
@@ -293,7 +297,8 @@ defmodule SocialPomodoro.Room do
           %{
             room_name: state.name,
             participant_user_ids: participant_user_ids,
-            participant_count: length(new_participants)
+            participant_count: length(new_participants),
+            bot_count: bot_count
           }
         )
 
@@ -407,12 +412,16 @@ defmodule SocialPomodoro.Room do
     timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
     # Emit telemetry event for session completion
+    participant_user_ids = Enum.map(state.participants, & &1.user_id)
+    bot_count = Enum.count(participant_user_ids, &SocialPomodoro.BotPersonality.bot?/1)
+
     :telemetry.execute(
       [:pomodoro, :session, :completed],
       %{count: 1},
       %{
         room_name: state.name,
         participant_count: length(state.participants),
+        bot_count: bot_count,
         duration_minutes: div(state.work_duration_seconds, 60)
       }
     )
@@ -458,6 +467,9 @@ defmodule SocialPomodoro.Room do
 
   @impl true
   def terminate(_reason, state) do
+    # Notify BotManager about room termination
+    SocialPomodoro.BotManager.room_terminated(state.name)
+
     # Broadcast room removal to all lobby viewers
     Phoenix.PubSub.broadcast(
       SocialPomodoro.PubSub,
@@ -496,11 +508,13 @@ defmodule SocialPomodoro.Room do
 
     # Emit telemetry event for session start
     participant_user_ids = Enum.map(state.participants, & &1.user_id)
+    bot_count = Enum.count(participant_user_ids, &SocialPomodoro.BotPersonality.bot?/1)
 
     telemetry_metadata = %{
       room_name: state.name,
       participant_user_ids: participant_user_ids,
       participant_count: length(state.participants),
+      bot_count: bot_count,
       wait_time_seconds: wait_time_seconds
     }
 

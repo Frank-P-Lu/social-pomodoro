@@ -13,6 +13,8 @@ defmodule SocialPomodoro.Application do
       {Phoenix.PubSub, name: SocialPomodoro.PubSub},
       # Start the user registry
       SocialPomodoro.UserRegistry,
+      # Start the bot manager
+      SocialPomodoro.BotManager,
       # Start the Finch HTTP client for sending emails
       {Finch, name: SocialPomodoro.Finch},
       # Start the room registry
