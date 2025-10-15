@@ -436,77 +436,98 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="flex items-center justify-between gap-4 w-full">
           <!-- Status -->
           <div class="flex gap-2 items-center">
-            <%= if @room.status == :autostart do %>
-              <div class="badge badge-soft badge-warning gap-2 text-xs h-auto py-2">
-                <div class="status status-warning animate-pulse flex-shrink-0"></div>
-                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-0 sm:gap-1 leading-tight">
-                  <span class="text-xs">Starting</span>
-                  <span
-                    phx-hook="AutostartTimer"
-                    id={"autostart-timer-#{@room.name}"}
-                    data-seconds-remaining={@room.seconds_remaining}
-                    class="font-mono font-semibold"
-                  >
-                    {format_time_remaining(@room.seconds_remaining)}
-                  </span>
+            <%= cond do %>
+              <% @room.status == :autostart -> %>
+                <div class="badge badge-soft badge-warning gap-2 text-xs h-auto py-2">
+                  <div class="status status-warning animate-pulse flex-shrink-0"></div>
+                  <div class="flex flex-col sm:flex-row items-start sm:items-center gap-0 sm:gap-1 leading-tight">
+                    <span class="text-xs">Starting</span>
+                    <span
+                      phx-hook="AutostartTimer"
+                      id={"autostart-timer-#{@room.name}"}
+                      data-seconds-remaining={@room.seconds_remaining}
+                      class="font-mono font-semibold"
+                    >
+                      {format_time_remaining(@room.seconds_remaining)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            <% else %>
-              <div class="badge badge-soft badge-neutral gap-2 h-auto py-2">
-                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fill-rule="evenodd"
-                    d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-                <span class="text-xs">In Progress</span>
-              </div>
+              <% @room.status == :break -> %>
+                <div class="badge badge-soft badge-info gap-2 text-xs h-auto py-2">
+                  <Icons.bell class="w-4 h-4 flex-shrink-0 fill-current" />
+                  <span class="text-xs">On Break</span>
+                </div>
+              <% true -> %>
+                <div class="badge badge-soft badge-neutral gap-2 h-auto py-2">
+                  <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <span class="text-xs">In Progress</span>
+                </div>
             <% end %>
           </div>
           
     <!-- Actions -->
           <div class="card-actions flex-shrink-0">
-            <%= if @room.status == :autostart do %>
-              <%= if @room.name == @my_room_name do %>
-                <button
-                  phx-click="leave_room"
-                  class="btn btn-error btn-outline btn-sm"
-                >
-                  Leave
-                </button>
-                <%= if @room.creator == @user_id do %>
+            <%= cond do %>
+              <% @room.status == :autostart -> %>
+                <%= if @room.name == @my_room_name do %>
                   <button
-                    phx-click="start_my_room"
+                    phx-click="leave_room"
+                    class="btn btn-error btn-outline btn-sm"
+                  >
+                    Leave
+                  </button>
+                  <%= if @room.creator == @user_id do %>
+                    <button
+                      phx-click="start_my_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"start-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-sm"
+                    >
+                      Start Now
+                    </button>
+                  <% end %>
+                <% else %>
+                  <button
+                    phx-click="join_room"
                     phx-value-room-name={@room.name}
                     phx-hook="RequestWakeLock"
-                    id={"start-room-btn-#{@room.name}"}
-                    class="btn btn-primary btn-sm"
+                    id={"join-room-btn-#{@room.name}"}
+                    class="btn btn-primary btn-outline btn-sm"
                   >
-                    Start Now
+                    Join
                   </button>
                 <% end %>
-              <% else %>
-                <button
-                  phx-click="join_room"
-                  phx-value-room-name={@room.name}
-                  phx-hook="RequestWakeLock"
-                  id={"join-room-btn-#{@room.name}"}
-                  class="btn btn-primary btn-outline btn-sm"
-                >
-                  Join
-                </button>
-              <% end %>
-            <% else %>
-              <%= if can_rejoin?(@room, @user_id) do %>
-                <button
-                  phx-click="rejoin_room"
-                  phx-value-room-name={@room.name}
-                  class="btn btn-primary btn-outline btn-sm"
-                >
-                  Rejoin
-                </button>
-              <% end %>
+              <% @room.status == :break -> %>
+                <%= if @room.name == @my_room_name do %>
+                  <%!-- User is already in the room, no action needed --%>
+                <% else %>
+                  <button
+                    phx-click="join_room"
+                    phx-value-room-name={@room.name}
+                    phx-hook="RequestWakeLock"
+                    id={"join-room-btn-#{@room.name}"}
+                    class="btn btn-primary btn-outline btn-sm"
+                  >
+                    Join
+                  </button>
+                <% end %>
+              <% true -> %>
+                <%= if can_rejoin?(@room, @user_id) do %>
+                  <button
+                    phx-click="rejoin_room"
+                    phx-value-room-name={@room.name}
+                    class="btn btn-primary btn-outline btn-sm"
+                  >
+                    Rejoin
+                  </button>
+                <% end %>
             <% end %>
           </div>
         </div>
