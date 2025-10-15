@@ -570,7 +570,8 @@ defmodule SocialPomodoro.Room do
       session_participants: state.session_participants,
       spectators_count: length(state.spectators),
       seconds_remaining: state.timer.remaining,
-      break_duration_minutes: div(state.break_duration_seconds, 60)
+      break_duration_minutes: div(state.break_duration_seconds, 60),
+      created_at: state.created_at
     }
   end
 end

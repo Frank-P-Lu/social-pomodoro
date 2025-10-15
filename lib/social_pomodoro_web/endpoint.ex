@@ -13,7 +13,13 @@ defmodule SocialPomodoroWeb.Endpoint do
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    longpoll: [connect_info: [session: @session_options]],
+    check_origin: [
+      "//localhost",
+      "//127.0.0.1",
+      "https://www.focuswithstrangers.com",
+      "https://focuswithstrangers.com"
+    ]
 
   # Serve at "/" the static files from "priv/static" directory.
   #

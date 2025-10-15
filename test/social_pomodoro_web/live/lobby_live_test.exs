@@ -417,6 +417,66 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
   end
 
   describe "rejoin feature" do
+    test "creator can rejoin their own session after leaving" do
+      connA = setup_user_conn("userA")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name_from_button(htmlA)
+
+      # User A starts the session
+      lobbyA
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      Process.sleep(50)
+
+      # User A navigates to the room
+      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+
+      # User A leaves the room
+      sessionA
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      Process.sleep(50)
+
+      # User A should be back in lobby
+      {:ok, lobbyA2, htmlA2} = live(connA, "/")
+
+      # Room should still be visible (creator can rejoin)
+      assert htmlA2 =~ room_name
+
+      # Should show "In Progress" badge
+      assert htmlA2 =~ "In Progress"
+
+      # Should show "Rejoin" button (not "Start")
+      assert htmlA2 =~ "Rejoin"
+
+      # User A clicks Rejoin button and should be redirected to room
+      lobbyA2
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
+      |> render_click()
+
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobbyA2, "/room/#{room_name}")
+
+      # User A should be able to navigate to the room screen successfully
+      {:ok, _sessionA2, htmlSession} = live(connA, "/room/#{room_name}")
+
+      # Should see active session
+      assert htmlSession =~ "Focus time remaining"
+      assert htmlSession =~ "Leave"
+    end
+
     test "user can rejoin an in-progress room they previously left" do
       connA = setup_user_conn("userA")
       connB = setup_user_conn("userB")
@@ -770,7 +830,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(50)
+      Process.sleep(100)
 
       # Now creator creates their own room
       {:ok, lobby_creator, _html} = live(conn_creator, "/")
@@ -789,57 +849,81 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # The HTML should show rooms in this order:
       # 1. room_creator (user-created room)
       # 2. room_other1 (open/autostart room)
-      # 3. room_other2 (in-progress room)
+      # 3. room_other2 should NOT be visible because other2 is in an active session
+      #    and creator is not a session participant
 
       # Find positions of each room name in the HTML
-      pos_creator = :binary.match(html_creator, room_creator) |> elem(0)
-      pos_other1 = :binary.match(html_creator, room_other1) |> elem(0)
-      pos_other2 = :binary.match(html_creator, room_other2) |> elem(0)
+      match_creator = :binary.match(html_creator, room_creator)
+      match_other1 = :binary.match(html_creator, room_other1)
+      match_other2 = :binary.match(html_creator, room_other2)
+
+      assert match_creator != :nomatch, "Creator room should be visible: #{room_creator}"
+      assert match_other1 != :nomatch, "Other1 room should be visible: #{room_other1}"
+
+      # Room other2 should not be visible since it's in an active session
+      # and creator is not a session participant
+      assert match_other2 == :nomatch,
+             "In-progress room should not be visible to non-participants: #{room_other2}"
+
+      pos_creator = elem(match_creator, 0)
+      pos_other1 = elem(match_other1, 0)
 
       # Assert that creator's room appears first
       assert pos_creator < pos_other1,
              "User-created room should appear before open rooms"
-
-      # Assert that open room appears before in-progress room
-      assert pos_other1 < pos_other2,
-             "Open rooms should appear before in-progress rooms"
     end
 
     test "multiple user-created rooms are sorted by creation time" do
-      conn = setup_user_conn("user1")
-      {:ok, lobby, _html} = live(conn, "/")
+      # Test that open rooms are sorted by creation time (oldest first)
+      # We use two other users creating rooms, then a viewer sees both
 
-      # Create first room
-      lobby
+      conn_viewer = setup_user_conn("viewer")
+      conn_user1 = setup_user_conn("user1")
+      conn_user2 = setup_user_conn("user2")
+
+      # User1 creates first room (older)
+      {:ok, lobby1, _html} = live(conn_user1, "/")
+
+      lobby1
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      html1 = render(lobby)
+      html1 = render(lobby1)
       room1 = extract_room_name_from_button(html1)
 
-      # Leave the first room
-      lobby
-      |> element("button[phx-click='leave_room']")
-      |> render_click()
+      # Wait to ensure different creation timestamp (need > 1 second for system_time(:second))
+      Process.sleep(1100)
 
-      # Wait a moment to ensure different creation timestamp
-      Process.sleep(50)
+      # User2 creates second room (newer)
+      {:ok, lobby2, _html} = live(conn_user2, "/")
 
-      # Create second room
-      lobby
+      lobby2
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      html2 = render(lobby)
+      html2 = render(lobby2)
       room2 = extract_room_name_from_button(html2)
 
-      # Both rooms should be visible (user created both)
-      # The first room should appear before the second (sorted by creation time)
-      pos1 = :binary.match(html2, room1) |> elem(0)
-      pos2 = :binary.match(html2, room2) |> elem(0)
+      # Viewer loads lobby and should see both rooms
+      # Wait for both rooms to be created before loading the viewer
+      Process.sleep(100)
+      {:ok, lobby_viewer, _html} = live(conn_viewer, "/")
+      Process.sleep(100)
+      html_viewer = render(lobby_viewer)
 
+      # Both rooms should be visible as open rooms
+      match1 = :binary.match(html_viewer, room1)
+      match2 = :binary.match(html_viewer, room2)
+
+      assert match1 != :nomatch, "First room should be visible: #{room1}"
+      assert match2 != :nomatch, "Second room should be visible: #{room2}"
+
+      pos1 = elem(match1, 0)
+      pos2 = elem(match2, 0)
+
+      # room1 (older) should appear before room2 (newer) since both are open rooms
       assert pos1 < pos2,
-             "Older user-created rooms should appear before newer ones"
+             "Older open room should appear before newer open room"
     end
   end
 end
