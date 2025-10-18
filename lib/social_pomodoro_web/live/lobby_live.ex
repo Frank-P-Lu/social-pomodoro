@@ -296,7 +296,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
 
-    <div class="min-h-screen bg-base-100 p-4 md:p-8">
+    <div class="bg-base-100 p-4 md:p-8">
       <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
