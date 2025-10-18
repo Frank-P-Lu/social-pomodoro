@@ -64,6 +64,12 @@ defmodule SocialPomodoro.TelemetryHandler do
     })
   end
 
+  def handle_event([:pomodoro, :user, :connected], _measurements, metadata, _config) do
+    send_analytics("User Connected", %{
+      user_id: metadata[:user_id]
+    })
+  end
+
   defp send_analytics(event_type, data) do
     SocialPomodoro.Discord.Webhook.send_analytics(event_type, data)
   end
