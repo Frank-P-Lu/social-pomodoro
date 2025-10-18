@@ -367,7 +367,9 @@ defmodule SocialPomodoroWeb.SessionLive do
       <div class="card-body text-center">
         <!-- No spectator badge during break since all spectators are promoted to participants -->
 
-        <div class="text-6xl mb-6">🎉</div>
+        <div class="mb-6">
+          <img src="/images/emojis/1F389.svg" class="w-24 h-24 mx-auto" alt="🎉" />
+        </div>
         <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
         <p class="text-xl mb-8">
           {@completion_message}

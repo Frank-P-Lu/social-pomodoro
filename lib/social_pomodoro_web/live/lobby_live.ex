@@ -336,7 +336,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
               <%= if Enum.empty?(@rooms) do %>
                 <div class="text-center py-12">
                   <p class="text-lg">
-                    No one is here yet 🥺 <br /> That's okay! You can focus solo!
+                    No one is here yet
+                    <img
+                      src="/images/emojis/1F97A.svg"
+                      class="w-6 h-6 inline align-middle"
+                      alt="🥺"
+                    /> <br /> That's okay! You can focus solo!
                   </p>
                 </div>
               <% else %>
