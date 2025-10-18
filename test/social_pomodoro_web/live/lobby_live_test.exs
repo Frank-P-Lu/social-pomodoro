@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.LobbyLiveTest do
   use SocialPomodoroWeb.ConnCase
   import Phoenix.LiveViewTest
+  import SocialPomodoro.TestHelpers
 
   # Helper to create a connection with a user session
   # Adds a unique suffix to prevent test interference
@@ -102,7 +103,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Wait for any existing rooms from other tests to be cleaned up
       # Rooms are cleaned up when they become empty, so we need to wait a bit
       # for any lingering room processes to terminate
-      Process.sleep(50)
+      sleep_short()
 
       # Set up a unique user for this test
       user_id = "empty_state_test_user_#{System.unique_integer([:positive])}"
@@ -119,7 +120,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       end
 
       # Wait a bit more for cleanup to complete
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, _lobby, html} = live(conn, "/")
 
@@ -205,7 +206,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(100)
+      sleep_short()
 
       # Now creator creates their own room
       {:ok, lobby_creator, _html} = live(conn_creator, "/")
@@ -215,7 +216,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(100)
+      sleep_short()
 
       html_creator = render(lobby_creator)
       room_creator = extract_room_name_from_button(html_creator)

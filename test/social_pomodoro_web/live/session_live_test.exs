@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.SessionLiveTest do
   use SocialPomodoroWeb.ConnCase
   import Phoenix.LiveViewTest
+  import SocialPomodoro.TestHelpers
 
   # Helper to create a connection with a user session
   defp setup_user_conn(user_id) do
@@ -15,7 +16,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     for _ <- 1..count do
       send(room_pid, :tick)
       # Give the room a moment to process the tick
-      Process.sleep(10)
+      sleep_short()
     end
   end
 
@@ -55,7 +56,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -101,7 +102,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -111,7 +112,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Advance time to trigger break
       tick_room(room_pid, 2)
-      Process.sleep(50)
+      sleep_short()
 
       # Check room state - B should now be a participant
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -148,7 +149,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Now navigate to session page
       {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
@@ -159,7 +160,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
-      Process.sleep(50)
+      sleep_short()
 
       # Check spectator count
       room_state = SocialPomodoro.Room.get_state(room_pid)
@@ -198,7 +199,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -208,7 +209,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # User B leaves
       SocialPomodoro.Room.leave(room_name, user_id_b)
-      Process.sleep(50)
+      sleep_short()
 
       # Should be removed from spectators
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -247,7 +248,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Join the room
       {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
@@ -264,7 +265,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       tick_room(room_pid, 3)
 
       # Give LiveView time to process the redirect
-      Process.sleep(50)
+      sleep_short()
 
       # Should be redirected to lobby
       assert_redirect(session_view, "/")
@@ -300,7 +301,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Join the room
       {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
@@ -317,7 +318,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Wait for the break to complete and room to close
       tick_room(room_pid, 4)
-      Process.sleep(50)
+      sleep_short()
 
       # Room should redirect to lobby when break ends
       assert_redirect(session_view, "/")
@@ -357,7 +358,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User A navigates to session page
       {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
@@ -370,7 +371,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       GenServer.stop(session_view.pid)
 
       # Give it a moment to process
-      Process.sleep(50)
+      sleep_short()
 
       # User should now be removed from the room
       room_state = SocialPomodoro.Room.get_state(room_pid)
@@ -412,7 +413,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -427,7 +428,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # User B navigates away
       GenServer.stop(session_view_b.pid)
-      Process.sleep(50)
+      sleep_short()
 
       # User B should be removed from spectators
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -464,7 +465,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator during active session
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -475,7 +476,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Wait for timer to finish and transition to break
       tick_room(room_pid, 2)
-      Process.sleep(100)
+      sleep_short()
 
       # User B should now see participant view (not spectator view)
       htmlB = render(sessionB)
@@ -520,7 +521,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B joins as spectator during active session
       SocialPomodoro.Room.join(room_name, user_id_b)
@@ -528,7 +529,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Wait for timer to finish and transition to break
       tick_room(room_pid, 2)
-      Process.sleep(100)
+      sleep_short()
 
       # Check completion message for User A
       # Should say "solo" not "with someone else" since B was a spectator
@@ -563,11 +564,11 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Wait for A's session to complete and transition to break
       tick_room(room_pid, 2)
-      Process.sleep(100)
+      sleep_short()
 
       # Verify A sees the break page
       {:ok, sessionA, htmlA} = live(connA, "/room/#{room_name}")
@@ -629,7 +630,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, _session, html} = live(conn, "/room/#{room_name}")
 
@@ -663,7 +664,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, session, _html} = live(conn, "/room/#{room_name}")
 
@@ -672,7 +673,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "Write tests"})
 
-      Process.sleep(50)
+      sleep_short()
 
       # Verify todo appears in UI
       html = render(session)
@@ -713,7 +714,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, session, _html} = live(conn, "/room/#{room_name}")
 
@@ -723,7 +724,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
         |> element("form[phx-submit='add_todo']")
         |> render_submit(%{"text" => "Task #{i}"})
 
-        Process.sleep(10)
+        sleep_short()
       end
 
       html = render(session)
@@ -760,7 +761,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, session, _html} = live(conn, "/room/#{room_name}")
 
@@ -769,7 +770,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "Write tests"})
 
-      Process.sleep(50)
+      sleep_short()
 
       # Get the todo ID from room state
       state = SocialPomodoro.Room.get_state(room_pid)
@@ -783,7 +784,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       )
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Verify todo is marked complete
       state = SocialPomodoro.Room.get_state(room_pid)
@@ -820,7 +821,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, session, _html} = live(conn, "/room/#{room_name}")
 
@@ -829,13 +830,13 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "Task 1"})
 
-      Process.sleep(50)
+      sleep_short()
 
       session
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "Task 2"})
 
-      Process.sleep(50)
+      sleep_short()
 
       # Get the first todo ID
       state = SocialPomodoro.Room.get_state(room_pid)
@@ -847,7 +848,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='delete_todo'][phx-value-todo_id='#{todo_id}']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       # Verify only one todo remains
       state = SocialPomodoro.Room.get_state(room_pid)
@@ -894,7 +895,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
       {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
@@ -904,7 +905,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "User A task"})
 
-      Process.sleep(50)
+      sleep_short()
 
       # User B should see User A's todo in participant display (read-only)
       htmlB = render(sessionB)

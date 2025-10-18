@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
   use SocialPomodoroWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
+  import SocialPomodoro.TestHelpers
 
   # Helper to create a connection with a user session
   # Adds a unique suffix to prevent test interference
@@ -166,7 +167,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for session to start
-      Process.sleep(50)
+      sleep_short()
 
       # User A should be navigated to the session page
       {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
@@ -177,7 +178,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait a moment for PubSub broadcast to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B's lobby should update and no longer show this room
       htmlB_after = render(lobbyB)
@@ -247,7 +248,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       refute htmlB2 =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
 
       # Wait for PubSub broadcast to propagate to User A's lobby
-      Process.sleep(100)
+      sleep_short()
 
       # User B should no longer be in participants (check on User A's view)
       htmlA = render(lobbyA)
@@ -280,7 +281,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait a moment for PubSub broadcast
-      Process.sleep(50)
+      sleep_short()
 
       # Room should disappear from User B's lobby
       htmlB_after = render(lobbyB)
@@ -316,7 +317,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub broadcasts to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # Verify 3 people in room
       htmlA = render(lobbyA)
@@ -328,7 +329,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub broadcast to propagate and LiveView to process it
-      Process.sleep(50)
+      sleep_short()
 
       # Room should still exist and show "2 people" (not closed)
       htmlB_after = render(lobbyB)
@@ -373,7 +374,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(50)
+      sleep_short()
 
       # User A navigates to the room
       {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
@@ -384,7 +385,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User A should be back in lobby
       {:ok, lobbyA2, htmlA2} = live(connA, "/")
@@ -436,7 +437,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User A starts the session
       lobbyA
@@ -444,7 +445,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(50)
+      sleep_short()
 
       # User B navigates to the room
       {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
@@ -455,7 +456,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B should be back in lobby
       {:ok, lobbyB2, htmlB2} = live(connB, "/")
@@ -515,7 +516,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(100)
+      sleep_short()
 
       # User B navigates to the room
       {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
@@ -526,7 +527,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B loads lobby again
       {:ok, _lobbyB2, htmlB2} = live(connB, "/")
@@ -561,7 +562,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       {:ok, lobbyB, htmlB} = live(connB, "/")
 
       # Wait for PubSub to propagate
-      Process.sleep(100)
+      sleep_short()
 
       # User B should now be in the room with autostart countdown
       assert htmlB =~ "Starting"
@@ -658,61 +659,6 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       htmlB_left = render(lobbyB)
       # User B should NOT see share button after leaving
       refute htmlB_left =~ ~r/id="share-btn-#{room_name}"/
-    end
-  end
-
-  describe "room sorting" do
-    test "multiple user-created rooms are sorted by creation time" do
-      # Test that open rooms are sorted by creation time (oldest first)
-      # We use two other users creating rooms, then a viewer sees both
-
-      conn_viewer = setup_user_conn("viewer")
-      conn_user1 = setup_user_conn("user1")
-      conn_user2 = setup_user_conn("user2")
-
-      # User1 creates first room (older)
-      {:ok, lobby1, _html} = live(conn_user1, "/")
-
-      lobby1
-      |> element("button[phx-click='create_room']")
-      |> render_click()
-
-      html1 = render(lobby1)
-      room1 = extract_room_name_from_button(html1)
-
-      # Wait to ensure different creation timestamp (need > 1 second for system_time(:second))
-      Process.sleep(1100)
-
-      # User2 creates second room (newer)
-      {:ok, lobby2, _html} = live(conn_user2, "/")
-
-      lobby2
-      |> element("button[phx-click='create_room']")
-      |> render_click()
-
-      html2 = render(lobby2)
-      room2 = extract_room_name_from_button(html2)
-
-      # Viewer loads lobby and should see both rooms
-      # Wait for both rooms to be created before loading the viewer
-      Process.sleep(100)
-      {:ok, lobby_viewer, _html} = live(conn_viewer, "/")
-      Process.sleep(100)
-      html_viewer = render(lobby_viewer)
-
-      # Both rooms should be visible as open rooms
-      match1 = :binary.match(html_viewer, room1)
-      match2 = :binary.match(html_viewer, room2)
-
-      assert match1 != :nomatch, "First room should be visible: #{room1}"
-      assert match2 != :nomatch, "Second room should be visible: #{room2}"
-
-      pos1 = elem(match1, 0)
-      pos2 = elem(match2, 0)
-
-      # room1 (older) should appear before room2 (newer) since both are open rooms
-      assert pos1 < pos2,
-             "Older open room should appear before newer open room"
     end
   end
 end

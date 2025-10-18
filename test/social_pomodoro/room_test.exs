@@ -2,6 +2,7 @@ defmodule SocialPomodoro.RoomTest do
   use ExUnit.Case, async: true
   alias SocialPomodoro.Room
   alias SocialPomodoro.RoomRegistry
+  import SocialPomodoro.TestHelpers
 
   setup do
     :ok
@@ -29,7 +30,7 @@ defmodule SocialPomodoro.RoomTest do
   defp tick(pid) do
     send(pid, :tick)
     # Give it a moment to process
-    Process.sleep(10)
+    sleep_short()
   end
 
   describe "room name generation" do
@@ -163,7 +164,7 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.leave(room_name, creator_id)
 
       # Give the process a moment to handle the leave
-      Process.sleep(10)
+      sleep_short()
 
       # Verify room process is still alive
       assert Process.alive?(room_pid)
@@ -246,7 +247,7 @@ defmodule SocialPomodoro.RoomTest do
         assert :ok = Room.go_again(room_name_2, creator_id)
         assert :ok = Room.go_again(room_name_2, participant2_id)
 
-        Process.sleep(10)
+        sleep_short()
 
         # Verify we transitioned to next cycle
         state = Room.get_state(room_pid_2)
@@ -533,7 +534,7 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      Process.sleep(10)
+      sleep_short()
 
       # Verify todos PERSISTED for cycle 2
       state = Room.get_state(room_pid)
@@ -742,7 +743,7 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      Process.sleep(10)
+      sleep_short()
 
       # Verify status_emoji was reset for cycle 2
       state = Room.get_state(room_pid)
@@ -1068,7 +1069,7 @@ defmodule SocialPomodoro.RoomTest do
         assert :ok = Room.go_again(room_name, user_b_id)
 
         # Give it a moment to process
-        Process.sleep(10)
+        sleep_short()
 
         # Verify room transitioned to cycle 2
         state = Room.get_state(room_pid)
@@ -1151,7 +1152,7 @@ defmodule SocialPomodoro.RoomTest do
             tick(room_pid)
 
             # Give it a moment to terminate
-            Process.sleep(20)
+            sleep_short()
 
             # Room should be terminated
             refute Process.alive?(room_pid)
@@ -1198,7 +1199,7 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      Process.sleep(10)
+      sleep_short()
 
       # Should advance to cycle 2 immediately
       if Process.alive?(room_pid) do
@@ -1271,7 +1272,7 @@ defmodule SocialPomodoro.RoomTest do
       # Complete break - should terminate (old behavior)
       tick(room_pid)
       tick(room_pid)
-      Process.sleep(20)
+      sleep_short()
 
       refute Process.alive?(room_pid)
     end
