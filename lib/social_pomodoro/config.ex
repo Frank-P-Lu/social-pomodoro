@@ -5,9 +5,34 @@ defmodule SocialPomodoro.Config do
   """
 
   @doc """
-  Minimum timer length in minutes (shown in lobby slider).
+  Available pomodoro duration options in minutes.
   """
-  def min_timer_minutes, do: 5
+  def pomodoro_duration_options, do: [1, 25, 50, 75]
+
+  @doc """
+  Available cycle count options.
+  """
+  def cycle_count_options, do: [1, 2, 3, 4]
+
+  @doc """
+  Available break duration options in minutes.
+  """
+  def break_duration_options, do: [1, 5, 10, 15]
+
+  @doc """
+  Default pomodoro duration in minutes.
+  """
+  def default_pomodoro_duration, do: 25
+
+  @doc """
+  Default number of cycles.
+  """
+  def default_cycle_count, do: 1
+
+  @doc """
+  Default break duration in minutes.
+  """
+  def default_break_duration, do: 5
 
   @spec autostart_countdown_seconds() :: 180
   @doc """

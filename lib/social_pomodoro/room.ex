@@ -26,7 +26,9 @@ defmodule SocialPomodoro.Room do
     :created_at,
     :tick_interval,
     :status_message,
-    :status_emoji
+    :status_emoji,
+    :total_cycles,
+    :current_cycle
   ]
 
   def start_link(opts) do
@@ -99,6 +101,7 @@ defmodule SocialPomodoro.Room do
     duration_seconds = Keyword.fetch!(opts, :duration_seconds)
     tick_interval = Keyword.get(opts, :tick_interval, @tick_interval)
     break_duration_seconds = Keyword.get(opts, :break_duration_seconds, 5 * 60)
+    total_cycles = Keyword.get(opts, :total_cycles, 1)
 
     # Start autostart countdown (configurable in SocialPomodoro.Config)
     autostart_seconds = SocialPomodoro.Config.autostart_countdown_seconds()
@@ -119,7 +122,9 @@ defmodule SocialPomodoro.Room do
       created_at: System.system_time(:second),
       tick_interval: tick_interval,
       status_message: %{},
-      status_emoji: %{}
+      status_emoji: %{},
+      total_cycles: total_cycles,
+      current_cycle: 1
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -263,42 +268,44 @@ defmodule SocialPomodoro.Room do
       new_state = %{state | participants: new_participants}
 
       if all_ready do
-        # Start new session
-        # Cancel existing timer before creating new one
+        # All participants ready to skip break
         if new_state.timer_ref, do: Process.cancel_timer(new_state.timer_ref)
 
-        timer = Timer.new(state.work_duration_seconds) |> Timer.start()
-        timer_ref = Process.send_after(self(), :tick, state.tick_interval)
+        # Check if more cycles remain
+        if state.current_cycle < state.total_cycles do
+          # Start next cycle immediately
+          timer = Timer.new(state.work_duration_seconds) |> Timer.start()
+          timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
-        # Capture current participants as session participants (includes promoted spectators)
-        session_participant_ids = Enum.map(new_participants, & &1.user_id)
-
-        final_state = %{
-          new_state
-          | status: :active,
-            timer: timer,
-            timer_ref: timer_ref,
-            participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
-            session_participants: session_participant_ids,
-            status_message: %{},
-            status_emoji: %{}
-        }
-
-        # Emit telemetry event for session restart (restarted after break)
-        participant_user_ids = Enum.map(new_participants, & &1.user_id)
-
-        :telemetry.execute(
-          [:pomodoro, :session, :restarted],
-          %{count: 1},
-          %{
-            room_name: state.name,
-            participant_user_ids: participant_user_ids,
-            participant_count: length(new_participants)
+          final_state = %{
+            new_state
+            | status: :active,
+              timer: timer,
+              timer_ref: timer_ref,
+              current_cycle: state.current_cycle + 1,
+              participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
+              status_message: %{},
+              status_emoji: %{}
           }
-        )
 
-        broadcast_room_update(final_state)
-        {:reply, :ok, final_state}
+          # Emit telemetry event for break skip
+          :telemetry.execute(
+            [:pomodoro, :break, :skipped],
+            %{count: 1},
+            %{
+              room_name: state.name,
+              cycle: final_state.current_cycle,
+              total_cycles: state.total_cycles,
+              participant_count: length(new_participants)
+            }
+          )
+
+          broadcast_room_update(final_state)
+          {:reply, :ok, final_state}
+        else
+          # This was the final break - button should be hidden in UI
+          {:reply, {:error, :final_break}, new_state}
+        end
       else
         broadcast_room_update(new_state)
         {:reply, :ok, new_state}
@@ -452,8 +459,43 @@ defmodule SocialPomodoro.Room do
   end
 
   defp handle_timer_complete(%{status: :break} = state) do
-    # Break complete, terminate the room
-    {:stop, :normal, state}
+    # Break complete - check if more cycles remain
+    if state.current_cycle < state.total_cycles do
+      # More cycles to go - start next work session
+      if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+
+      timer = Timer.new(state.work_duration_seconds) |> Timer.start()
+      timer_ref = Process.send_after(self(), :tick, state.tick_interval)
+
+      new_state = %{
+        state
+        | status: :active,
+          timer: timer,
+          timer_ref: timer_ref,
+          current_cycle: state.current_cycle + 1,
+          participants: Enum.map(state.participants, &%{&1 | ready_for_next: false}),
+          status_message: %{},
+          status_emoji: %{}
+      }
+
+      # Emit telemetry event for next cycle start
+      :telemetry.execute(
+        [:pomodoro, :cycle, :started],
+        %{count: 1},
+        %{
+          room_name: state.name,
+          cycle: new_state.current_cycle,
+          total_cycles: state.total_cycles,
+          participant_count: length(new_state.participants)
+        }
+      )
+
+      broadcast_room_update(new_state)
+      {:noreply, new_state}
+    else
+      # All cycles complete - terminate the room
+      {:stop, :normal, state}
+    end
   end
 
   @impl true
@@ -571,7 +613,9 @@ defmodule SocialPomodoro.Room do
       spectators_count: length(state.spectators),
       seconds_remaining: state.timer.remaining,
       break_duration_minutes: div(state.break_duration_seconds, 60),
-      created_at: state.created_at
+      created_at: state.created_at,
+      total_cycles: state.total_cycles,
+      current_cycle: state.current_cycle
     }
   end
 end

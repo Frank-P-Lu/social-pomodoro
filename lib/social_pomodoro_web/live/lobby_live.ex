@@ -31,7 +31,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:user_id, user_id)
       |> assign(:username, username)
       |> assign(:rooms, rooms)
-      |> assign(:duration_minutes, 25)
+      |> assign(:duration_minutes, SocialPomodoro.Config.default_pomodoro_duration())
+      |> assign(:num_cycles, SocialPomodoro.Config.default_cycle_count())
+      |> assign(:break_duration_minutes, SocialPomodoro.Config.default_break_duration())
       |> assign(:creating, false)
       |> assign(:my_room_name, my_room_name)
 
@@ -132,11 +134,25 @@ defmodule SocialPomodoroWeb.LobbyLive do
   end
 
   @impl true
+  def handle_event("set_cycles", %{"cycles" => cycles}, socket) do
+    num_cycles = String.to_integer(cycles)
+    {:noreply, assign(socket, :num_cycles, num_cycles)}
+  end
+
+  @impl true
+  def handle_event("set_break_duration", %{"minutes" => minutes}, socket) do
+    break_duration = String.to_integer(minutes)
+    {:noreply, assign(socket, :break_duration_minutes, break_duration)}
+  end
+
+  @impl true
   def handle_event("create_room", _params, socket) do
     {:ok, name} =
       SocialPomodoro.RoomRegistry.create_room(
         socket.assigns.user_id,
-        socket.assigns.duration_minutes
+        socket.assigns.duration_minutes,
+        socket.assigns.num_cycles,
+        socket.assigns.break_duration_minutes
       )
 
     socket = assign(socket, :my_room_name, name)
@@ -251,8 +267,16 @@ defmodule SocialPomodoroWeb.LobbyLive do
     end)
   end
 
-  defp min_timer_minutes do
-    SocialPomodoro.Config.min_timer_minutes()
+  defp pomodoro_duration_options do
+    SocialPomodoro.Config.pomodoro_duration_options()
+  end
+
+  defp cycle_count_options do
+    SocialPomodoro.Config.cycle_count_options()
+  end
+
+  defp break_duration_options do
+    SocialPomodoro.Config.break_duration_options()
   end
 
   @impl true
@@ -342,6 +366,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
               username={@username}
               my_room_name={@my_room_name}
               duration_minutes={@duration_minutes}
+              num_cycles={@num_cycles}
+              break_duration_minutes={@break_duration_minutes}
             />
           </div>
         </div>
@@ -439,7 +465,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% end %>
           </div>
           <div class="text-sm opacity-70">
-            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting · {@room.duration_minutes} min
+            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting ·
+            <%= if @room.total_cycles > 1 do %>
+              {@room.total_cycles} × {@room.duration_minutes} min · {@room.break_duration_minutes} min breaks
+            <% else %>
+              {@room.duration_minutes} min
+            <% end %>
           </div>
         </div>
         
@@ -566,6 +597,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
   attr :username, :string, required: true
   attr :my_room_name, :string, default: nil
   attr :duration_minutes, :integer, required: true
+  attr :num_cycles, :integer, required: true
+  attr :break_duration_minutes, :integer, required: true
 
   defp user_card(assigns) do
     ~H"""
@@ -626,56 +659,56 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="flex flex-col mx-auto w-full lg:w-xs relative">
           <div class="relative z-0 bg-base-200/50 p-4 rounded-box">
             <h2 class="card-title mb-4">Set your timer</h2>
-            <!-- Duration Presets -->
-            <%!-- TODO: make this client side --%>
-            <div class="join w-full mb-2">
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="25"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                25 min
-              </button>
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="50"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                50 min
-              </button>
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="75"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                75 min
-              </button>
+            
+    <!-- Pomodoro Duration -->
+            <label class="label">
+              <span class="label-text">Pomodoro time</span>
+            </label>
+            <div class="join w-full mb-4">
+              <%= for minutes <- pomodoro_duration_options() do %>
+                <button
+                  phx-click="set_duration"
+                  phx-value-minutes={minutes}
+                  disabled={@my_room_name != nil}
+                  class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == minutes, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+                >
+                  {minutes} min
+                </button>
+              <% end %>
             </div>
             
-    <!-- Duration Slider -->
-            <div class="mb-4">
-              <form phx-change="set_duration">
-                <input
-                  type="range"
-                  id="duration-slider"
-                  min={min_timer_minutes()}
-                  max="180"
-                  value={@duration_minutes}
-                  name="minutes"
+    <!-- Number of Cycles -->
+            <label class="label">
+              <span class="label-text">Number of pomodoros</span>
+            </label>
+            <div class="join w-full mb-4">
+              <%= for cycles <- cycle_count_options() do %>
+                <button
+                  phx-click="set_cycles"
+                  phx-value-cycles={cycles}
                   disabled={@my_room_name != nil}
-                  class="range range-neutral"
-                />
-              </form>
-              <div class="flex justify-between text-xs opacity-50 mt-1">
-                <span>{min_timer_minutes()} min</span>
-                <span>3 hours</span>
-              </div>
-              <label for="duration-slider" class="label w-full">
-                <span class="label-text mx-auto">Duration: {@duration_minutes} minutes</span>
-              </label>
+                  class={"join-item btn flex-1 !border-2 " <> if @num_cycles == cycles, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+                >
+                  {cycles}
+                </button>
+              <% end %>
+            </div>
+            
+    <!-- Break Duration -->
+            <label class="label">
+              <span class="label-text">Break time</span>
+            </label>
+            <div class="join w-full mb-4">
+              <%= for minutes <- break_duration_options() do %>
+                <button
+                  phx-click="set_break_duration"
+                  phx-value-minutes={minutes}
+                  disabled={@my_room_name != nil}
+                  class={"join-item btn flex-1 !border-2 " <> if @break_duration_minutes == minutes, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+                >
+                  {minutes} min
+                </button>
+              <% end %>
             </div>
 
             <div class="card-actions">

@@ -240,9 +240,16 @@ defmodule SocialPomodoroWeb.SessionLive do
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
         <div class="card-body text-center">
-          <%= if @room_state.spectators_count > 0 do %>
-            <!-- Spectator Badge -->
-            <div class="flex justify-center mb-4">
+          <!-- Cycle Progress & Spectator Badge -->
+          <div class="flex justify-center items-center gap-4 mb-4">
+            <%= if @room_state.total_cycles > 1 do %>
+              <div class="text-sm opacity-70 flex items-center gap-1">
+                <img src="/images/emojis/1F345.svg" class="w-4 h-4 inline" alt="🍅" />
+                <span>{@room_state.current_cycle} of {@room_state.total_cycles}</span>
+              </div>
+            <% end %>
+
+            <%= if @room_state.spectators_count > 0 do %>
               <div
                 class="tooltip tooltip-bottom"
                 data-tip={"#{@room_state.spectators_count} spectator#{if @room_state.spectators_count > 1, do: "s", else: ""}. They will join when the current session ends."}
@@ -252,8 +259,8 @@ defmodule SocialPomodoroWeb.SessionLive do
                   <span>{@room_state.spectators_count}</span>
                 </div>
               </div>
-            </div>
-          <% end %>
+            <% end %>
+          </div>
           
     <!-- Timer Display -->
           <.timer_display
@@ -362,15 +369,40 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp break_view(assigns) do
+    # Determine if this is the final break
+    assigns =
+      assign(
+        assigns,
+        :is_final_break,
+        assigns.room_state.current_cycle == assigns.room_state.total_cycles
+      )
+
     ~H"""
     <div class="card bg-base-200">
       <div class="card-body text-center">
-        <!-- No spectator badge during break since all spectators are promoted to participants -->
+        <!-- Cycle Progress -->
+        <%= if @room_state.total_cycles > 1 do %>
+          <div class="text-sm opacity-70 mb-2 flex items-center justify-center gap-1">
+            <%= if @is_final_break do %>
+              <img src="/images/emojis/1F345.svg" class="w-4 h-4 inline" alt="🍅" />
+              <span>All cycles complete!</span>
+            <% else %>
+              <img src="/images/emojis/1F345.svg" class="w-4 h-4 inline" alt="🍅" />
+              <span>Cycle {@room_state.current_cycle} of {@room_state.total_cycles} complete</span>
+            <% end %>
+          </div>
+        <% end %>
 
         <div class="mb-6">
           <img src="/images/emojis/1F389.svg" class="w-24 h-24 mx-auto" alt="🎉" />
         </div>
-        <h1 class="card-title text-4xl justify-center mb-4">Great Work!</h1>
+        <h1 class="card-title text-4xl justify-center mb-4">
+          <%= if @is_final_break do %>
+            Amazing Work!
+          <% else %>
+            Great Work!
+          <% end %>
+        </h1>
         <p class="text-xl mb-8">
           {@completion_message}
         </p>
@@ -474,12 +506,14 @@ defmodule SocialPomodoroWeb.SessionLive do
         <% end %>
 
         <div class="card-actions justify-center gap-4">
-          <button
-            phx-click="go_again"
-            class="btn btn-primary"
-          >
-            Go Again Together
-          </button>
+          <%= if not @is_final_break do %>
+            <button
+              phx-click="go_again"
+              class="btn btn-primary"
+            >
+              Skip Break
+            </button>
+          <% end %>
           <button
             phx-click="leave_room"
             phx-hook="ReleaseWakeLock"
@@ -491,9 +525,9 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
         </div>
 
-        <%= if Enum.any?(@room_state.participants, & &1.ready_for_next) do %>
+        <%= if not @is_final_break and Enum.any?(@room_state.participants, & &1.ready_for_next) do %>
           <p class="text-sm opacity-50 mt-6">
-            Waiting for everyone to be ready...
+            Waiting for everyone to skip break...
           </p>
         <% end %>
       </div>

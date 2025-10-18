@@ -255,9 +255,9 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # Advance time for active session to complete (1 second duration + 1 tick to transition)
       tick_room(room_pid, 2)
 
-      # Should now be in break
+      # Should now be in break (single cycle = final break = "Amazing Work!")
       html = render(session_view)
-      assert html =~ "Great Work!"
+      assert html =~ "Amazing Work!"
       assert html =~ "Break time remaining"
 
       # Advance time for break to end (2 seconds + 1 tick to trigger redirect)
@@ -308,22 +308,19 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # Advance time for active session to complete (1 second duration + 1 tick to transition)
       tick_room(room_pid, 2)
 
-      # Should now be in break
+      # Should now be in break (single cycle = final break)
       html = render(session_view)
-      assert html =~ "Great Work!"
+      assert html =~ "Amazing Work!"
 
-      # Click "Go Again Together" - this marks user as ready and starts new session immediately (since only 1 user)
-      session_view
-      |> element("button[phx-click='go_again']")
-      |> render_click()
+      # Skip break button should NOT appear on final break
+      refute html =~ "Skip Break"
 
-      # Small delay to let the state update propagate
+      # Wait for the break to complete and room to close
+      tick_room(room_pid, 4)
       Process.sleep(50)
 
-      # Should be in active session again (not break)
-      html = render(session_view)
-      assert html =~ "Focus time remaining"
-      refute html =~ "Great Work!"
+      # Room should redirect to lobby when break ends
+      assert_redirect(session_view, "/")
     end
   end
 
@@ -483,8 +480,9 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # User B should now see participant view (not spectator view)
       htmlB = render(sessionB)
       refute htmlB =~ "You&#39;re a spectator"
-      assert htmlB =~ "Great Work!"
-      assert htmlB =~ "Go Again Together"
+      assert htmlB =~ "Amazing Work!"
+      # Single cycle = final break, so no Skip Break button
+      refute htmlB =~ "Skip Break"
 
       # Verify in room state that B is now a participant
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -537,6 +535,71 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       htmlA = render(sessionA)
       assert htmlA =~ ~r/(You focused solo|Flying solo|Solo focus|You stayed focused)/
       refute htmlA =~ "You focused with"
+    end
+
+    test "user joining during break sees break page (not spectator view)" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # Wait for A's session to complete and transition to break
+      tick_room(room_pid, 2)
+      Process.sleep(100)
+
+      # Verify A sees the break page
+      {:ok, sessionA, htmlA} = live(connA, "/room/#{room_name}")
+      assert htmlA =~ "Amazing Work!"
+      assert htmlA =~ "Break time remaining"
+
+      # User B navigates to lobby and joins the room via UI
+      {:ok, lobbyB, htmlB} = live(connB, "/")
+
+      # User B should see the room in the lobby (in break status)
+      assert htmlB =~ room_name |> String.replace("-", " ")
+      assert htmlB =~ "On Break"
+
+      # User B clicks join button
+      lobbyB
+      |> element("button[phx-click='join_room'][phx-value-room-name='#{room_name}']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # User B should now be in the session page showing the break view
+      {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
+
+      # User B should see the break page (not spectator view)
+      refute htmlB =~ "You&#39;re a spectator"
+      assert htmlB =~ "Amazing Work!"
+      assert htmlB =~ "Break time remaining"
+
+      # Both users should see each other's avatars in the break view
+      htmlA = render(sessionA)
+      # Should now show 2 participants
+      assert String.contains?(htmlA, "avatar")
     end
   end
 end

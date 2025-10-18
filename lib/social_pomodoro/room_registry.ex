@@ -13,8 +13,11 @@ defmodule SocialPomodoro.RoomRegistry do
   @doc """
   Creates a new room and returns its name.
   """
-  def create_room(creator_user_id, duration_minutes) do
-    GenServer.call(__MODULE__, {:create_room, creator_user_id, duration_minutes})
+  def create_room(creator_user_id, duration_minutes, num_cycles \\ 1, break_duration_minutes \\ 5) do
+    GenServer.call(
+      __MODULE__,
+      {:create_room, creator_user_id, duration_minutes, num_cycles, break_duration_minutes}
+    )
   end
 
   @doc """
@@ -56,14 +59,21 @@ defmodule SocialPomodoro.RoomRegistry do
   end
 
   @impl true
-  def handle_call({:create_room, creator_user_id, duration_minutes}, _from, state) do
+  def handle_call(
+        {:create_room, creator_user_id, duration_minutes, num_cycles, break_duration_minutes},
+        _from,
+        state
+      ) do
     name = SocialPomodoro.RoomNameGenerator.generate()
     duration_seconds = duration_minutes * 60
+    break_duration_seconds = break_duration_minutes * 60
 
     case SocialPomodoro.Room.start_link(
            name: name,
            creator: creator_user_id,
-           duration_seconds: duration_seconds
+           duration_seconds: duration_seconds,
+           break_duration_seconds: break_duration_seconds,
+           total_cycles: num_cycles
          ) do
       {:ok, pid} ->
         :ets.insert(@table_name, {name, pid})
@@ -75,7 +85,9 @@ defmodule SocialPomodoro.RoomRegistry do
           %{
             room_name: name,
             user_id: creator_user_id,
-            duration_minutes: duration_minutes
+            duration_minutes: duration_minutes,
+            num_cycles: num_cycles,
+            break_duration_minutes: break_duration_minutes
           }
         )
 
@@ -83,7 +95,11 @@ defmodule SocialPomodoro.RoomRegistry do
 
       {:error, {:already_started, _pid}} ->
         # Room name collision - retry with a new name
-        handle_call({:create_room, creator_user_id, duration_minutes}, self(), state)
+        handle_call(
+          {:create_room, creator_user_id, duration_minutes, num_cycles, break_duration_minutes},
+          self(),
+          state
+        )
     end
   end
 
