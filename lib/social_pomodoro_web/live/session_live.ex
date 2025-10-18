@@ -71,11 +71,33 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
-  def handle_event("set_status_message", %{"text" => text}, socket) do
-    SocialPomodoro.Room.set_status_message(
+  def handle_event("add_todo", %{"text" => text}, socket) do
+    SocialPomodoro.Room.add_todo(
       socket.assigns.name,
       socket.assigns.user_id,
       text
+    )
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_todo", %{"todo_id" => todo_id}, socket) do
+    SocialPomodoro.Room.toggle_todo(
+      socket.assigns.name,
+      socket.assigns.user_id,
+      todo_id
+    )
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("delete_todo", %{"todo_id" => todo_id}, socket) do
+    SocialPomodoro.Room.delete_todo(
+      socket.assigns.name,
+      socket.assigns.user_id,
+      todo_id
     )
 
     {:noreply, socket}
@@ -326,29 +348,14 @@ defmodule SocialPomodoroWeb.SessionLive do
             </button>
           </div>
           
-    <!-- What are you working on? -->
-          <%= if is_nil(@current_participant.status_message) do %>
-            <div class="mb-8">
-              <form phx-submit="set_status_message" class="flex gap-2 justify-center">
-                <input
-                  type="text"
-                  name="text"
-                  placeholder="What are you working on?"
-                  class="input input-bordered w-full max-w-xs text-base"
-                  maxlength="30"
-                  required
-                />
-                <button
-                  type="submit"
-                  phx-hook="MaintainWakeLock"
-                  id="submit-status-message"
-                  class="btn btn-square btn-primary"
-                >
-                  <Icons.submit class="w-6 h-6 fill-current" />
-                </button>
-              </form>
-            </div>
-          <% end %>
+    <!-- Todo List -->
+          <div class="mb-8">
+            <.todo_list
+              current_participant={@current_participant}
+              max_todos={SocialPomodoro.Config.max_todos_per_user()}
+              placeholder="What are you working on?"
+            />
+          </div>
         </div>
       </div>
       
@@ -482,28 +489,14 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
         </div>
         
-    <!-- What was your session? -->
-        <%= if is_nil(@current_participant.status_message) do %>
-          <div class="mb-8">
-            <form phx-submit="set_status_message" class="flex gap-2 justify-center">
-              <input
-                type="text"
-                name="text"
-                placeholder="How was your session?"
-                class="input input-bordered w-full max-w-xs text-base"
-                maxlength="30"
-                required
-              />
-              <button
-                type="submit"
-                id="submit-session-feedback"
-                class="btn btn-square btn-primary"
-              >
-                <Icons.submit class="w-6 h-6 fill-current" />
-              </button>
-            </form>
-          </div>
-        <% end %>
+    <!-- Todo List -->
+        <div class="mb-8">
+          <.todo_list
+            current_participant={@current_participant}
+            max_todos={SocialPomodoro.Config.max_todos_per_user()}
+            placeholder="How was your session?"
+          />
+        </div>
 
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
@@ -683,13 +676,109 @@ defmodule SocialPomodoroWeb.SessionLive do
         <% end %>
       </div>
       <p class="font-semibold text-center text-sm">{@participant.username}</p>
-      <%= if @participant.status_message do %>
-        <p class="text-xs opacity-70 text-center break-words w-full">
-          {@participant.status_message}
-        </p>
+      <%= if @participant.todos && length(@participant.todos) > 0 do %>
+        <div class="text-xs text-center w-full max-w-xs space-y-1">
+          <%= for todo <- @participant.todos do %>
+            <div class="flex items-center gap-2 justify-center">
+              <input
+                type="checkbox"
+                checked={todo.completed}
+                disabled
+                class="checkbox checkbox-xs"
+              />
+              <span class={if todo.completed, do: "line-through opacity-50", else: ""}>
+                {todo.text}
+              </span>
+            </div>
+          <% end %>
+        </div>
       <% end %>
       <%= if @show_ready && @participant.ready_for_next do %>
         <p class="text-xs text-success font-semibold">Ready!</p>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :current_participant, :map, required: true
+  attr :max_todos, :integer, required: true
+  attr :placeholder, :string, default: "What are you working on?"
+
+  defp todo_list(assigns) do
+    todos = Map.get(assigns.current_participant, :todos, [])
+    todos_count = length(todos)
+    at_max = todos_count >= assigns.max_todos
+
+    assigns =
+      assigns
+      |> assign(:todos, todos)
+      |> assign(:todos_count, todos_count)
+      |> assign(:at_max, at_max)
+
+    ~H"""
+    <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
+      <!-- Add todo form -->
+      <form phx-submit="add_todo" class="flex gap-2 w-full justify-center">
+        <input
+          type="text"
+          name="text"
+          placeholder={@placeholder}
+          class="input input-bordered w-full max-w-xs text-base"
+          maxlength="30"
+          required
+          disabled={@at_max}
+        />
+        <button
+          type="submit"
+          phx-hook="MaintainWakeLock"
+          id="add-todo-button"
+          class="btn btn-square btn-primary"
+          disabled={@at_max}
+        >
+          <Icons.submit class="w-6 h-6 fill-current" />
+        </button>
+      </form>
+      <%= if @at_max do %>
+        <p class="text-xs opacity-50">Max {@max_todos} todos reached</p>
+      <% end %>
+      <!-- Todo items -->
+      <%= if @todos_count > 0 do %>
+        <div class="flex flex-col gap-2 w-full max-w-xs">
+          <%= for todo <- @todos do %>
+            <div
+              class="flex items-center gap-2 bg-base-300 rounded-lg p-2 transition-all duration-200 ease-in-out"
+              id={"todo-#{todo.id}"}
+            >
+              <button
+                phx-click="delete_todo"
+                phx-value-todo_id={todo.id}
+                phx-hook="MaintainWakeLock"
+                id={"delete-todo-#{todo.id}"}
+                class="btn btn-ghost btn-xs btn-square hover:bg-error/20 transition-colors duration-200"
+              >
+                <Icons.trash class="w-4 h-4 fill-current opacity-50 hover:opacity-100" />
+              </button>
+
+              <span class={
+                [
+                  "flex-1 text-sm transition-all duration-200",
+                  if(todo.completed, do: "line-through opacity-50", else: "")
+                ]
+                |> Enum.join(" ")
+              }>
+                {todo.text}
+              </span>
+
+              <input
+                type="checkbox"
+                checked={todo.completed}
+                phx-click="toggle_todo"
+                phx-value-todo_id={todo.id}
+                class="checkbox checkbox-sm transition-transform duration-200"
+              />
+            </div>
+          <% end %>
+        </div>
       <% end %>
     </div>
     """

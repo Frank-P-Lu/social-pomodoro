@@ -39,4 +39,9 @@ defmodule SocialPomodoro.Config do
   Time before a room autostarts in seconds.
   """
   def autostart_countdown_seconds, do: 180
+
+  @doc """
+  Maximum number of todos per user.
+  """
+  def max_todos_per_user, do: 5
 end

@@ -581,14 +581,15 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       assert htmlB =~ room_name |> String.replace("-", " ")
       assert htmlB =~ "On Break"
 
-      # User B clicks join button
+      # User B clicks join button - should trigger navigation to room page
       lobbyB
       |> element("button[phx-click='join_room'][phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      Process.sleep(50)
+      # Should have a redirect
+      assert_redirect(lobbyB, "/room/#{room_name}")
 
-      # User B should now be in the session page showing the break view
+      # Navigate directly to the room page
       {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
 
       # User B should see the break page (not spectator view)
@@ -600,6 +601,319 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       htmlA = render(sessionA)
       # Should now show 2 participants
       assert String.contains?(htmlA, "avatar")
+    end
+  end
+
+  describe "todo list UI" do
+    test "shows todo input form during active session" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, _session, html} = live(conn, "/room/#{room_name}")
+
+      # Should show todo input
+      assert html =~ "What are you working on?"
+      assert html =~ "phx-submit=\"add_todo\""
+    end
+
+    test "user can add todo via form" do
+      conn = setup_user_conn("userA")
+      user_id = get_session(conn, "user_id")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Add a todo
+      session
+      |> element("form[phx-submit='add_todo']")
+      |> render_submit(%{"text" => "Write tests"})
+
+      Process.sleep(50)
+
+      # Verify todo appears in UI
+      html = render(session)
+      assert html =~ "Write tests"
+
+      # Verify todo has checkbox and delete button
+      assert html =~ "phx-click=\"toggle_todo\""
+      assert html =~ "phx-click=\"delete_todo\""
+
+      # Verify in room state
+      state = SocialPomodoro.Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == user_id))
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Write tests"
+    end
+
+    test "input disabled when 5 todos exist" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Add 5 todos
+      for i <- 1..5 do
+        session
+        |> element("form[phx-submit='add_todo']")
+        |> render_submit(%{"text" => "Task #{i}"})
+
+        Process.sleep(10)
+      end
+
+      html = render(session)
+
+      # Should show max todos message
+      assert html =~ "Max 5 todos reached"
+
+      # Input should be disabled
+      assert html =~ "disabled"
+    end
+
+    test "user can toggle todo checkbox" do
+      conn = setup_user_conn("userA")
+      user_id = get_session(conn, "user_id")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Add a todo
+      session
+      |> element("form[phx-submit='add_todo']")
+      |> render_submit(%{"text" => "Write tests"})
+
+      Process.sleep(50)
+
+      # Get the todo ID from room state
+      state = SocialPomodoro.Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == user_id))
+      todo_id = hd(participant.todos).id
+
+      # Toggle the todo
+      session
+      |> element(
+        "input[type='checkbox'][phx-click='toggle_todo'][phx-value-todo_id='#{todo_id}']"
+      )
+      |> render_click()
+
+      Process.sleep(50)
+
+      # Verify todo is marked complete
+      state = SocialPomodoro.Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == user_id))
+      assert hd(participant.todos).completed == true
+
+      # UI should show strikethrough
+      html = render(session)
+      assert html =~ "line-through"
+    end
+
+    test "user can delete todo via trash icon" do
+      conn = setup_user_conn("userA")
+      user_id = get_session(conn, "user_id")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Add two todos
+      session
+      |> element("form[phx-submit='add_todo']")
+      |> render_submit(%{"text" => "Task 1"})
+
+      Process.sleep(50)
+
+      session
+      |> element("form[phx-submit='add_todo']")
+      |> render_submit(%{"text" => "Task 2"})
+
+      Process.sleep(50)
+
+      # Get the first todo ID
+      state = SocialPomodoro.Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == user_id))
+      todo_id = hd(participant.todos).id
+
+      # Delete the first todo
+      session
+      |> element("button[phx-click='delete_todo'][phx-value-todo_id='#{todo_id}']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      # Verify only one todo remains
+      state = SocialPomodoro.Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == user_id))
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Task 2"
+
+      # UI should only show Task 2
+      html = render(session)
+      assert html =~ "Task 2"
+      refute html =~ "Task 1"
+    end
+
+    test "other participants see todos in read-only mode" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      _user_id_a = get_session(connA, "user_id")
+      user_id_b = get_session(connB, "user_id")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      # User B joins
+      SocialPomodoro.Room.join(room_name, user_id_b)
+
+      # Start session
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      Process.sleep(50)
+
+      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
+
+      # User A adds a todo
+      sessionA
+      |> element("form[phx-submit='add_todo']")
+      |> render_submit(%{"text" => "User A task"})
+
+      Process.sleep(50)
+
+      # User B should see User A's todo in participant display (read-only)
+      htmlB = render(sessionB)
+
+      # Should show the todo text
+      assert htmlB =~ "User A task"
+
+      # Should have disabled checkbox (read-only for other participants)
+      assert htmlB =~ "disabled"
     end
   end
 end

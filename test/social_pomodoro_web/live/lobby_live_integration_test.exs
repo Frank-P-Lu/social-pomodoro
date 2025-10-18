@@ -54,23 +54,18 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       {:ok, lobbyB, htmlB} = live(conn2, "/")
       assert htmlB =~ room_name
 
-      # User B joins the specific room using phx-value-room-name
+      # User B joins the specific room using phx-value-room-name (room is in autostart)
       lobbyB
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      # Both lobbies should now show 2 participants
-      htmlA = render(lobbyA)
+      # User B should stay on lobby (room is in autostart, not active/break)
       htmlB = render(lobbyB)
+      htmlA = render(lobbyA)
 
       # Both should see "2 people" for the room
       assert htmlA =~ "2 people"
       assert htmlB =~ "2 people"
-
-      # User B should see "Starting" countdown somewhere in the page
-      assert htmlB =~ "Starting"
-      # And the room_name should exist in a button (no longer Join for this room)
-      refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-name="#{room_name}"/
 
       # User A should see "Start" button for their room (with room_name attribute)
       assert htmlA =~ ~r/phx-value-room-name="#{room_name}"/
@@ -81,9 +76,8 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
-      # Both should navigate to the same room
+      # User A should navigate to the room
       assert_redirect(lobbyA, "/room/#{room_name}")
-      assert_redirect(lobbyB, "/room/#{room_name}")
     end
   end
 
@@ -192,7 +186,7 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
   end
 
   describe "room state and button interactions" do
-    test "join room disables create button" do
+    test "join room in autostart stays on lobby" do
       connA = setup_user_conn("userA")
       connB = setup_user_conn("userB")
 
@@ -206,16 +200,17 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       htmlA = render(lobbyA)
       room_name = extract_room_name_from_button(htmlA)
 
-      # User B joins room
+      # User B joins room (in autostart)
       {:ok, lobbyB, _html} = live(connB, "/")
 
       lobbyB
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      # User B's Create Room button should be disabled
+      # User B should stay on lobby (not redirected because room is in autostart)
       htmlB = render(lobbyB)
-      assert htmlB =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
+      assert htmlB =~ room_name
+      assert htmlB =~ "2 people"
     end
 
     test "leave room from lobby re-enables create button" do

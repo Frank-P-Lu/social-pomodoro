@@ -25,7 +25,7 @@ defmodule SocialPomodoro.Room do
     :break_duration_seconds,
     :created_at,
     :tick_interval,
-    :status_message,
+    :todos,
     :status_emoji,
     :total_cycles,
     :current_cycle
@@ -71,9 +71,23 @@ defmodule SocialPomodoro.Room do
     end
   end
 
-  def set_status_message(name, user_id, text) do
+  def add_todo(name, user_id, text) do
     case SocialPomodoro.RoomRegistry.get_room(name) do
-      {:ok, pid} -> GenServer.call(pid, {:set_status_message, user_id, text})
+      {:ok, pid} -> GenServer.call(pid, {:add_todo, user_id, text})
+      error -> error
+    end
+  end
+
+  def toggle_todo(name, user_id, todo_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
+      {:ok, pid} -> GenServer.call(pid, {:toggle_todo, user_id, todo_id})
+      error -> error
+    end
+  end
+
+  def delete_todo(name, user_id, todo_id) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
+      {:ok, pid} -> GenServer.call(pid, {:delete_todo, user_id, todo_id})
       error -> error
     end
   end
@@ -121,7 +135,7 @@ defmodule SocialPomodoro.Room do
       break_duration_seconds: break_duration_seconds,
       created_at: System.system_time(:second),
       tick_interval: tick_interval,
-      status_message: %{},
+      todos: %{},
       status_emoji: %{},
       total_cycles: total_cycles,
       current_cycle: 1
@@ -284,7 +298,6 @@ defmodule SocialPomodoro.Room do
               timer_ref: timer_ref,
               current_cycle: state.current_cycle + 1,
               participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
-              status_message: %{},
               status_emoji: %{}
           }
 
@@ -316,25 +329,83 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
-  def handle_call({:set_status_message, user_id, text}, _from, state) do
+  def handle_call({:add_todo, user_id, text}, _from, state) do
     if state.status in [:active, :break] do
-      new_status_message = Map.put(state.status_message, user_id, text)
-      new_state = %{state | status_message: new_status_message}
+      user_todos = Map.get(state.todos, user_id, [])
+      max_todos = SocialPomodoro.Config.max_todos_per_user()
 
-      # Track status_message analytics
-      :telemetry.execute(
-        [:pomodoro, :user, :set_status_message],
-        %{count: 1},
-        %{
-          room_name: state.name,
-          user_id: user_id,
-          text_length: String.length(text),
-          status: state.status
+      if length(user_todos) >= max_todos do
+        {:reply, {:error, :max_todos_reached}, state}
+      else
+        new_todo = %{
+          id: generate_todo_id(),
+          text: text,
+          completed: false
         }
-      )
 
-      broadcast_room_update(new_state)
-      {:reply, :ok, new_state}
+        new_user_todos = user_todos ++ [new_todo]
+        new_todos = Map.put(state.todos, user_id, new_user_todos)
+        new_state = %{state | todos: new_todos}
+
+        # Track analytics
+        :telemetry.execute(
+          [:pomodoro, :user, :add_todo],
+          %{count: 1},
+          %{
+            room_name: state.name,
+            user_id: user_id,
+            text_length: String.length(text),
+            status: state.status
+          }
+        )
+
+        broadcast_room_update(new_state)
+        {:reply, :ok, new_state}
+      end
+    else
+      {:reply, {:error, :invalid_status}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:toggle_todo, user_id, todo_id}, _from, state) do
+    if state.status in [:active, :break] do
+      user_todos = Map.get(state.todos, user_id, [])
+
+      case Enum.find_index(user_todos, &(&1.id == todo_id)) do
+        nil ->
+          {:reply, {:error, :todo_not_found}, state}
+
+        index ->
+          todo = Enum.at(user_todos, index)
+          updated_todo = %{todo | completed: !todo.completed}
+          updated_user_todos = List.replace_at(user_todos, index, updated_todo)
+          new_todos = Map.put(state.todos, user_id, updated_user_todos)
+          new_state = %{state | todos: new_todos}
+
+          broadcast_room_update(new_state)
+          {:reply, :ok, new_state}
+      end
+    else
+      {:reply, {:error, :invalid_status}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:delete_todo, user_id, todo_id}, _from, state) do
+    if state.status in [:active, :break] do
+      user_todos = Map.get(state.todos, user_id, [])
+      new_user_todos = Enum.reject(user_todos, &(&1.id == todo_id))
+
+      if length(new_user_todos) == length(user_todos) do
+        {:reply, {:error, :todo_not_found}, state}
+      else
+        new_todos = Map.put(state.todos, user_id, new_user_todos)
+        new_state = %{state | todos: new_todos}
+
+        broadcast_room_update(new_state)
+        {:reply, :ok, new_state}
+      end
     else
       {:reply, {:error, :invalid_status}, state}
     end
@@ -450,7 +521,6 @@ defmodule SocialPomodoro.Room do
         timer_ref: timer_ref,
         participants: state.participants ++ promoted_participants,
         spectators: [],
-        status_message: %{},
         status_emoji: %{}
     }
 
@@ -474,7 +544,6 @@ defmodule SocialPomodoro.Room do
           timer_ref: timer_ref,
           current_cycle: state.current_cycle + 1,
           participants: Enum.map(state.participants, &%{&1 | ready_for_next: false}),
-          status_message: %{},
           status_emoji: %{}
       }
 
@@ -513,6 +582,12 @@ defmodule SocialPomodoro.Room do
 
   ## Private Helpers
 
+  defp generate_todo_id do
+    # Generate a random UUID-like string
+    :crypto.strong_rand_bytes(16)
+    |> Base.encode16(case: :lower)
+  end
+
   defp do_start_session(state, opts) do
     # Cancel existing timer before creating new one
     if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
@@ -532,7 +607,6 @@ defmodule SocialPomodoro.Room do
         timer: timer,
         timer_ref: timer_ref,
         session_participants: session_participant_ids,
-        status_message: %{},
         status_emoji: %{}
     }
 
@@ -586,16 +660,16 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
-    # Add usernames, status_message, and status_emoji to participants for display
+    # Add usernames, todos, and status_emoji to participants for display
     participants_with_usernames =
       Enum.map(state.participants, fn p ->
         username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
-        status_message = Map.get(state.status_message, p.user_id)
+        todos = Map.get(state.todos, p.user_id, [])
         status_emoji = Map.get(state.status_emoji, p.user_id)
 
         p
         |> Map.put(:username, username)
-        |> Map.put(:status_message, status_message)
+        |> Map.put(:todos, todos)
         |> Map.put(:status_emoji, status_emoji)
       end)
 

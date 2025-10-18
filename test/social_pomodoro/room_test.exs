@@ -361,8 +361,8 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
-  describe "status_message functionality" do
-    test "user can set status_message during active session" do
+  describe "todo list functionality" do
+    test "user can add todo during active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
       {:ok, room_pid} = RoomRegistry.get_room(room_name)
@@ -370,25 +370,106 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message
-      assert :ok = Room.set_status_message(room_name, creator_id, "Building tests")
+      # Add todo
+      assert :ok = Room.add_todo(room_name, creator_id, "Building tests")
 
-      # Verify it was set (via serialized state since that's how LiveView sees it)
+      # Verify it was added
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert participant.status_message == "Building tests"
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Building tests"
+      assert hd(participant.todos).completed == false
+      assert is_binary(hd(participant.todos).id)
     end
 
-    test "user cannot set status_message when not in active session" do
+    test "user can add multiple todos up to max limit" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Add 5 todos (max limit)
+      for i <- 1..5 do
+        assert :ok = Room.add_todo(room_name, creator_id, "Task #{i}")
+      end
+
+      # Verify all added
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 5
+
+      # Try to add 6th - should fail
+      assert {:error, :max_todos_reached} = Room.add_todo(room_name, creator_id, "Task 6")
+
+      # Verify still only 5
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 5
+    end
+
+    test "user can toggle todo completion" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == false
+
+      # Toggle to complete
+      assert :ok = Room.toggle_todo(room_name, creator_id, todo.id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == true
+
+      # Toggle back to incomplete
+      assert :ok = Room.toggle_todo(room_name, creator_id, todo.id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == false
+    end
+
+    test "user can delete todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 2")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 2
+
+      # Delete first todo
+      todo_id = hd(participant.todos).id
+      assert :ok = Room.delete_todo(room_name, creator_id, todo_id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Task 2"
+    end
+
+    test "user cannot add/modify todos when not in active or break session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
-      # Try to set status_message in waiting state
-      assert {:error, :invalid_status} =
-               Room.set_status_message(room_name, creator_id, "Building tests")
+      # Try to add todo in autostart state
+      assert {:error, :invalid_status} = Room.add_todo(room_name, creator_id, "Building tests")
     end
 
-    test "status_message persists when user leaves and rejoins" do
+    test "todos persist when user leaves and rejoins" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
@@ -401,25 +482,28 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message
-      assert :ok = Room.set_status_message(room_name, participant_id, "Important task")
+      # Add todos
+      assert :ok = Room.add_todo(room_name, participant_id, "Important task")
+      assert :ok = Room.add_todo(room_name, participant_id, "Another task")
 
-      # Verify it was set
+      # Verify they were added
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.status_message == "Important task"
+      assert length(participant.todos) == 2
 
       # Leave and rejoin
       assert :ok = Room.leave(room_name, participant_id)
       assert :ok = Room.join(room_name, participant_id)
 
-      # Verify status_message persisted
+      # Verify todos persisted
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.status_message == "Important task"
+      assert length(participant.todos) == 2
+      assert Enum.at(participant.todos, 0).text == "Important task"
+      assert Enum.at(participant.todos, 1).text == "Another task"
     end
 
-    test "status_message is reset when next cycle starts" do
+    test "todos persist across multiple cycles" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
@@ -437,9 +521,9 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message for both
-      assert :ok = Room.set_status_message(room_name, creator_id, "Task 1")
-      assert :ok = Room.set_status_message(room_name, participant_id, "Task 2")
+      # Add todos for both
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+      assert :ok = Room.add_todo(room_name, participant_id, "Task 2")
 
       # Complete session and go to break
       tick(room_pid)
@@ -451,18 +535,20 @@ defmodule SocialPomodoro.RoomTest do
 
       Process.sleep(10)
 
-      # Verify status_message was reset for cycle 2
+      # Verify todos PERSISTED for cycle 2
       state = Room.get_state(room_pid)
       assert state.current_cycle == 2
 
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
 
-      assert is_nil(creator.status_message)
-      assert is_nil(participant.status_message)
+      assert length(creator.todos) == 1
+      assert length(participant.todos) == 1
+      assert hd(creator.todos).text == "Task 1"
+      assert hd(participant.todos).text == "Task 2"
     end
 
-    test "can set status_message during break after it was cleared" do
+    test "can add todos during break and they persist from active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
 
       {:ok, room_name, room_pid} =
@@ -471,30 +557,55 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message during active session
-      assert :ok = Room.set_status_message(room_name, creator_id, "Working on feature X")
+      # Add todo during active session
+      assert :ok = Room.add_todo(room_name, creator_id, "Working on feature X")
 
-      # Verify it was set
+      # Verify it was added
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert creator.status_message == "Working on feature X"
+      assert length(creator.todos) == 1
 
       # Complete session and go to break
       tick(room_pid)
       tick(room_pid)
 
-      # Verify status_message was cleared when transitioning to break
+      # Verify todos PERSISTED when transitioning to break
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert is_nil(creator.status_message)
+      assert length(creator.todos) == 1
+      assert hd(creator.todos).text == "Working on feature X"
 
-      # Now set a new status_message during break
-      assert :ok = Room.set_status_message(room_name, creator_id, "Great session!")
+      # Now add another todo during break
+      assert :ok = Room.add_todo(room_name, creator_id, "Great session!")
 
-      # Verify the new message was set
+      # Verify both todos are present
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert creator.status_message == "Great session!"
+      assert length(creator.todos) == 2
+      assert Enum.at(creator.todos, 0).text == "Working on feature X"
+      assert Enum.at(creator.todos, 1).text == "Great session!"
+    end
+
+    test "error when trying to toggle non-existent todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Try to toggle non-existent todo
+      assert {:error, :todo_not_found} =
+               Room.toggle_todo(room_name, creator_id, "fake-id-123")
+    end
+
+    test "error when trying to delete non-existent todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Try to delete non-existent todo
+      assert {:error, :todo_not_found} =
+               Room.delete_todo(room_name, creator_id, "fake-id-123")
     end
   end
 
@@ -687,7 +798,7 @@ defmodule SocialPomodoro.RoomTest do
       :telemetry.detach("test-rejoin")
     end
 
-    test "emits telemetry event when status_message is set" do
+    test "emits telemetry event when todo is added" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
@@ -698,28 +809,27 @@ defmodule SocialPomodoro.RoomTest do
       test_pid = self()
 
       :telemetry.attach(
-        "test-status-message",
-        [:pomodoro, :user, :set_status_message],
+        "test-add-todo",
+        [:pomodoro, :user, :add_todo],
         fn event, measurements, metadata, _config ->
           send(test_pid, {:telemetry_event, event, measurements, metadata})
         end,
         nil
       )
 
-      # Set status_message (should trigger telemetry)
-      status_message_text = "Building cool features"
-      assert :ok = Room.set_status_message(room_name, creator_id, status_message_text)
+      # Add todo (should trigger telemetry)
+      todo_text = "Building cool features"
+      assert :ok = Room.add_todo(room_name, creator_id, todo_text)
 
       # Assert telemetry event was emitted
-      assert_receive {:telemetry_event, [:pomodoro, :user, :set_status_message], %{count: 1},
-                      metadata}
+      assert_receive {:telemetry_event, [:pomodoro, :user, :add_todo], %{count: 1}, metadata}
 
       assert metadata.room_name == room_name
       assert metadata.user_id == creator_id
-      assert metadata.text_length == String.length(status_message_text)
+      assert metadata.text_length == String.length(todo_text)
 
       # Clean up
-      :telemetry.detach("test-status-message")
+      :telemetry.detach("test-add-todo")
     end
 
     test "does not emit rejoin telemetry when user first joins" do
@@ -1182,6 +1292,77 @@ defmodule SocialPomodoro.RoomTest do
       assert state.current_cycle == 1
       assert state.duration_minutes == 25
       assert state.break_duration_minutes == 5
+    end
+
+    test "break timer auto-starts next cycle when participants don't all skip" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      # Create room with 3 cycles
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 3
+        )
+
+      # Add participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Complete first work session (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break now
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.current_cycle == 1
+
+        # Creator clicks skip, but participant doesn't
+        assert :ok = Room.go_again(room_name, creator_id)
+
+        # Verify creator is ready but participant is not
+        state = Room.get_state(room_pid)
+        creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+        participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+        assert creator.ready_for_next == true
+        assert participant.ready_for_next == false
+
+        # Still in break since not everyone is ready
+        assert state.status == :break
+
+        # Let break timer complete naturally (2 -> 1 -> 0 -> next cycle)
+        tick(room_pid)
+        tick(room_pid)
+        tick(room_pid)
+
+        # Should auto-start cycle 2 (not go to lobby, not stay in break)
+        if Process.alive?(room_pid) do
+          state = Room.get_state(room_pid)
+          assert state.status == :active
+          assert state.current_cycle == 2
+          assert state.seconds_remaining == 2
+
+          # Both participants should have ready_for_next reset
+          creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+          participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+          assert creator.ready_for_next == false
+          assert participant.ready_for_next == false
+        else
+          flunk("Room terminated after break instead of starting cycle 2")
+        end
+      else
+        flunk("Room terminated after first session")
+      end
     end
   end
 end

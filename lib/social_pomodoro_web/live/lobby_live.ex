@@ -169,7 +169,21 @@ defmodule SocialPomodoroWeb.LobbyLive do
   def handle_event("join_room", %{"room-name" => name}, socket) do
     case join_room_and_update_state(socket, name, socket.assigns.user_id) do
       {:ok, socket} ->
-        {:noreply, socket}
+        # Check if room is already in progress (active or break)
+        # If so, navigate to room page. If in autostart, stay on lobby
+        case SocialPomodoro.RoomRegistry.get_room(name) do
+          {:ok, room_pid} ->
+            room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+            if room_state.status in [:active, :break] do
+              {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+            else
+              {:noreply, socket}
+            end
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
 
       {:error, socket} ->
         {:noreply, put_flash(socket, :error, "Could not join room")}
