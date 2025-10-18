@@ -300,19 +300,37 @@ defmodule SocialPomodoroWeb.LobbyLive do
       <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
-          <div class="card bg-base-200">
-            <div class="card-body">
-              <h1 class="card-title text-4xl mb-4">Fancy a Pomodoro?</h1>
-              <div class="space-y-4 text-lg">
-                <p class="leading-relaxed">Focus with strangers. Or friends.</p>
+          <div class="card bg-base-200 relative overflow-hidden ">
+            <!-- Background emoji pattern -->
+            <div class="absolute inset-0 opacity-10 pointer-events-none">
+              <div class="flex flex-wrap gap-4 -rotate-12 scale-200 -ml-8">
+                <%= for _ <- 1..75 do %>
+                  <img src="/images/emojis/1F345.svg" class="w-4 h-4" alt="" />
+                  <img src="/images/emojis/E0AB.svg" class="w-4 h-4" alt="" />
+                  <img src="/images/emojis/26A1.svg" class="w-4 h-4" alt="" />
+                <% end %>
+              </div>
+            </div>
 
-                <p class="leading-relaxed">
-                  Create a room, set your timer, and get things done together.
-                </p>
-                <div>
-                  <div class="badge badge-primary badge-dash badge-md lg:badge-lg p-4">No webcam</div>
-                  <div class="badge badge-secondary badge-dash badge-md lg:badge-lg p-4">No chat</div>
-                  <div class="badge badge-accent badge-dash badge-md lg:badge-lg p-4">Just work</div>
+            <div class="card-body relative z-10 flex flex-col justify-center min-h-[365px]">
+              <div>
+                <h1 class="card-title text-4xl mb-2">Fancy a Pomodoro?</h1>
+                <div class="h-1 w-24 bg-secondary rounded-full mb-6"></div>
+
+                <div class="space-y-8">
+                  <p class="text-2xl leading-relaxed">
+                    Focus with strangers. Or friends.
+                  </p>
+
+                  <p class="text-xl leading-relaxed">
+                    Create a room, set your timer, and get things done together.
+                  </p>
+
+                  <div class="flex gap-4 flex-wrap text-lg">
+                    <span class="text-primary font-semibold">No webcam</span>
+                    <span class="text-secondary font-semibold">No chat</span>
+                    <span class="text-accent font-semibold">Just work</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -605,10 +623,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
           </form>
         </div>
 
-        <h2 class="card-title mt-4 mb-2">Set your timer</h2>
-
         <div class="flex flex-col mx-auto w-full lg:w-xs relative">
           <div class="relative z-0 bg-base-200/50 p-4 rounded-box">
+            <h2 class="card-title mb-4">Set your timer</h2>
             <!-- Duration Presets -->
             <%!-- TODO: make this client side --%>
             <div class="join w-full mb-2">
