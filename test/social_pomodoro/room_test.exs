@@ -1366,4 +1366,191 @@ defmodule SocialPomodoro.RoomTest do
       end
     end
   end
+
+  describe "chat messages during break" do
+    test "user can send chat message during break" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.join(room_name, participant_id)
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send a chat message
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Hello!")
+
+      # Verify message was stored
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_participant.chat_messages) == 1
+      assert hd(creator_participant.chat_messages).text == "Hello!"
+    end
+
+    test "messages are stored in FIFO order with max 3 limit" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send 4 messages (4th should replace 1st)
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 1")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 2")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 3")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 4")
+
+      # Verify only 3 messages and FIFO behavior
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+
+      assert length(creator_participant.chat_messages) == 3
+      messages = Enum.map(creator_participant.chat_messages, & &1.text)
+      assert messages == ["Message 2", "Message 3", "Message 4"]
+    end
+
+    test "message length is validated (max 50 chars)" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Try to send a message longer than 50 chars
+      long_message = String.duplicate("a", 51)
+
+      assert {:error, :message_too_long} =
+               Room.send_chat_message(room_name, creator_id, long_message)
+
+      # 50 chars should be allowed
+      exact_message = String.duplicate("b", 50)
+      assert :ok = Room.send_chat_message(room_name, creator_id, exact_message)
+
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_participant.chat_messages) == 1
+    end
+
+    test "cannot send messages during active status" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 10, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+
+      # Try to send message during active status
+      assert {:error, :not_in_break} = Room.send_chat_message(room_name, creator_id, "Hello")
+
+      # Verify no messages were stored
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_participant.chat_messages)
+    end
+
+    test "chat messages are cleared when break ends and next cycle starts" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 1,
+          total_cycles: 2
+        )
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send messages during break
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 1")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 2")
+
+      # Verify messages exist
+      break_state = Room.get_state(room_pid)
+      creator_break = Enum.find(break_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_break.chat_messages) == 2
+
+      # Tick to next active session (1 -> 0 -> active)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify chat messages were cleared
+      final_state = Room.get_state(room_pid)
+      assert final_state.status == :active
+      creator_final = Enum.find(final_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_final.chat_messages)
+    end
+
+    test "chat messages are cleared when break is skipped via go_again" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 10,
+          total_cycles: 2
+        )
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send messages during break
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Hello!")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "How are you?")
+
+      # Verify messages exist
+      break_state = Room.get_state(room_pid)
+      creator_break = Enum.find(break_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_break.chat_messages) == 2
+
+      # Skip break
+      assert :ok = Room.go_again(room_name, creator_id)
+      sleep_short()
+
+      # Verify chat messages were cleared and we're back to active
+      final_state = Room.get_state(room_pid)
+      assert final_state.status == :active
+      creator_final = Enum.find(final_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_final.chat_messages)
+    end
+  end
 end

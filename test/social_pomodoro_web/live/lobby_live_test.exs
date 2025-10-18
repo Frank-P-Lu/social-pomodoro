@@ -36,6 +36,69 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     end
   end
 
+  describe "timer defaults" do
+    test "defaults to configured duration, cycles, and break" do
+      conn = setup_user_conn("defaults_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="25"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="4"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      refute html =~ "Break is locked at 5 min for a single pomodoro."
+    end
+
+    test "selecting a duration applies configured defaults" do
+      conn = setup_user_conn("duration_defaults_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='set_duration'][phx-value-minutes='50']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="50"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="2"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="10"[^>]*btn-primary/
+      refute html =~ "Break is locked at 5 min for a single pomodoro."
+
+      lobby
+      |> element("button[phx-click='set_duration'][phx-value-minutes='75']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="75"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "Break is locked at 5 min for a single pomodoro."
+      assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
+    end
+
+    test "single cycle selection locks break duration" do
+      conn = setup_user_conn("single_cycle_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='set_cycles'][phx-value-cycles='1']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "Break is locked at 5 min for a single pomodoro."
+      assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "Break is locked at 5 min for a single pomodoro."
+    end
+  end
+
   describe "single user flow" do
     test "user can create room, start it, and navigate to session" do
       conn = setup_user_conn("user1")

@@ -28,7 +28,8 @@ defmodule SocialPomodoro.Room do
     :todos,
     :status_emoji,
     :total_cycles,
-    :current_cycle
+    :current_cycle,
+    :chat_messages
   ]
 
   def start_link(opts) do
@@ -106,6 +107,13 @@ defmodule SocialPomodoro.Room do
     end
   end
 
+  def send_chat_message(name, user_id, text) do
+    case SocialPomodoro.RoomRegistry.get_room(name) do
+      {:ok, pid} -> GenServer.call(pid, {:send_chat_message, user_id, text})
+      error -> error
+    end
+  end
+
   ## Callbacks
 
   @impl true
@@ -138,7 +146,8 @@ defmodule SocialPomodoro.Room do
       todos: %{},
       status_emoji: %{},
       total_cycles: total_cycles,
-      current_cycle: 1
+      current_cycle: 1,
+      chat_messages: %{}
     }
 
     {:ok, state, {:continue, :broadcast_update}}
@@ -298,7 +307,8 @@ defmodule SocialPomodoro.Room do
               timer_ref: timer_ref,
               current_cycle: state.current_cycle + 1,
               participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
-              status_emoji: %{}
+              status_emoji: %{},
+              chat_messages: %{}
           }
 
           # Emit telemetry event for break skip
@@ -431,6 +441,32 @@ defmodule SocialPomodoro.Room do
   end
 
   @impl true
+  def handle_call({:send_chat_message, user_id, text}, _from, state) do
+    if state.status == :break do
+      # Validate message length (max 50 chars)
+      if String.length(text) > 50 do
+        {:reply, {:error, :message_too_long}, state}
+      else
+        # Get existing messages for this user
+        user_messages = Map.get(state.chat_messages, user_id, [])
+
+        # Add new message and maintain max 3 messages (FIFO)
+        new_user_messages =
+          (user_messages ++ [%{text: text, timestamp: System.system_time(:second)}])
+          |> Enum.take(-3)
+
+        new_chat_messages = Map.put(state.chat_messages, user_id, new_user_messages)
+        new_state = %{state | chat_messages: new_chat_messages}
+
+        broadcast_room_update(new_state)
+        {:reply, :ok, new_state}
+      end
+    else
+      {:reply, {:error, :not_in_break}, state}
+    end
+  end
+
+  @impl true
   def handle_info(:tick, state) do
     case Timer.tick(state.timer) do
       {:ok, updated_timer} ->
@@ -544,7 +580,8 @@ defmodule SocialPomodoro.Room do
           timer_ref: timer_ref,
           current_cycle: state.current_cycle + 1,
           participants: Enum.map(state.participants, &%{&1 | ready_for_next: false}),
-          status_emoji: %{}
+          status_emoji: %{},
+          chat_messages: %{}
       }
 
       # Emit telemetry event for next cycle start
@@ -660,17 +697,19 @@ defmodule SocialPomodoro.Room do
   end
 
   defp serialize_state(state) do
-    # Add usernames, todos, and status_emoji to participants for display
+    # Add usernames, todos, status_emoji, and chat_messages to participants for display
     participants_with_usernames =
       Enum.map(state.participants, fn p ->
         username = SocialPomodoro.UserRegistry.get_username(p.user_id) || "Unknown User"
         todos = Map.get(state.todos, p.user_id, [])
         status_emoji = Map.get(state.status_emoji, p.user_id)
+        chat_messages = Map.get(state.chat_messages, p.user_id, [])
 
         p
         |> Map.put(:username, username)
         |> Map.put(:todos, todos)
         |> Map.put(:status_emoji, status_emoji)
+        |> Map.put(:chat_messages, chat_messages)
       end)
 
     # Get creator username

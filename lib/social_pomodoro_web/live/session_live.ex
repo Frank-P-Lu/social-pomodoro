@@ -121,6 +121,17 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_event("send_chat_message", %{"text" => text}, socket) do
+    SocialPomodoro.Room.send_chat_message(
+      socket.assigns.name,
+      socket.assigns.user_id,
+      text
+    )
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("leave_room", _params, socket) do
     SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     {:noreply, push_navigate(socket, to: ~p"/")}
@@ -487,6 +498,29 @@ defmodule SocialPomodoroWeb.SessionLive do
           >
             <img src="/images/emojis/1F4AA.svg" class="w-8 h-8 md:w-12 md:h-12" alt="💪" />
           </button>
+        </div>
+        
+    <!-- Chat Message Box -->
+        <div class="mb-8">
+          <p class="text-sm opacity-70 mb-2">Chat during break</p>
+          <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
+            <input
+              type="text"
+              name="text"
+              placeholder="Say something..."
+              class="input input-bordered w-full max-w-xs text-base"
+              maxlength="50"
+              required
+            />
+            <button
+              type="submit"
+              phx-hook="MaintainWakeLock"
+              id="send-chat-button"
+              class="btn btn-square btn-primary"
+            >
+              <Icons.submit class="w-6 h-6 fill-current" />
+            </button>
+          </form>
         </div>
         
     <!-- Todo List -->

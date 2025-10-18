@@ -26,16 +26,16 @@ defmodule SocialPomodoroWeb.LobbyLive do
         {:error, :not_found} -> nil
       end
 
+    default_duration = SocialPomodoro.Config.default_pomodoro_duration()
+
     socket =
       socket
       |> assign(:user_id, user_id)
       |> assign(:username, username)
       |> assign(:rooms, rooms)
-      |> assign(:duration_minutes, SocialPomodoro.Config.default_pomodoro_duration())
-      |> assign(:num_cycles, SocialPomodoro.Config.default_cycle_count())
-      |> assign(:break_duration_minutes, SocialPomodoro.Config.default_break_duration())
       |> assign(:creating, false)
       |> assign(:my_room_name, my_room_name)
+      |> assign_timer_defaults(default_duration)
 
     # Handle direct room link (/at/:room_name) - only during connected mount
     socket =
@@ -130,13 +130,39 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_event("set_duration", %{"minutes" => minutes}, socket) do
     duration = String.to_integer(minutes)
-    {:noreply, assign(socket, :duration_minutes, duration)}
+    {:noreply, assign_timer_defaults(socket, duration)}
   end
 
   @impl true
   def handle_event("set_cycles", %{"cycles" => cycles}, socket) do
     num_cycles = String.to_integer(cycles)
-    {:noreply, assign(socket, :num_cycles, num_cycles)}
+
+    socket =
+      socket
+      |> assign(:num_cycles, num_cycles)
+      |> assign(:break_options_disabled, num_cycles == 1)
+
+    socket =
+      if num_cycles == 1 do
+        assign(
+          socket,
+          :break_duration_minutes,
+          SocialPomodoro.Config.single_cycle_break_duration()
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "set_break_duration",
+        _params,
+        %{assigns: %{break_options_disabled: true}} = socket
+      ) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -279,6 +305,24 @@ defmodule SocialPomodoroWeb.LobbyLive do
         true -> {2, room.created_at}
       end
     end)
+  end
+
+  defp assign_timer_defaults(socket, duration_minutes) do
+    defaults = SocialPomodoro.Config.defaults_for_duration(duration_minutes)
+    cycles = defaults.cycles
+
+    break_minutes =
+      if cycles == 1 do
+        SocialPomodoro.Config.single_cycle_break_duration()
+      else
+        defaults.break_minutes
+      end
+
+    socket
+    |> assign(:duration_minutes, duration_minutes)
+    |> assign(:num_cycles, cycles)
+    |> assign(:break_duration_minutes, break_minutes)
+    |> assign(:break_options_disabled, cycles == 1)
   end
 
   defp pomodoro_duration_options do
@@ -712,16 +756,40 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <label class="label">
               <span class="label-text">Break time</span>
             </label>
-            <div class="join w-full mb-4">
-              <%= for minutes <- break_duration_options() do %>
-                <button
-                  phx-click="set_break_duration"
-                  phx-value-minutes={minutes}
-                  disabled={@my_room_name != nil}
-                  class={"join-item btn flex-1 !border-2 " <> if @break_duration_minutes == minutes, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-                >
-                  {minutes} min
-                </button>
+            <div class="relative mb-4">
+              <div class="join w-full">
+                <%= for minutes <- break_duration_options() do %>
+                  <button
+                    phx-click="set_break_duration"
+                    phx-value-minutes={minutes}
+                    disabled={@my_room_name != nil or @break_options_disabled}
+                    class={[
+                      "join-item btn flex-1 !border-2",
+                      if(@break_duration_minutes == minutes,
+                        do: "btn-primary btn-outline",
+                        else: "btn-neutral btn-outline"
+                      ),
+                      if(@my_room_name != nil or @break_options_disabled,
+                        do: "btn-disabled",
+                        else: nil
+                      )
+                    ]}
+                  >
+                    {minutes} min
+                  </button>
+                <% end %>
+              </div>
+
+              <%= if @break_options_disabled do %>
+                <div class="absolute inset-0 z-10 flex items-center justify-center">
+                  <div
+                    role="alert"
+                    class="flex items-center gap-2 rounded-box bg-base-200/95 border border-warning/60 text-warning shadow-lg px-4 py-3 text-xs sm:text-sm font-medium leading-snug"
+                  >
+                    <.icon name="hero-lock-closed" class="w-4 h-4 flex-shrink-0" />
+                    <span>Break is locked at 5 min for a single pomodoro.</span>
+                  </div>
+                </div>
               <% end %>
             </div>
 
