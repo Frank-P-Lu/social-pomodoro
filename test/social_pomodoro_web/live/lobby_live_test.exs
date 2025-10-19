@@ -46,7 +46,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert html =~ ~r/phx-value-minutes="25"[^>]*btn-primary/
       assert html =~ ~r/phx-value-cycles="4"[^>]*btn-primary/
       assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
-      refute html =~ "Break is locked at 5 min for a single pomodoro."
+      refute html =~ "No breaks for a single pomodoro."
     end
 
     test "selecting a duration applies configured defaults" do
@@ -62,7 +62,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert html =~ ~r/phx-value-minutes="50"[^>]*btn-primary/
       assert html =~ ~r/phx-value-cycles="2"[^>]*btn-primary/
       assert html =~ ~r/phx-value-minutes="10"[^>]*btn-primary/
-      refute html =~ "Break is locked at 5 min for a single pomodoro."
+      refute html =~ "No breaks for a single pomodoro."
 
       lobby
       |> element("button[phx-click='set_duration'][phx-value-minutes='75']")
@@ -73,7 +73,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       assert html =~ ~r/phx-value-minutes="75"[^>]*btn-primary/
       assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
       assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
-      assert html =~ "Break is locked at 5 min for a single pomodoro."
+      assert html =~ "No breaks for a single pomodoro."
       assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
     end
 
@@ -89,13 +89,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
       assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
-      assert html =~ "Break is locked at 5 min for a single pomodoro."
+      assert html =~ "No breaks for a single pomodoro."
       assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
 
       html = render(lobby)
 
       assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
-      assert html =~ "Break is locked at 5 min for a single pomodoro."
+      assert html =~ "No breaks for a single pomodoro."
     end
   end
 

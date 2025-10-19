@@ -408,10 +408,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     Create a room, set your timer, and get things done together.
                   </p>
 
-                  <div class="flex gap-4 flex-wrap text-lg">
-                    <span class="text-primary font-semibold">No webcam</span>
-                    <span class="text-secondary font-semibold">No chat</span>
-                    <span class="text-accent font-semibold">Just work</span>
+                  <div class="text-secondary italic text-lg">
+                    No webcam. No chat. Just work
                   </div>
                 </div>
               </div>
@@ -788,9 +786,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   role="alert"
                 >
                   <div class="pointer-events-auto flex items-center gap-2 text-xs text-sm text-base-content/90">
-                    <span>
-                      Break is locked at {@break_duration_minutes} min for a single pomodoro.
-                    </span>
+                    <span>No breaks for a single pomodoro.</span>
                   </div>
                 </div>
               <% end %>
