@@ -645,7 +645,6 @@ defmodule SocialPomodoroWeb.SessionLive do
   defp status_emoji_selector(assigns) do
     ~H"""
     <div class="flex flex-col items-center gap-2 flex-shrink-0">
-      <p class="text-sm opacity-70">Status</p>
       <div class="grid grid-cols-3 gap-2">
         <%= for emoji <- @status_emojis do %>
           <button
@@ -659,6 +658,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
         <% end %>
       </div>
+      <p class="text-sm opacity-70">Status</p>
     </div>
     """
   end
@@ -673,26 +673,26 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp horizontal_session_layout(assigns) do
     ~H"""
-    <div class="flex flex-col lg:flex-row items-start justify-center gap-8 mb-8">
-      <!-- User Avatar -->
-      <div class="self-center lg:self-start">
-        <.current_user_avatar_with_status
-          participant={@current_participant}
-          show_ready={@show_ready}
-        />
-      </div>
-      
-    <!-- Status Section -->
-      <div class="self-center lg:self-start">
-        <.status_emoji_selector
-          current_participant={@current_participant}
-          status_emojis={@status_emojis}
-          id_prefix={@emoji_id_prefix}
-        />
+    <div class="flex flex-col items-center justify-center gap-4 mb-8 w-full">
+      <!-- User Avatar & Status (Horizontal) -->
+      <div class="w-full">
+        <div class="card bg-base-300 p-4">
+          <div class="flex flex-row items-center justify-center gap-4">
+            <.current_user_avatar_with_status
+              participant={@current_participant}
+              show_ready={@show_ready}
+            />
+            <.status_emoji_selector
+              current_participant={@current_participant}
+              status_emojis={@status_emojis}
+              id_prefix={@emoji_id_prefix}
+            />
+          </div>
+        </div>
       </div>
       
     <!-- Tabs and Content -->
-      <div class="flex-grow w-full lg:w-auto self-stretch lg:self-start">
+      <div class="w-full">
         <.tabs_with_content
           room_state={@room_state}
           selected_tab={@selected_tab}
