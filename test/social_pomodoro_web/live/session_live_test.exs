@@ -925,6 +925,131 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
   end
 
+  describe "multi-cycle room navigation" do
+    test "users remain on session page when break ends with remaining cycles" do
+      conn = setup_user_conn("userA")
+
+      # Create a room through the normal flow
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      # Extract room_name
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      # Get room pid and set 3 cycles with short durations
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 2, 2, total_cycles: 3)
+
+      # Start the session
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      # Join the room
+      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
+
+      # Verify we're in cycle 1, active session
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Advance time for active session to complete (2 -> 1 -> 0 -> break)
+      tick_room(room_pid, 3)
+
+      # Should now be in break
+      html = render(session_view)
+      assert html =~ "Great Work!"
+      assert html =~ "Break time remaining"
+
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :break
+      assert state.current_cycle == 1
+
+      # Advance time for break to end (2 -> 1 -> 0 -> next cycle)
+      tick_room(room_pid, 3)
+
+      # Give LiveView time to process the state change
+      sleep_short()
+
+      # CRITICAL: User should NOT be redirected to lobby since we have 2 more cycles
+      # They should remain on the session page and see cycle 2
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 2
+
+      # Verify we're still on the session page (NOT redirected)
+      html = render(session_view)
+      assert html =~ "Focus time remaining"
+      assert html =~ "2 of 3"
+      refute html =~ "Amazing Work!"
+    end
+
+    test "users are redirected to lobby when final break ends" do
+      conn = setup_user_conn("userA")
+
+      # Create a room through the normal flow
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      # Extract room_name
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      # Get room pid and set 1 cycle (final break should redirect)
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 2, total_cycles: 1)
+
+      # Start the session
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      # Join the room
+      {:ok, session_view, _html} = live(conn, "/room/#{room_name}")
+
+      # Advance time for active session to complete
+      tick_room(room_pid, 2)
+
+      # Should be in final break
+      html = render(session_view)
+      assert html =~ "Amazing Work!"
+
+      # Advance time for break to end
+      tick_room(room_pid, 3)
+
+      # Give LiveView time to process the redirect
+      sleep_short()
+
+      # Should be redirected to lobby since this was the final cycle
+      assert_redirect(session_view, "/")
+    end
+  end
+
   describe "tab functionality" do
     test "todo tab is selected by default during active session" do
       conn = setup_user_conn("userA")
@@ -1074,8 +1199,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Chat input should be visible
       assert html =~ "Say something..."
-      # Todo section header should not be visible
-      refute html =~ "How was your session?"
+      # Todo input should not be visible
+      refute html =~ "What are you working on?"
 
       # Switch back to todo tab
       session
@@ -1085,7 +1210,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       html = render(session)
 
       # Todo content should be visible
-      assert html =~ "How was your session?"
+      assert html =~ "What are you working on?"
       # Chat input should not be visible
       refute html =~ "Say something..."
     end

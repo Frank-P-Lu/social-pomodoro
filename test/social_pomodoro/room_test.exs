@@ -1367,6 +1367,83 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
+  describe "multi-cycle session persistence" do
+    @tag :sync
+    test "users remain in room after break ends with remaining cycles" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      # Create room with 3 cycles, short durations for fast testing
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 3
+        )
+
+      # Add participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify both users are in the room
+      state = Room.get_state(room_pid)
+      assert length(state.participants) == 2
+      assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+      assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Complete first work session (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break now
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.current_cycle == 1
+
+        # Verify both users are still in the room during break
+        assert length(state.participants) == 2
+        assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+        assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+        # Complete break (2 -> 1 -> 0 -> next cycle)
+        tick(room_pid)
+        tick(room_pid)
+        tick(room_pid)
+
+        # Should auto-start cycle 2 (room should NOT terminate since we have more cycles)
+        if Process.alive?(room_pid) do
+          state = Room.get_state(room_pid)
+          assert state.status == :active
+          assert state.current_cycle == 2
+          assert state.seconds_remaining == 2
+
+          # VERIFY: Both users should STILL be in the room (not kicked out)
+          assert length(state.participants) == 2
+          assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+          assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+          # Verify ready_for_next flags were reset
+          creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+          participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+          assert creator.ready_for_next == false
+          assert participant.ready_for_next == false
+        else
+          flunk("Room terminated after break instead of starting cycle 2")
+        end
+      else
+        flunk("Room terminated after first session")
+      end
+    end
+  end
+
   describe "chat messages during break" do
     test "user can send chat message during break" do
       creator_id = "user1_#{System.unique_integer([:positive])}"

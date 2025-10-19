@@ -155,12 +155,14 @@ defmodule SocialPomodoroWeb.SessionLive do
     # Update spectator status
     is_spectator = is_spectator?(room_state, socket.assigns.user_id)
 
-    # Update completion message if in break (recompute in case participants changed)
+    # Update completion message only when transitioning INTO break
+    # (not on every update during break, to avoid regenerating random messages)
     completion_msg =
-      if room_state.status == :break do
+      if socket.assigns.room_state.status != :break and room_state.status == :break do
         completion_message(room_state.duration_minutes, length(room_state.session_participants))
       else
-        nil
+        # Keep existing message if already in break
+        socket.assigns.completion_message
       end
 
     # Find current participant
@@ -213,7 +215,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100 flex items-center justify-center p-8">
+    <div class="min-h-screen bg-base-100 flex items-center justify-center px-4 py-8 sm:px-6 md:px-8">
       <div class="max-w-4xl w-full">
         <%= if @is_spectator do %>
           <.spectator_view room_state={@room_state} />
@@ -297,6 +299,12 @@ defmodule SocialPomodoroWeb.SessionLive do
   attr :selected_tab, :atom, required: true
 
   defp active_session_view(assigns) do
+    # Separate current user from other participants
+    other_participants =
+      Enum.reject(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
+
+    assigns = assign(assigns, :other_participants, other_participants)
+
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
@@ -330,12 +338,11 @@ defmodule SocialPomodoroWeb.SessionLive do
             label="Focus time remaining"
           />
           
-    <!-- Participants with status and status_message -->
-          <div class="flex flex-wrap justify-center gap-6 mb-8">
-            <%= for participant <- sort_participants_current_user_first(@room_state.participants, @user_id) do %>
-              <.participant_display participant={participant} current_user_id={@user_id} />
-            <% end %>
-          </div>
+    <!-- Current User Display -->
+          <.current_user_display
+            participant={@current_participant}
+            status_emoji={@current_participant.status_emoji}
+          />
           
     <!-- Status Emoji Buttons -->
           <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
@@ -396,6 +403,16 @@ defmodule SocialPomodoroWeb.SessionLive do
             current_participant={@current_participant}
             placeholder="What are you working on?"
           />
+          
+    <!-- Other Participants -->
+          <%= if length(@other_participants) > 0 do %>
+            <div class="divider">Other Participants</div>
+            <div class="flex flex-wrap justify-center gap-6 mb-4">
+              <%= for participant <- @other_participants do %>
+                <.participant_display participant={participant} />
+              <% end %>
+            </div>
+          <% end %>
         </div>
       </div>
       
@@ -429,6 +446,12 @@ defmodule SocialPomodoroWeb.SessionLive do
         :is_final_break,
         assigns.room_state.current_cycle == assigns.room_state.total_cycles
       )
+
+    # Separate current user from other participants
+    other_participants =
+      Enum.reject(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
+
+    assigns = assign(assigns, :other_participants, other_participants)
 
     ~H"""
     <div class="card bg-base-200">
@@ -466,16 +489,15 @@ defmodule SocialPomodoroWeb.SessionLive do
           label="Break time remaining"
         />
         
-    <!-- Participants with ready status and status -->
-        <div class="flex flex-wrap justify-center gap-6 mb-8">
-          <%= for participant <- sort_participants_current_user_first(@room_state.participants, @user_id) do %>
-            <.participant_display
-              participant={participant}
-              current_user_id={@user_id}
-              show_ready={true}
-            />
-          <% end %>
-        </div>
+    <!-- Current User Display -->
+        <.current_user_display
+          participant={@current_participant}
+          status_emoji={@current_participant.status_emoji}
+        />
+
+        <%= if @current_participant.ready_for_next do %>
+          <p class="text-xs text-success font-semibold mb-4">Ready!</p>
+        <% end %>
         
     <!-- Break Feedback Emoji Buttons -->
         <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
@@ -542,8 +564,21 @@ defmodule SocialPomodoroWeb.SessionLive do
         <.tab_content
           selected_tab={@selected_tab}
           current_participant={@current_participant}
-          placeholder="How was your session?"
+          placeholder="What are you working on?"
         />
+        
+    <!-- Other Participants -->
+        <%= if length(@other_participants) > 0 do %>
+          <div class="divider">Other Participants</div>
+          <div class="flex flex-wrap justify-center gap-6 mb-8">
+            <%= for participant <- @other_participants do %>
+              <.participant_display
+                participant={participant}
+                show_ready={true}
+              />
+            <% end %>
+          </div>
+        <% end %>
 
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
@@ -649,11 +684,13 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   defp maybe_show_break_ending_flash(socket, room_state) do
+    is_final_break = room_state.current_cycle == room_state.total_cycles
+
     cond do
-      room_state.status == :break && room_state.seconds_remaining == 10 ->
+      room_state.status == :break && room_state.seconds_remaining == 10 && is_final_break ->
         put_flash(socket, :info, "Break ending soon! Returning to lobby in 10 seconds...")
 
-      room_state.status == :break && room_state.seconds_remaining <= 0 ->
+      room_state.status == :break && room_state.seconds_remaining <= 0 && is_final_break ->
         push_navigate(socket, to: ~p"/")
 
       true ->
@@ -681,10 +718,32 @@ defmodule SocialPomodoroWeb.SessionLive do
     end
   end
 
-  defp sort_participants_current_user_first(participants, current_user_id) do
-    Enum.sort_by(participants, fn p ->
-      if p.user_id == current_user_id, do: 0, else: 1
-    end)
+  attr :participant, :map, required: true
+  attr :status_emoji, :string, default: nil
+
+  defp current_user_display(assigns) do
+    ~H"""
+    <div class="flex flex-col items-center gap-2 mb-6">
+      <div class="relative">
+        <.avatar
+          user_id={@participant.user_id}
+          username={@participant.username}
+          size="w-20"
+          class="ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+        />
+        <%= if @status_emoji do %>
+          <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-10 h-10 flex items-center justify-center border-2 border-base-100">
+            <img
+              src={emoji_to_openmoji(@status_emoji)}
+              class="w-10 h-10"
+              alt={@status_emoji}
+            />
+          </span>
+        <% end %>
+      </div>
+      <p class="font-semibold text-center">{@participant.username}</p>
+    </div>
+    """
   end
 
   attr :participant, :map, required: true
@@ -764,7 +823,47 @@ defmodule SocialPomodoroWeb.SessionLive do
 
     ~H"""
     <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
-      <!-- Add todo form -->
+      <!-- Todo items -->
+      <%= if @todos_count > 0 do %>
+        <div class="flex flex-col gap-2 w-full max-w-xs mb-4">
+          <%= for todo <- @todos do %>
+            <div
+              class="flex items-center gap-2 bg-base-300 rounded-lg p-2 transition-all duration-200 ease-in-out"
+              id={"todo-#{todo.id}"}
+            >
+              <input
+                type="checkbox"
+                checked={todo.completed}
+                phx-click="toggle_todo"
+                phx-value-todo_id={todo.id}
+                class="checkbox checkbox-sm transition-transform duration-200"
+              />
+
+              <span class={
+                [
+                  "flex-1 text-sm transition-all duration-200",
+                  if(todo.completed, do: "line-through opacity-50", else: "")
+                ]
+                |> Enum.join(" ")
+              }>
+                {todo.text}
+              </span>
+
+              <button
+                phx-click="delete_todo"
+                phx-value-todo_id={todo.id}
+                phx-hook="MaintainWakeLock"
+                id={"delete-todo-#{todo.id}"}
+                class="btn btn-ghost btn-xs btn-square btn-ghost btn-error group"
+              >
+                <Icons.trash class="w-4 h-4 fill-neutral group-hover:fill-neutral-content" />
+              </button>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+      
+    <!-- Add todo form -->
       <form phx-submit="add_todo" class="flex gap-2 w-full justify-center">
         <input
           type="text"
@@ -787,45 +886,6 @@ defmodule SocialPomodoroWeb.SessionLive do
       </form>
       <%= if @at_max do %>
         <p class="text-xs opacity-50">Max {@max_todos} todos reached</p>
-      <% end %>
-      <!-- Todo items -->
-      <%= if @todos_count > 0 do %>
-        <div class="flex flex-col gap-2 w-full max-w-xs">
-          <%= for todo <- @todos do %>
-            <div
-              class="flex items-center gap-2 bg-base-300 rounded-lg p-2 transition-all duration-200 ease-in-out"
-              id={"todo-#{todo.id}"}
-            >
-              <button
-                phx-click="delete_todo"
-                phx-value-todo_id={todo.id}
-                phx-hook="MaintainWakeLock"
-                id={"delete-todo-#{todo.id}"}
-                class="btn btn-ghost btn-xs btn-square hover:bg-error/20 transition-colors duration-200"
-              >
-                <Icons.trash class="w-4 h-4 fill-current opacity-50 hover:opacity-100" />
-              </button>
-
-              <span class={
-                [
-                  "flex-1 text-sm transition-all duration-200",
-                  if(todo.completed, do: "line-through opacity-50", else: "")
-                ]
-                |> Enum.join(" ")
-              }>
-                {todo.text}
-              </span>
-
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                phx-click="toggle_todo"
-                phx-value-todo_id={todo.id}
-                class="checkbox checkbox-sm transition-transform duration-200"
-              />
-            </div>
-          <% end %>
-        </div>
       <% end %>
     </div>
     """
