@@ -20,8 +20,8 @@
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
-import {Socket} from "phoenix"
-import {LiveSocket} from "phoenix_live_view"
+import { Socket } from "phoenix"
+import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
 // Wake Lock functionality
@@ -90,6 +90,7 @@ Hooks.Timer = {
   mounted() {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
+    this.segmentTargets = this.getSegmentTargets()
     this.updateTimer()
     this.interval = setInterval(() => {
       this.seconds--
@@ -109,6 +110,7 @@ Hooks.Timer = {
     // Reset timer on update from server
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
+    this.segmentTargets = this.getSegmentTargets()
     this.updateTimer()
   },
   destroyed() {
@@ -116,11 +118,41 @@ Hooks.Timer = {
     // Reset title when leaving the page
     document.title = APP_TITLE
   },
+  getSegmentTargets() {
+    const segments = {}
+      ;['minutes', 'seconds'].forEach((unit) => {
+        const valueEl = this.el.querySelector(`[data-countdown-segment="${unit}"] [data-countdown-value]`)
+        if (valueEl) {
+          segments[unit] = valueEl
+        }
+      })
+    return segments
+  },
+  updateSegment(unit, value) {
+    const target = this.segmentTargets?.[unit]
+    if (!target) return
+
+    const safeValue = Math.max(0, Math.floor(value))
+    target.style.setProperty('--value', safeValue)
+    target.textContent = `${safeValue}`
+    target.setAttribute('aria-label', `${safeValue}`)
+  },
+  breakdown(seconds) {
+    const safeSeconds = Math.max(0, seconds)
+    const minutes = Math.floor(safeSeconds / 60)
+    const secs = safeSeconds % 60
+
+    return { minutes, seconds: secs }
+  },
   updateTimer() {
-    const minutes = Math.floor(this.seconds / 60)
-    const secs = this.seconds % 60
-    const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`
-    this.el.textContent = timeStr
+    const { minutes, seconds } = this.breakdown(this.seconds)
+
+    this.updateSegment('minutes', minutes)
+    this.updateSegment('seconds', seconds)
+
+    const displayMinutes = Math.floor(this.seconds / 60)
+    const displaySeconds = this.seconds % 60
+    const timeStr = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`
 
     // Update tab title
     if (this.isBreak) {
@@ -191,12 +223,12 @@ Hooks.ReleaseWakeLock = {
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
+  params: { _csrf_token: csrfToken },
   hooks: Hooks,
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
@@ -216,7 +248,7 @@ window.liveSocket = liveSocket
 //     2. click on elements to jump to their definitions in your code editor
 //
 if (process.env.NODE_ENV === "development") {
-  window.addEventListener("phx:live_reload:attached", ({detail: reloader}) => {
+  window.addEventListener("phx:live_reload:attached", ({ detail: reloader }) => {
     // Enable server log streaming to client.
     // Disable with reloader.disableServerLogs()
     reloader.enableServerLogs()
@@ -229,11 +261,11 @@ if (process.env.NODE_ENV === "development") {
     window.addEventListener("keydown", e => keyDown = e.key)
     window.addEventListener("keyup", e => keyDown = null)
     window.addEventListener("click", e => {
-      if(keyDown === "c"){
+      if (keyDown === "c") {
         e.preventDefault()
         e.stopImmediatePropagation()
         reloader.openEditorAtCaller(e.target)
-      } else if(keyDown === "d"){
+      } else if (keyDown === "d") {
         e.preventDefault()
         e.stopImmediatePropagation()
         reloader.openEditorAtDef(e.target)
