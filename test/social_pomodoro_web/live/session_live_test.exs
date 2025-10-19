@@ -222,6 +222,54 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
       refute Enum.member?(room_state.spectators, user_id_b)
     end
+
+    test "joining mid-session via direct link renders without errors" do
+      connA = setup_user_conn("userA")
+      connB = setup_user_conn("userB")
+
+      # User A creates room and starts session
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobbyA
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      # User B joins via direct link (not via lobby) - simulates sharing link
+      {:ok, sessionB, htmlB} = live(connB, "/room/#{room_name}")
+
+      # Should successfully render spectator view without errors
+      assert htmlB =~ "You&#39;re a spectator"
+      assert htmlB =~ "Watch the session in progress"
+
+      # Advance to break and verify it still works
+      tick_room(room_pid, 2)
+      sleep_short()
+
+      htmlB = render(sessionB)
+
+      # Should now see break view as participant
+      assert htmlB =~ "Great Work!"
+      assert htmlB =~ "Break time remaining"
+      # Should show task count even when joining mid-session
+      assert htmlB =~ "0/0 tasks"
+    end
   end
 
   describe "break timer auto-redirect" do

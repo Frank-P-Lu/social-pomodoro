@@ -312,10 +312,14 @@ defmodule SocialPomodoroWeb.SessionLive do
       %{code: "1F60E", path: "/images/emojis/1F60E.svg", alt: "😎"}
     ]
 
-    # Calculate task count
-    todos = Map.get(assigns.current_participant, :todos, [])
-    completed_count = Enum.count(todos, & &1.completed)
-    total_count = length(todos)
+    # Calculate task count (handle nil current_participant for spectators)
+    {completed_count, total_count} =
+      if assigns.current_participant do
+        todos = Map.get(assigns.current_participant, :todos, [])
+        {Enum.count(todos, & &1.completed), length(todos)}
+      else
+        {0, 0}
+      end
 
     assigns =
       assigns
@@ -364,17 +368,19 @@ defmodule SocialPomodoroWeb.SessionLive do
           />
           
     <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
-          <.horizontal_session_layout
-            current_participant={@current_participant}
-            status_emojis={@active_emojis}
-            room_state={@room_state}
-            selected_tab={@selected_tab}
-            placeholder="What are you working on?"
-            show_ready={false}
-            emoji_id_prefix=""
-            completed_count={@completed_count}
-            total_count={@total_count}
-          />
+          <%= if @current_participant do %>
+            <.horizontal_session_layout
+              current_participant={@current_participant}
+              status_emojis={@active_emojis}
+              room_state={@room_state}
+              selected_tab={@selected_tab}
+              placeholder="What are you working on?"
+              show_ready={false}
+              emoji_id_prefix=""
+              completed_count={@completed_count}
+              total_count={@total_count}
+            />
+          <% end %>
         </div>
       </div>
       
@@ -417,10 +423,14 @@ defmodule SocialPomodoroWeb.SessionLive do
       %{code: "1F4AA", path: "/images/emojis/1F4AA.svg", alt: "💪"}
     ]
 
-    # Calculate task count
-    todos = Map.get(assigns.current_participant, :todos, [])
-    completed_count = Enum.count(todos, & &1.completed)
-    total_count = length(todos)
+    # Calculate task count (handle nil current_participant for spectators)
+    {completed_count, total_count} =
+      if assigns.current_participant do
+        todos = Map.get(assigns.current_participant, :todos, [])
+        {Enum.count(todos, & &1.completed), length(todos)}
+      else
+        {0, 0}
+      end
 
     assigns =
       assigns
@@ -473,17 +483,19 @@ defmodule SocialPomodoroWeb.SessionLive do
         />
         
     <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
-        <.horizontal_session_layout
-          current_participant={@current_participant}
-          status_emojis={@break_emojis}
-          room_state={@room_state}
-          selected_tab={@selected_tab}
-          placeholder="What are you working on?"
-          show_ready={true}
-          emoji_id_prefix="break-"
-          completed_count={@completed_count}
-          total_count={@total_count}
-        />
+        <%= if @current_participant do %>
+          <.horizontal_session_layout
+            current_participant={@current_participant}
+            status_emojis={@break_emojis}
+            room_state={@room_state}
+            selected_tab={@selected_tab}
+            placeholder="What are you working on?"
+            show_ready={true}
+            emoji_id_prefix="break-"
+            completed_count={@completed_count}
+            total_count={@total_count}
+          />
+        <% end %>
 
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
