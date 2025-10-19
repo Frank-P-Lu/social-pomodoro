@@ -426,6 +426,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
               duration_minutes={@duration_minutes}
               num_cycles={@num_cycles}
               break_duration_minutes={@break_duration_minutes}
+              break_options_disabled={@break_options_disabled}
             />
           </div>
         </div>
@@ -657,6 +658,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   attr :duration_minutes, :integer, required: true
   attr :num_cycles, :integer, required: true
   attr :break_duration_minutes, :integer, required: true
+  attr :break_options_disabled, :boolean, default: false
 
   defp user_card(assigns) do
     ~H"""
@@ -781,13 +783,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
               </div>
 
               <%= if @break_options_disabled do %>
-                <div class="absolute inset-0 z-10 flex items-center justify-center">
-                  <div
-                    role="alert"
-                    class="flex items-center gap-2 rounded-box bg-base-200/95 border border-warning/60 text-warning shadow-lg px-4 py-3 text-xs sm:text-sm font-medium leading-snug"
-                  >
-                    <.icon name="hero-lock-closed" class="w-4 h-4 flex-shrink-0" />
-                    <span>Break is locked at 5 min for a single pomodoro.</span>
+                <div
+                  class="absolute inset-0 z-20 flex items-center justify-center p-4 rounded-box border border-base-content/5 bg-gradient-to-br from-base-200/35 via-base-200/20 to-base-100/10 backdrop-blur-lg shadow-lg pointer-events-none"
+                  role="alert"
+                >
+                  <div class="pointer-events-auto flex items-center gap-2 text-xs text-sm text-base-content/90">
+                    <span>
+                      Break is locked at {@break_duration_minutes} min for a single pomodoro.
+                    </span>
                   </div>
                 </div>
               <% end %>

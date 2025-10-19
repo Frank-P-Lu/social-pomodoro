@@ -55,6 +55,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             |> assign(:is_spectator, is_spectator)
             |> assign(:completion_message, completion_msg)
             |> assign(:current_participant, current_participant)
+            |> assign(:selected_tab, :todo)
 
           {:ok, socket}
         end
@@ -132,6 +133,17 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    tab_atom = String.to_atom(tab)
+    # Only allow switching to chat during break
+    if tab_atom == :chat and socket.assigns.room_state.status != :break do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, :selected_tab, tab_atom)}
+    end
+  end
+
+  @impl true
   def handle_event("leave_room", _params, socket) do
     SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
     {:noreply, push_navigate(socket, to: ~p"/")}
@@ -155,12 +167,21 @@ defmodule SocialPomodoroWeb.SessionLive do
     current_participant =
       Enum.find(room_state.participants, &(&1.user_id == socket.assigns.user_id))
 
+    # Reset tab to todo when transitioning from break to active
+    selected_tab =
+      if socket.assigns.room_state.status == :break and room_state.status == :active do
+        :todo
+      else
+        socket.assigns.selected_tab
+      end
+
     socket =
       socket
       |> assign(:room_state, room_state)
       |> assign(:is_spectator, is_spectator)
       |> assign(:completion_message, completion_msg)
       |> assign(:current_participant, current_participant)
+      |> assign(:selected_tab, selected_tab)
       |> maybe_show_spectator_joining_flash(room_state, is_spectator)
       |> maybe_show_break_ending_flash(room_state)
 
@@ -202,6 +223,7 @@ defmodule SocialPomodoroWeb.SessionLive do
               room_state={@room_state}
               user_id={@user_id}
               current_participant={@current_participant}
+              selected_tab={@selected_tab}
             />
           <% end %>
 
@@ -211,6 +233,7 @@ defmodule SocialPomodoroWeb.SessionLive do
               user_id={@user_id}
               completion_message={@completion_message}
               current_participant={@current_participant}
+              selected_tab={@selected_tab}
             />
           <% end %>
         <% end %>
@@ -267,6 +290,11 @@ defmodule SocialPomodoroWeb.SessionLive do
     </div>
     """
   end
+
+  attr :room_state, :map, required: true
+  attr :user_id, :string, required: true
+  attr :current_participant, :map, required: true
+  attr :selected_tab, :atom, required: true
 
   defp active_session_view(assigns) do
     ~H"""
@@ -359,14 +387,15 @@ defmodule SocialPomodoroWeb.SessionLive do
             </button>
           </div>
           
-    <!-- Todo List -->
-          <div class="mb-8">
-            <.todo_list
-              current_participant={@current_participant}
-              max_todos={SocialPomodoro.Config.max_todos_per_user()}
-              placeholder="What are you working on?"
-            />
-          </div>
+    <!-- Tabs -->
+          <.tabs_ui room_state={@room_state} selected_tab={@selected_tab} />
+          
+    <!-- Tab Content -->
+          <.tab_content
+            selected_tab={@selected_tab}
+            current_participant={@current_participant}
+            placeholder="What are you working on?"
+          />
         </div>
       </div>
       
@@ -385,6 +414,12 @@ defmodule SocialPomodoroWeb.SessionLive do
     </div>
     """
   end
+
+  attr :room_state, :map, required: true
+  attr :user_id, :string, required: true
+  attr :completion_message, :string, required: true
+  attr :current_participant, :map, required: true
+  attr :selected_tab, :atom, required: true
 
   defp break_view(assigns) do
     # Determine if this is the final break
@@ -500,37 +535,15 @@ defmodule SocialPomodoroWeb.SessionLive do
           </button>
         </div>
         
-    <!-- Chat Message Box -->
-        <div class="mb-8">
-          <p class="text-sm opacity-70 mb-2">Chat during break</p>
-          <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
-            <input
-              type="text"
-              name="text"
-              placeholder="Say something..."
-              class="input input-bordered w-full max-w-xs text-base"
-              maxlength="50"
-              required
-            />
-            <button
-              type="submit"
-              phx-hook="MaintainWakeLock"
-              id="send-chat-button"
-              class="btn btn-square btn-primary"
-            >
-              <Icons.submit class="w-6 h-6 fill-current" />
-            </button>
-          </form>
-        </div>
+    <!-- Tabs -->
+        <.tabs_ui room_state={@room_state} selected_tab={@selected_tab} />
         
-    <!-- Todo List -->
-        <div class="mb-8">
-          <.todo_list
-            current_participant={@current_participant}
-            max_todos={SocialPomodoro.Config.max_todos_per_user()}
-            placeholder="How was your session?"
-          />
-        </div>
+    <!-- Tab Content -->
+        <.tab_content
+          selected_tab={@selected_tab}
+          current_participant={@current_participant}
+          placeholder="How was your session?"
+        />
 
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
@@ -815,6 +828,71 @@ defmodule SocialPomodoroWeb.SessionLive do
         </div>
       <% end %>
     </div>
+    """
+  end
+
+  attr :room_state, :map, required: true
+  attr :selected_tab, :atom, required: true
+
+  defp tabs_ui(assigns) do
+    ~H"""
+    <div role="tablist" class="tabs tabs-bordered mb-8">
+      <button
+        phx-click="switch_tab"
+        phx-value-tab="todo"
+        role="tab"
+        class={"tab #{if @selected_tab == :todo, do: "tab-active"}"}
+      >
+        Todo
+      </button>
+      <button
+        phx-click="switch_tab"
+        phx-value-tab="chat"
+        role="tab"
+        class={"tab #{if @selected_tab == :chat, do: "tab-active"} #{if @room_state.status != :break, do: "tab-disabled"}"}
+        disabled={@room_state.status != :break}
+      >
+        Chat
+      </button>
+    </div>
+    """
+  end
+
+  attr :selected_tab, :atom, required: true
+  attr :current_participant, :map, required: true
+  attr :placeholder, :string, default: "What are you working on?"
+
+  defp tab_content(assigns) do
+    ~H"""
+    <%= if @selected_tab == :todo do %>
+      <.todo_list
+        current_participant={@current_participant}
+        max_todos={SocialPomodoro.Config.max_todos_per_user()}
+        placeholder={@placeholder}
+      />
+    <% else %>
+      <!-- Chat content -->
+      <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
+        <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
+          <input
+            type="text"
+            name="text"
+            placeholder="Say something..."
+            class="input input-bordered w-full max-w-xs text-base"
+            maxlength="50"
+            required
+          />
+          <button
+            type="submit"
+            phx-hook="MaintainWakeLock"
+            id="send-chat-button"
+            class="btn btn-square btn-primary"
+          >
+            <Icons.submit class="w-6 h-6 fill-current" />
+          </button>
+        </form>
+      </div>
+    <% end %>
     """
   end
 end

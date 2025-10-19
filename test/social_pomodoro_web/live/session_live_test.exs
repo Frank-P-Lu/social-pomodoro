@@ -21,9 +21,16 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
   end
 
   # Helper to set shorter durations for faster testing
-  defp set_short_durations(room_pid, work_seconds \\ 10, break_seconds \\ 5) do
+  defp set_short_durations(room_pid, work_seconds \\ 10, break_seconds \\ 5, opts \\ []) do
     :sys.replace_state(room_pid, fn state ->
-      %{state | work_duration_seconds: work_seconds, break_duration_seconds: break_seconds}
+      total_cycles = Keyword.get(opts, :total_cycles, state.total_cycles)
+
+      %{
+        state
+        | work_duration_seconds: work_seconds,
+          break_duration_seconds: break_seconds,
+          total_cycles: total_cycles
+      }
     end)
   end
 
@@ -239,7 +246,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Get room pid and set shorter durations for faster testing
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-      set_short_durations(room_pid, 1, 2)
+      set_short_durations(room_pid, 1, 2, total_cycles: 1)
 
       # Start the session
       {:ok, lobby, _html} = live(conn, "/")
@@ -292,7 +299,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Get room pid and set shorter durations for faster testing
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-      set_short_durations(room_pid, 1, 3)
+      set_short_durations(room_pid, 1, 3, total_cycles: 1)
 
       # Start the session
       {:ok, lobby, _html} = live(conn, "/")
@@ -459,7 +466,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
         end
 
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-      set_short_durations(room_pid, 1, 5)
+      set_short_durations(room_pid, 1, 5, total_cycles: 1)
 
       lobbyA
       |> element("button[phx-click='start_my_room']")
@@ -558,7 +565,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
         end
 
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
-      set_short_durations(room_pid, 1, 5)
+      set_short_durations(room_pid, 1, 5, total_cycles: 1)
 
       lobbyA
       |> element("button[phx-click='start_my_room']")
@@ -915,6 +922,218 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Should have disabled checkbox (read-only for other participants)
       assert htmlB =~ "disabled"
+    end
+  end
+
+  describe "tab functionality" do
+    test "todo tab is selected by default during active session" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      html = render(session)
+
+      # Todo tab should be active (tab-active class)
+      assert html =~ ~r/button[^>]*phx-value-tab="todo"[^>]*class="[^"]*tab-active/
+      # Todo content should be visible
+      assert html =~ "What are you working on?"
+    end
+
+    test "chat tab is disabled during active session" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      html = render(session)
+
+      # Chat tab should be disabled
+      assert html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*class="[^"]*tab-disabled/
+      assert html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*disabled/
+    end
+
+    test "chat tab is enabled during break" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Tick to break
+      tick_room(room_pid, 2)
+
+      html = render(session)
+
+      # Chat tab should NOT be disabled
+      refute html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*tab-disabled/
+    end
+
+    test "switching tabs shows correct content" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Tick to break
+      tick_room(room_pid, 2)
+
+      # Switch to chat tab
+      session
+      |> element("button[phx-value-tab='chat']")
+      |> render_click()
+
+      html = render(session)
+
+      # Chat input should be visible
+      assert html =~ "Say something..."
+      # Todo section header should not be visible
+      refute html =~ "How was your session?"
+
+      # Switch back to todo tab
+      session
+      |> element("button[phx-value-tab='todo']")
+      |> render_click()
+
+      html = render(session)
+
+      # Todo content should be visible
+      assert html =~ "How was your session?"
+      # Chat input should not be visible
+      refute html =~ "Say something..."
+    end
+
+    test "tab resets to todo when break ends" do
+      conn = setup_user_conn("userA")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid, 1, 5)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Tick to break
+      tick_room(room_pid, 2)
+
+      # Verify we're in break and chat tab is available
+      html = render(session)
+      assert html =~ "Break time remaining"
+
+      # Switch to chat tab during break
+      session
+      |> element("button[phx-value-tab='chat']")
+      |> render_click()
+
+      html = render(session)
+      assert html =~ "Say something..."
+      # Chat input should be visible
+      assert html =~ ~r/phx-value-tab="chat"[^>]*class="[^"]*tab-active/
     end
   end
 end
