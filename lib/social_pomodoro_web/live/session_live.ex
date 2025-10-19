@@ -215,7 +215,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100 flex items-center justify-center px-4 py-8 sm:px-6 md:px-8">
+    <div class="min-h-screen bg-base-100 flex items-center justify-center p-4 md:px-8">
       <div class="max-w-4xl w-full">
         <%= if @is_spectator do %>
           <.spectator_view room_state={@room_state} />
@@ -456,14 +456,13 @@ defmodule SocialPomodoroWeb.SessionLive do
           </div>
         <% end %>
 
-        <div class="mb-6">
-          <img src="/images/emojis/1F389.svg" class="w-24 h-24 mx-auto" alt="🎉" />
-        </div>
         <h1 class="card-title text-4xl justify-center mb-4">
           <%= if @is_final_break do %>
-            Amazing Work!
+            <img src="/images/emojis/1F389.svg" class="w-12 h-12" alt="🎉" />
+            <span>Amazing Work!</span>
           <% else %>
-            Great Work!
+            <img src="/images/emojis/1F389.svg" class="w-12 h-12" alt="🎉" />
+            <span>Great Work!</span>
           <% end %>
         </h1>
         <p class="text-xl mb-8">
@@ -643,6 +642,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   defp current_user_avatar_with_status(assigns) do
     ~H"""
     <div class="flex flex-col items-center gap-2 flex-shrink-0">
+      <p class="font-semibold text-center">{@participant.username}</p>
       <div class="relative">
         <.avatar
           user_id={@participant.user_id}
@@ -660,7 +660,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           </span>
         <% end %>
       </div>
-      <p class="font-semibold text-center">{@participant.username}</p>
+      <p class="text-sm opacity-70">You</p>
       <%= if @show_ready && @participant.ready_for_next do %>
         <p class="text-xs text-success font-semibold">Ready!</p>
       <% end %>
@@ -710,6 +710,9 @@ defmodule SocialPomodoroWeb.SessionLive do
       <div class="w-full">
         <div class="card bg-base-300 p-4">
           <div class="flex flex-col gap-3">
+            <div class="text-center text-sm opacity-70">
+              {@completed_count}/{@total_count} tasks
+            </div>
             <div class="flex flex-row items-center justify-center gap-4">
               <.current_user_avatar_with_status
                 participant={@current_participant}
@@ -720,9 +723,6 @@ defmodule SocialPomodoroWeb.SessionLive do
                 status_emojis={@status_emojis}
                 id_prefix={@emoji_id_prefix}
               />
-            </div>
-            <div class="text-center text-sm opacity-70">
-              {@completed_count}/{@total_count} tasks
             </div>
           </div>
         </div>
