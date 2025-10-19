@@ -303,7 +303,19 @@ defmodule SocialPomodoroWeb.SessionLive do
     other_participants =
       Enum.reject(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
 
-    assigns = assign(assigns, :other_participants, other_participants)
+    # Define active session emoji set
+    active_emojis = [
+      %{code: "1F636", path: "/images/emojis/1F636.svg", alt: "😶"},
+      %{code: "1FAE0", path: "/images/emojis/1FAE0.svg", alt: "🫠"},
+      %{code: "1F914", path: "/images/emojis/1F914.svg", alt: "🤔"},
+      %{code: "1F604", path: "/images/emojis/1F604.svg", alt: "😄"},
+      %{code: "1F60E", path: "/images/emojis/1F60E.svg", alt: "😎"}
+    ]
+
+    assigns =
+      assigns
+      |> assign(:other_participants, other_participants)
+      |> assign(:active_emojis, active_emojis)
 
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
@@ -338,81 +350,22 @@ defmodule SocialPomodoroWeb.SessionLive do
             label="Focus time remaining"
           />
           
-    <!-- Current User Display -->
-          <.current_user_display
-            participant={@current_participant}
-            status_emoji={@current_participant.status_emoji}
-          />
-          
-    <!-- Status Emoji Buttons -->
-          <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
-          <div class="join mb-8 mx-auto">
-            <button
-              phx-click="set_status"
-              phx-value-emoji="1F636"
-              phx-hook="MaintainWakeLock"
-              id="emoji-1F636"
-              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F636", do: "btn-active"}"}
-            >
-              <img src="/images/emojis/1F636.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😶" />
-            </button>
-            <button
-              phx-click="set_status"
-              phx-value-emoji="1FAE0"
-              phx-hook="MaintainWakeLock"
-              id="emoji-1FAE0"
-              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1FAE0", do: "btn-active"}"}
-            >
-              <img src="/images/emojis/1FAE0.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🫠" />
-            </button>
-            <button
-              phx-click="set_status"
-              phx-value-emoji="1F914"
-              phx-hook="MaintainWakeLock"
-              id="emoji-1F914"
-              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F914", do: "btn-active"}"}
-            >
-              <img src="/images/emojis/1F914.svg" class="w-8 h-8 md:w-12 md:h-12" alt="🤔" />
-            </button>
-            <button
-              phx-click="set_status"
-              phx-value-emoji="1F604"
-              phx-hook="MaintainWakeLock"
-              id="emoji-1F604"
-              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F604", do: "btn-active"}"}
-            >
-              <img src="/images/emojis/1F604.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😄" />
-            </button>
-            <button
-              phx-click="set_status"
-              phx-value-emoji="1F60E"
-              phx-hook="MaintainWakeLock"
-              id="emoji-1F60E"
-              class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F60E", do: "btn-active"}"}
-            >
-              <img src="/images/emojis/1F60E.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😎" />
-            </button>
-          </div>
-          
-    <!-- Tabs -->
-          <.tabs_ui room_state={@room_state} selected_tab={@selected_tab} />
-          
-    <!-- Tab Content -->
-          <.tab_content
-            selected_tab={@selected_tab}
+    <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
+          <.horizontal_session_layout
             current_participant={@current_participant}
+            status_emojis={@active_emojis}
+            room_state={@room_state}
+            selected_tab={@selected_tab}
             placeholder="What are you working on?"
+            show_ready={false}
+            emoji_id_prefix=""
           />
           
     <!-- Other Participants -->
-          <%= if length(@other_participants) > 0 do %>
-            <div class="divider">Other Participants</div>
-            <div class="flex flex-wrap justify-center gap-6 mb-4">
-              <%= for participant <- @other_participants do %>
-                <.participant_display participant={participant} />
-              <% end %>
-            </div>
-          <% end %>
+          <.other_participants_section
+            other_participants={@other_participants}
+            show_ready={false}
+          />
         </div>
       </div>
       
@@ -440,18 +393,26 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp break_view(assigns) do
     # Determine if this is the final break
-    assigns =
-      assign(
-        assigns,
-        :is_final_break,
-        assigns.room_state.current_cycle == assigns.room_state.total_cycles
-      )
+    is_final_break = assigns.room_state.current_cycle == assigns.room_state.total_cycles
 
     # Separate current user from other participants
     other_participants =
       Enum.reject(assigns.room_state.participants, &(&1.user_id == assigns.user_id))
 
-    assigns = assign(assigns, :other_participants, other_participants)
+    # Define break emoji set
+    break_emojis = [
+      %{code: "1F635-200D-1F4AB", path: "/images/emojis/1F635-200D-1F4AB.svg", alt: "😵‍💫"},
+      %{code: "1F62E-200D-1F4A8", path: "/images/emojis/1F62E-200D-1F4A8.svg", alt: "😮‍💨"},
+      %{code: "1F60C", path: "/images/emojis/1F60C.svg", alt: "😌"},
+      %{code: "2615", path: "/images/emojis/2615.svg", alt: "☕"},
+      %{code: "1F4AA", path: "/images/emojis/1F4AA.svg", alt: "💪"}
+    ]
+
+    assigns =
+      assigns
+      |> assign(:is_final_break, is_final_break)
+      |> assign(:other_participants, other_participants)
+      |> assign(:break_emojis, break_emojis)
 
     ~H"""
     <div class="card bg-base-200">
@@ -489,96 +450,22 @@ defmodule SocialPomodoroWeb.SessionLive do
           label="Break time remaining"
         />
         
-    <!-- Current User Display -->
-        <.current_user_display
-          participant={@current_participant}
-          status_emoji={@current_participant.status_emoji}
-        />
-
-        <%= if @current_participant.ready_for_next do %>
-          <p class="text-xs text-success font-semibold mb-4">Ready!</p>
-        <% end %>
-        
-    <!-- Break Feedback Emoji Buttons -->
-        <p class="text-sm opacity-70 mb-2">How are you feeling?</p>
-        <div class="join mb-8 mx-auto">
-          <button
-            phx-click="set_status"
-            phx-value-emoji="1F635-200D-1F4AB"
-            phx-hook="MaintainWakeLock"
-            id="break-emoji-1F635-200D-1F4AB"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F635-200D-1F4AB", do: "btn-active"}"}
-          >
-            <img
-              src="/images/emojis/1F635-200D-1F4AB.svg"
-              class="w-8 h-8 md:w-12 md:h-12"
-              alt="😵‍💫"
-            />
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="1F62E-200D-1F4A8"
-            phx-hook="MaintainWakeLock"
-            id="break-emoji-1F62E-200D-1F4A8"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F62E-200D-1F4A8", do: "btn-active"}"}
-          >
-            <img
-              src="/images/emojis/1F62E-200D-1F4A8.svg"
-              class="w-8 h-8 md:w-12 md:h-12"
-              alt="😮‍💨"
-            />
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="1F60C"
-            phx-hook="MaintainWakeLock"
-            id="break-emoji-1F60C"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F60C", do: "btn-active"}"}
-          >
-            <img src="/images/emojis/1F60C.svg" class="w-8 h-8 md:w-12 md:h-12" alt="😌" />
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="2615"
-            phx-hook="MaintainWakeLock"
-            id="break-emoji-2615"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "2615", do: "btn-active"}"}
-          >
-            <img src="/images/emojis/2615.svg" class="w-8 h-8 md:w-12 md:h-12" alt="☕" />
-          </button>
-          <button
-            phx-click="set_status"
-            phx-value-emoji="1F4AA"
-            phx-hook="MaintainWakeLock"
-            id="break-emoji-1F4AA"
-            class={"join-item btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == "1F4AA", do: "btn-active"}"}
-          >
-            <img src="/images/emojis/1F4AA.svg" class="w-8 h-8 md:w-12 md:h-12" alt="💪" />
-          </button>
-        </div>
-        
-    <!-- Tabs -->
-        <.tabs_ui room_state={@room_state} selected_tab={@selected_tab} />
-        
-    <!-- Tab Content -->
-        <.tab_content
-          selected_tab={@selected_tab}
+    <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
+        <.horizontal_session_layout
           current_participant={@current_participant}
+          status_emojis={@break_emojis}
+          room_state={@room_state}
+          selected_tab={@selected_tab}
           placeholder="What are you working on?"
+          show_ready={true}
+          emoji_id_prefix="break-"
         />
         
     <!-- Other Participants -->
-        <%= if length(@other_participants) > 0 do %>
-          <div class="divider">Other Participants</div>
-          <div class="flex flex-wrap justify-center gap-6 mb-8">
-            <%= for participant <- @other_participants do %>
-              <.participant_display
-                participant={participant}
-                show_ready={true}
-              />
-            <% end %>
-          </div>
-        <% end %>
+        <.other_participants_section
+          other_participants={@other_participants}
+          show_ready={true}
+        />
 
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
@@ -716,6 +603,121 @@ defmodule SocialPomodoroWeb.SessionLive do
         # For other statuses, check session participants
         not Enum.any?(room_state.session_participants, &(&1 == user_id))
     end
+  end
+
+  # Reusable Components
+
+  attr :participant, :map, required: true
+  attr :show_ready, :boolean, default: false
+
+  defp current_user_avatar_with_status(assigns) do
+    ~H"""
+    <div class="flex flex-col items-center gap-2 flex-shrink-0">
+      <div class="relative">
+        <.avatar
+          user_id={@participant.user_id}
+          username={@participant.username}
+          size="w-20"
+          class="ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+        />
+        <%= if @participant.status_emoji do %>
+          <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-10 h-10 flex items-center justify-center border-2 border-base-100">
+            <img
+              src={emoji_to_openmoji(@participant.status_emoji)}
+              class="w-10 h-10"
+              alt={@participant.status_emoji}
+            />
+          </span>
+        <% end %>
+      </div>
+      <p class="font-semibold text-center">{@participant.username}</p>
+      <%= if @show_ready && @participant.ready_for_next do %>
+        <p class="text-xs text-success font-semibold">Ready!</p>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :current_participant, :map, required: true
+  attr :status_emojis, :list, required: true
+  attr :id_prefix, :string, default: ""
+
+  defp status_emoji_selector(assigns) do
+    ~H"""
+    <div class="flex flex-col items-center gap-2 flex-shrink-0">
+      <p class="text-sm opacity-70">Status</p>
+      <div class="grid grid-cols-3 gap-2">
+        <%= for emoji <- @status_emojis do %>
+          <button
+            phx-click="set_status"
+            phx-value-emoji={emoji.code}
+            phx-hook="MaintainWakeLock"
+            id={"#{@id_prefix}emoji-#{emoji.code}"}
+            class={"btn btn-neutral btn-square btn-lg #{if @current_participant.status_emoji == emoji.code, do: "btn-active"}"}
+          >
+            <img src={emoji.path} class="w-8 h-8 md:w-10 md:h-10" alt={emoji.alt} />
+          </button>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  attr :current_participant, :map, required: true
+  attr :status_emojis, :list, required: true
+  attr :room_state, :map, required: true
+  attr :selected_tab, :atom, required: true
+  attr :placeholder, :string, default: "What are you working on?"
+  attr :show_ready, :boolean, default: false
+  attr :emoji_id_prefix, :string, default: ""
+
+  defp horizontal_session_layout(assigns) do
+    ~H"""
+    <div class="flex flex-col lg:flex-row items-start justify-center gap-8 mb-8">
+      <!-- User Avatar -->
+      <div class="self-center lg:self-start">
+        <.current_user_avatar_with_status
+          participant={@current_participant}
+          show_ready={@show_ready}
+        />
+      </div>
+      
+    <!-- Status Section -->
+      <div class="self-center lg:self-start">
+        <.status_emoji_selector
+          current_participant={@current_participant}
+          status_emojis={@status_emojis}
+          id_prefix={@emoji_id_prefix}
+        />
+      </div>
+      
+    <!-- Tabs and Content -->
+      <div class="flex-grow w-full lg:w-auto self-stretch lg:self-start">
+        <.tabs_with_content
+          room_state={@room_state}
+          selected_tab={@selected_tab}
+          current_participant={@current_participant}
+          placeholder={@placeholder}
+        />
+      </div>
+    </div>
+    """
+  end
+
+  attr :other_participants, :list, required: true
+  attr :show_ready, :boolean, default: false
+
+  defp other_participants_section(assigns) do
+    ~H"""
+    <%= if length(@other_participants) > 0 do %>
+      <div class="divider">Other Participants</div>
+      <div class="flex flex-wrap justify-center gap-6 mb-4">
+        <%= for participant <- @other_participants do %>
+          <.participant_display participant={participant} show_ready={@show_ready} />
+        <% end %>
+      </div>
+    <% end %>
+    """
   end
 
   attr :participant, :map, required: true
@@ -893,66 +895,62 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   attr :room_state, :map, required: true
   attr :selected_tab, :atom, required: true
-
-  defp tabs_ui(assigns) do
-    ~H"""
-    <div role="tablist" class="tabs tabs-bordered mb-8">
-      <button
-        phx-click="switch_tab"
-        phx-value-tab="todo"
-        role="tab"
-        class={"tab #{if @selected_tab == :todo, do: "tab-active"}"}
-      >
-        Todo
-      </button>
-      <button
-        phx-click="switch_tab"
-        phx-value-tab="chat"
-        role="tab"
-        class={"tab #{if @selected_tab == :chat, do: "tab-active"} #{if @room_state.status != :break, do: "tab-disabled"}"}
-        disabled={@room_state.status != :break}
-      >
-        Chat
-      </button>
-    </div>
-    """
-  end
-
-  attr :selected_tab, :atom, required: true
   attr :current_participant, :map, required: true
   attr :placeholder, :string, default: "What are you working on?"
 
-  defp tab_content(assigns) do
+  defp tabs_with_content(assigns) do
     ~H"""
-    <%= if @selected_tab == :todo do %>
-      <.todo_list
-        current_participant={@current_participant}
-        max_todos={SocialPomodoro.Config.max_todos_per_user()}
-        placeholder={@placeholder}
+    <div role="tablist" class="tabs tabs-lift tabs-lg">
+      <input
+        type="radio"
+        name="session_tabs"
+        class="tab"
+        aria-label="Todo"
+        checked={@selected_tab == :todo}
+        phx-click="switch_tab"
+        phx-value-tab="todo"
       />
-    <% else %>
-      <!-- Chat content -->
-      <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
-        <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
-          <input
-            type="text"
-            name="text"
-            placeholder="Say something..."
-            class="input input-bordered w-full max-w-xs text-base"
-            maxlength="50"
-            required
-          />
-          <button
-            type="submit"
-            phx-hook="MaintainWakeLock"
-            id="send-chat-button"
-            class="btn btn-square btn-primary"
-          >
-            <Icons.submit class="w-6 h-6 fill-current" />
-          </button>
-        </form>
+      <div role="tabpanel" class="tab-content bg-base-100 border-base-300 p-6">
+        <.todo_list
+          current_participant={@current_participant}
+          max_todos={SocialPomodoro.Config.max_todos_per_user()}
+          placeholder={@placeholder}
+        />
       </div>
-    <% end %>
+
+      <input
+        type="radio"
+        name="session_tabs"
+        class="tab"
+        aria-label="Chat"
+        checked={@selected_tab == :chat}
+        disabled={@room_state.status != :break}
+        phx-click="switch_tab"
+        phx-value-tab="chat"
+      />
+      <div role="tabpanel" class="tab-content bg-base-100 border-base-300 p-6">
+        <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
+          <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
+            <input
+              type="text"
+              name="text"
+              placeholder="Say something..."
+              class="input input-bordered w-full max-w-xs text-base"
+              maxlength="50"
+              required
+            />
+            <button
+              type="submit"
+              phx-hook="MaintainWakeLock"
+              id="send-chat-button"
+              class="btn btn-square btn-primary"
+            >
+              <Icons.submit class="w-6 h-6 fill-current" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
     """
   end
 end
