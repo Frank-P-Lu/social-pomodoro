@@ -312,10 +312,17 @@ defmodule SocialPomodoroWeb.SessionLive do
       %{code: "1F60E", path: "/images/emojis/1F60E.svg", alt: "😎"}
     ]
 
+    # Calculate task count
+    todos = Map.get(assigns.current_participant, :todos, [])
+    completed_count = Enum.count(todos, & &1.completed)
+    total_count = length(todos)
+
     assigns =
       assigns
       |> assign(:other_participants, other_participants)
       |> assign(:active_emojis, active_emojis)
+      |> assign(:completed_count, completed_count)
+      |> assign(:total_count, total_count)
 
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
@@ -343,6 +350,12 @@ defmodule SocialPomodoroWeb.SessionLive do
             <% end %>
           </div>
           
+    <!-- Other Participants -->
+          <.other_participants_section
+            other_participants={@other_participants}
+            show_ready={false}
+          />
+          
     <!-- Timer Display -->
           <.timer_display
             id="timer-display"
@@ -359,12 +372,8 @@ defmodule SocialPomodoroWeb.SessionLive do
             placeholder="What are you working on?"
             show_ready={false}
             emoji_id_prefix=""
-          />
-          
-    <!-- Other Participants -->
-          <.other_participants_section
-            other_participants={@other_participants}
-            show_ready={false}
+            completed_count={@completed_count}
+            total_count={@total_count}
           />
         </div>
       </div>
@@ -408,11 +417,18 @@ defmodule SocialPomodoroWeb.SessionLive do
       %{code: "1F4AA", path: "/images/emojis/1F4AA.svg", alt: "💪"}
     ]
 
+    # Calculate task count
+    todos = Map.get(assigns.current_participant, :todos, [])
+    completed_count = Enum.count(todos, & &1.completed)
+    total_count = length(todos)
+
     assigns =
       assigns
       |> assign(:is_final_break, is_final_break)
       |> assign(:other_participants, other_participants)
       |> assign(:break_emojis, break_emojis)
+      |> assign(:completed_count, completed_count)
+      |> assign(:total_count, total_count)
 
     ~H"""
     <div class="card bg-base-200">
@@ -443,6 +459,12 @@ defmodule SocialPomodoroWeb.SessionLive do
         <p class="text-xl mb-8">
           {@completion_message}
         </p>
+        
+    <!-- Other Participants -->
+        <.other_participants_section
+          other_participants={@other_participants}
+          show_ready={true}
+        />
 
         <.timer_display
           id="break-timer-display"
@@ -459,12 +481,8 @@ defmodule SocialPomodoroWeb.SessionLive do
           placeholder="What are you working on?"
           show_ready={true}
           emoji_id_prefix="break-"
-        />
-        
-    <!-- Other Participants -->
-        <.other_participants_section
-          other_participants={@other_participants}
-          show_ready={true}
+          completed_count={@completed_count}
+          total_count={@total_count}
         />
 
         <div class="card-actions justify-center gap-4">
@@ -670,6 +688,8 @@ defmodule SocialPomodoroWeb.SessionLive do
   attr :placeholder, :string, default: "What are you working on?"
   attr :show_ready, :boolean, default: false
   attr :emoji_id_prefix, :string, default: ""
+  attr :completed_count, :integer, required: true
+  attr :total_count, :integer, required: true
 
   defp horizontal_session_layout(assigns) do
     ~H"""
@@ -677,16 +697,21 @@ defmodule SocialPomodoroWeb.SessionLive do
       <!-- User Avatar & Status (Horizontal) -->
       <div class="w-full">
         <div class="card bg-base-300 p-4">
-          <div class="flex flex-row items-center justify-center gap-4">
-            <.current_user_avatar_with_status
-              participant={@current_participant}
-              show_ready={@show_ready}
-            />
-            <.status_emoji_selector
-              current_participant={@current_participant}
-              status_emojis={@status_emojis}
-              id_prefix={@emoji_id_prefix}
-            />
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-row items-center justify-center gap-4">
+              <.current_user_avatar_with_status
+                participant={@current_participant}
+                show_ready={@show_ready}
+              />
+              <.status_emoji_selector
+                current_participant={@current_participant}
+                status_emojis={@status_emojis}
+                id_prefix={@emoji_id_prefix}
+              />
+            </div>
+            <div class="text-center text-sm opacity-70">
+              {@completed_count}/{@total_count} tasks
+            </div>
           </div>
         </div>
       </div>

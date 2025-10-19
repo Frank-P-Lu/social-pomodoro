@@ -1081,8 +1081,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Todo tab should be active (tab-active class)
-      assert html =~ ~r/button[^>]*phx-value-tab="todo"[^>]*class="[^"]*tab-active/
+      # Todo tab should be checked (using radio input now)
+      assert html =~ ~r/input[^>]*aria-label="Todo"[^>]*checked/
       # Todo content should be visible
       assert html =~ "What are you working on?"
     end
@@ -1117,9 +1117,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Chat tab should be disabled
-      assert html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*class="[^"]*tab-disabled/
-      assert html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*disabled/
+      # Chat tab should be disabled (using radio input now)
+      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*disabled/
     end
 
     test "chat tab is enabled during break" do
@@ -1155,8 +1154,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Chat tab should NOT be disabled
-      refute html =~ ~r/button[^>]*phx-value-tab="chat"[^>]*tab-disabled/
+      # Chat tab should NOT be disabled (using radio input now)
+      refute html =~ ~r/input[^>]*aria-label="Chat"[^>]*disabled/
     end
 
     test "switching tabs shows correct content" do
@@ -1190,29 +1189,31 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # Tick to break
       tick_room(room_pid, 2)
 
-      # Switch to chat tab
+      # Switch to chat tab (using radio input now)
       session
-      |> element("button[phx-value-tab='chat']")
+      |> element("input[phx-value-tab='chat']")
       |> render_click()
 
       html = render(session)
 
-      # Chat input should be visible
+      # Chat tab should be checked
+      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*checked/
+      # Both inputs exist in DOM (daisyUI tabs behavior), but chat should be active
       assert html =~ "Say something..."
-      # Todo input should not be visible
-      refute html =~ "What are you working on?"
+      assert html =~ "What are you working on?"
 
-      # Switch back to todo tab
+      # Switch back to todo tab (using radio input now)
       session
-      |> element("button[phx-value-tab='todo']")
+      |> element("input[phx-value-tab='todo']")
       |> render_click()
 
       html = render(session)
 
-      # Todo content should be visible
+      # Todo tab should be checked
+      assert html =~ ~r/input[^>]*aria-label="Todo"[^>]*checked/
+      # Both inputs exist in DOM (daisyUI tabs behavior), but todo should be active
       assert html =~ "What are you working on?"
-      # Chat input should not be visible
-      refute html =~ "Say something..."
+      assert html =~ "Say something..."
     end
 
     test "tab resets to todo when break ends" do
@@ -1250,15 +1251,15 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       html = render(session)
       assert html =~ "Break time remaining"
 
-      # Switch to chat tab during break
+      # Switch to chat tab during break (using radio input now)
       session
-      |> element("button[phx-value-tab='chat']")
+      |> element("input[phx-value-tab='chat']")
       |> render_click()
 
       html = render(session)
       assert html =~ "Say something..."
-      # Chat input should be visible
-      assert html =~ ~r/phx-value-tab="chat"[^>]*class="[^"]*tab-active/
+      # Chat tab should be checked
+      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*checked/
     end
   end
 end
