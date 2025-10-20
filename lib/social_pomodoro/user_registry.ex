@@ -29,6 +29,25 @@ defmodule SocialPomodoro.UserRegistry do
   end
 
   @doc """
+  Finds user_id by username. Returns {:ok, user_id} or {:error, :not_found}.
+  """
+  def find_user_id_by_username(username) do
+    case :ets.match(@table_name, {:"$1", username}) do
+      [[user_id]] -> {:ok, user_id}
+      [] -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Lists all usernames in the registry.
+  """
+  def list_all_usernames do
+    :ets.tab2list(@table_name)
+    |> Enum.map(fn {_user_id, username} -> username end)
+    |> Enum.sort()
+  end
+
+  @doc """
   Removes a user from the registry.
   """
   def remove_user(user_id) do

@@ -267,9 +267,13 @@ defmodule SocialPomodoroWeb.SessionLive do
         />
         
     <!-- Participants with status and status_message (read-only) -->
-        <div class="flex flex-wrap justify-center gap-6 mb-8">
+        <div class="flex flex-col items-center gap-4 mb-8">
           <%= for participant <- @room_state.participants do %>
-            <.participant_display participant={participant} />
+            <.participant_display
+              participant={participant}
+              show_ready={@room_state.status == :break}
+              chat_messages={@room_state.chat_messages}
+            />
           <% end %>
         </div>
 
@@ -358,6 +362,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           <.other_participants_section
             other_participants={@other_participants}
             show_ready={false}
+            chat_messages={@room_state.chat_messages}
           />
           
     <!-- Timer Display -->
@@ -474,6 +479,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <.other_participants_section
           other_participants={@other_participants}
           show_ready={true}
+          chat_messages={@room_state.chat_messages}
         />
 
         <.timer_display
@@ -778,14 +784,19 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   attr :other_participants, :list, required: true
   attr :show_ready, :boolean, default: false
+  attr :chat_messages, :map, default: %{}
 
   defp other_participants_section(assigns) do
     ~H"""
     <%= if length(@other_participants) > 0 do %>
       <div class="divider">Other Participants</div>
-      <div class="flex flex-wrap justify-center gap-6 mb-4">
+      <div class="flex flex-col items-center gap-4 mb-4">
         <%= for participant <- @other_participants do %>
-          <.participant_display participant={participant} show_ready={@show_ready} />
+          <.participant_display
+            participant={participant}
+            show_ready={@show_ready}
+            chat_messages={@chat_messages}
+          />
         <% end %>
       </div>
     <% end %>
@@ -823,59 +834,118 @@ defmodule SocialPomodoroWeb.SessionLive do
   attr :participant, :map, required: true
   attr :current_user_id, :string, default: nil
   attr :show_ready, :boolean, default: false
+  attr :chat_messages, :map, default: %{}
 
   defp participant_display(assigns) do
+    # Get user's chat messages (max 3)
+    user_messages =
+      assigns.chat_messages
+      |> Map.get(assigns.participant.user_id, [])
+      |> Enum.take(3)
+
+    assigns = Map.put(assigns, :user_messages, user_messages)
+
     ~H"""
-    <div class="flex flex-col items-center gap-2 max-w-xs">
-      <div class="relative">
-        <div class={if @show_ready, do: "indicator", else: ""}>
-          <%= if @show_ready && @participant.ready_for_next do %>
-            <span class="indicator-item badge badge-success badge-sm">✓</span>
-          <% end %>
-          <.avatar
-            user_id={@participant.user_id}
-            username={@participant.username}
-            size="w-16"
-            class={
-              if @current_user_id && @participant.user_id == @current_user_id do
-                "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
-              else
-                ""
-              end
-            }
-          />
-        </div>
-        <%= if @participant.status_emoji do %>
-          <span class="absolute -bottom-2 -right-2 bg-base-100 rounded-full w-8 h-8 flex items-center justify-center border-2 border-base-100">
-            <img
-              src={emoji_to_openmoji(@participant.status_emoji)}
-              class="w-8 h-8"
-              alt={@participant.status_emoji}
-            />
-          </span>
-        <% end %>
-      </div>
-      <p class="font-semibold text-center text-sm">{@participant.username}</p>
-      <%= if @participant.todos && length(@participant.todos) > 0 do %>
-        <div class="text-xs text-center w-full max-w-xs space-y-1">
-          <%= for todo <- @participant.todos do %>
-            <div class="flex items-center gap-2 justify-center">
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                disabled
-                class="checkbox checkbox-xs"
+    <div
+      class="card bg-base-300 shadow-lg max-w-sm relative p-4"
+      phx-hook="ParticipantCard"
+      id={"participant-card-#{@participant.user_id}"}
+      data-participant-id={@participant.user_id}
+    >
+      <div class="flex gap-4">
+        <!-- Collapse Button (Top Right) -->
+        <button
+          class="absolute top-2 right-2 btn btn-ghost btn-sm btn-circle collapse-toggle z-10"
+          data-action="toggle"
+        >
+          <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
+        </button>
+        
+    <!-- Left Section: Avatar + Emoji + Username -->
+        <div class="flex flex-col items-center gap-2 flex-shrink-0 w-20">
+          <div class="relative">
+            <div class={if @show_ready, do: "indicator", else: ""}>
+              <%= if @show_ready && @participant.ready_for_next do %>
+                <span class="indicator-item badge badge-success badge-sm">✓</span>
+              <% end %>
+              <.avatar
+                user_id={@participant.user_id}
+                username={@participant.username}
+                size="w-14"
+                class={
+                  if @current_user_id && @participant.user_id == @current_user_id do
+                    "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
+                  else
+                    ""
+                  end
+                }
               />
-              <span class={if todo.completed, do: "line-through opacity-50", else: ""}>
-                {todo.text}
+            </div>
+            <%= if @participant.status_emoji do %>
+              <span class="absolute -bottom-1 -right-1 bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
+                <img
+                  src={emoji_to_openmoji(@participant.status_emoji)}
+                  class="w-7 h-7"
+                  alt={@participant.status_emoji}
+                />
               </span>
+            <% end %>
+          </div>
+          <p class="font-semibold text-center text-xs leading-tight">{@participant.username}</p>
+          <%= if @show_ready && @participant.ready_for_next do %>
+            <p class="text-xs text-success font-semibold">Ready!</p>
+          <% end %>
+        </div>
+        
+    <!-- Right Section: Tasks + Messages (Collapsible) -->
+        <div class="flex-grow overflow-hidden collapsible-content">
+          <!-- Tasks Section -->
+          <div class="mb-2">
+            <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
+            <%= if @participant.todos && length(@participant.todos) > 0 do %>
+              <div class="space-y-1">
+                <%= for todo <- @participant.todos do %>
+                  <div class="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={todo.completed}
+                      disabled
+                      class="checkbox checkbox-xs"
+                    />
+                    <span class={[
+                      "text-xs",
+                      if(todo.completed, do: "line-through opacity-50", else: "")
+                    ]}>
+                      {todo.text}
+                    </span>
+                  </div>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="text-xs opacity-50">No tasks yet</p>
+            <% end %>
+          </div>
+          
+    <!-- Recent Messages Section (Only during break) -->
+          <%= if @show_ready && length(@user_messages) > 0 do %>
+            <div class="divider my-1"></div>
+            <div>
+              <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
+                Recent Messages
+              </h4>
+              <div class="space-y-1">
+                <%= for message <- @user_messages do %>
+                  <div class="chat chat-start">
+                    <div class="chat-bubble chat-bubble-secondary text-xs py-1 px-2 min-h-0">
+                      {message.text}
+                    </div>
+                  </div>
+                <% end %>
+              </div>
             </div>
           <% end %>
         </div>
-      <% end %>
-      <%= if @show_ready && @participant.ready_for_next do %>
-        <p class="text-xs text-success font-semibold">Ready!</p>
-      <% end %>
+      </div>
     </div>
     """
   end
@@ -977,7 +1047,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   defp tabs_with_content(assigns) do
     ~H"""
-    <div role="tablist" class="tabs tabs-lift tabs-lg">
+    <div role="tablist" class="tabs tabs-lift tabs-lg justify-end">
       <input
         type="radio"
         name="session_tabs"

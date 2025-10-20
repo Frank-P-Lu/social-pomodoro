@@ -230,6 +230,73 @@ Hooks.ClearForm = {
   }
 }
 
+Hooks.ParticipantCard = {
+  mounted() {
+    this.participantId = this.el.dataset.participantId
+    this.storageKey = `participant-card-collapsed-${this.participantId}`
+
+    // Get elements
+    this.collapseButton = this.el.querySelector('.collapse-toggle')
+    this.collapsibleContent = this.el.querySelector('.collapsible-content')
+    this.chevronIcon = this.el.querySelector('.chevron-icon')
+
+    // Load saved state from sessionStorage (auto-clears when tab closes)
+    const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
+
+    // Apply initial state
+    if (isCollapsed) {
+      this.collapse()
+    }
+
+    // Add click handler for collapse button
+    this.collapseButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      const currentlyCollapsed = this.collapsibleContent.style.display === 'none'
+
+      if (currentlyCollapsed) {
+        this.expand()
+        sessionStorage.setItem(this.storageKey, 'false')
+      } else {
+        this.collapse()
+        sessionStorage.setItem(this.storageKey, 'true')
+      }
+    })
+  },
+
+  updated() {
+    // Re-apply collapse state after LiveView updates
+    const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
+
+    // Re-get elements in case DOM was replaced
+    this.collapsibleContent = this.el.querySelector('.collapsible-content')
+    this.chevronIcon = this.el.querySelector('.chevron-icon')
+
+    if (isCollapsed) {
+      this.collapse()
+    } else {
+      this.expand()
+    }
+  },
+
+  collapse() {
+    if (this.collapsibleContent) {
+      this.collapsibleContent.style.display = 'none'
+    }
+    if (this.chevronIcon) {
+      this.chevronIcon.style.transform = 'rotate(180deg)' // Point right when collapsed
+    }
+  },
+
+  expand() {
+    if (this.collapsibleContent) {
+      this.collapsibleContent.style.display = 'block'
+    }
+    if (this.chevronIcon) {
+      this.chevronIcon.style.transform = 'rotate(0deg)' // Point left when expanded
+    }
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
