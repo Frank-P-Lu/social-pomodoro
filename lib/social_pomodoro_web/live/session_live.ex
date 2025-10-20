@@ -273,7 +273,6 @@ defmodule SocialPomodoroWeb.SessionLive do
             <SessionParticipantComponents.participant_display
               participant={participant}
               show_ready={@room_state.status == :break}
-              chat_messages={@room_state.chat_messages}
             />
           <% end %>
         </div>
@@ -363,7 +362,6 @@ defmodule SocialPomodoroWeb.SessionLive do
           <SessionParticipantComponents.other_participants_section
             other_participants={@other_participants}
             show_ready={false}
-            chat_messages={@room_state.chat_messages}
           />
           
     <!-- Timer Display -->
@@ -480,7 +478,6 @@ defmodule SocialPomodoroWeb.SessionLive do
         <SessionParticipantComponents.other_participants_section
           other_participants={@other_participants}
           show_ready={true}
-          chat_messages={@room_state.chat_messages}
         />
 
         <SessionTimerComponents.timer_display

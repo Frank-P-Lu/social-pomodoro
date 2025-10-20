@@ -6,17 +6,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
   attr :participant, :map, required: true
   attr :show_ready, :boolean, default: false
-  attr :current_user_id, :string, default: nil
-  attr :chat_messages, :map, default: %{}
 
   def participant_display(assigns) do
-    user_messages =
-      assigns.chat_messages
-      |> Map.get(assigns.participant.user_id, [])
-      |> Enum.take(-3)
-
-    assigns = Map.put(assigns, :user_messages, user_messages)
-
     ~H"""
     <div
       class="card bg-base-300 shadow-lg max-w-sm relative p-4"
@@ -42,13 +33,6 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
                 user_id={@participant.user_id}
                 username={@participant.username}
                 size="w-14"
-                class={
-                  if @current_user_id && @participant.user_id == @current_user_id do
-                    "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
-                  else
-                    ""
-                  end
-                }
               />
             </div>
             <%= if @participant.status_emoji do %>
@@ -94,14 +78,14 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             <% end %>
           </div>
 
-          <%= if @show_ready && length(@user_messages) > 0 do %>
+          <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
             <div class="divider my-1"></div>
             <div>
               <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
                 Recent Messages
               </h4>
               <div class="space-y-1">
-                <%= for message <- @user_messages do %>
+                <%= for message <- @participant.chat_messages do %>
                   <div class="chat chat-start">
                     <div class="chat-bubble chat-bubble-secondary text-xs py-1 px-2 min-h-0">
                       {message.text}
@@ -228,46 +212,20 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
   attr :other_participants, :list, required: true
   attr :show_ready, :boolean, default: false
-  attr :chat_messages, :map, default: %{}
-  attr :current_user_id, :string, default: nil
 
   def other_participants_section(assigns) do
     ~H"""
     <%= if length(@other_participants) > 0 do %>
       <div class="divider">Other Participants</div>
       <div class="flex flex-col items-center gap-4 mb-4">
-        <%= for participant <- @other_participants do %>
+        <div :for={participant <- @other_participants} :key={participant.user_id}>
           <.participant_display
             participant={participant}
             show_ready={@show_ready}
-            chat_messages={@chat_messages}
-            current_user_id={@current_user_id}
           />
-        <% end %>
+        </div>
       </div>
     <% end %>
-    """
-  end
-
-  attr :user_id, :string, required: true
-  attr :username, :string, required: true
-  attr :current_user_id, :string, required: true
-  attr :size, :string, default: "w-16"
-
-  def participant_avatar(assigns) do
-    ~H"""
-    <.avatar
-      user_id={@user_id}
-      username={@username}
-      size={@size}
-      class={
-        if @user_id == @current_user_id do
-          "ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
-        else
-          ""
-        end
-      }
-    />
     """
   end
 
