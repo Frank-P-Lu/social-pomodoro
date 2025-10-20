@@ -98,17 +98,34 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
 
   def tabs_with_content(assigns) do
     ~H"""
-    <div role="tablist" class="tabs tabs-lift tabs-lg justify-end">
-      <input
-        type="radio"
-        name="session_tabs"
-        class="tab"
-        aria-label="Todo"
-        checked={@selected_tab == :todo}
+    <div role="tablist" class="tabs tabs-lift tabs-lg tabs-bottom">
+      <button
+        type="button"
+        id="session-tab-todo"
+        role="tab"
+        aria-controls="session-tab-panel-todo"
+        aria-selected={@selected_tab == :todo}
         phx-click="switch_tab"
         phx-value-tab="todo"
-      />
-      <div role="tabpanel" class="tab-content bg-base-100 border-base-300 p-6">
+        class={[
+          "tab flex items-center gap-2 px-4 py-2 transition-colors",
+          @selected_tab == :todo && "tab-active text-primary",
+          @selected_tab != :todo && "text-base-content/60 hover:text-base-content"
+        ]}
+      >
+        <Icons.todo class="w-5 h-5 fill-current" />
+        <span class="text-sm font-semibold">Todo</span>
+      </button>
+      <div
+        id="session-tab-panel-todo"
+        role="tabpanel"
+        aria-labelledby="session-tab-todo"
+        class={[
+          "tab-content bg-base-100 border-base-300 p-6",
+          @selected_tab == :todo && "block",
+          @selected_tab != :todo && "hidden"
+        ]}
+      >
         <.todo_list
           current_participant={@current_participant}
           max_todos={SocialPomodoro.Config.max_todos_per_user()}
@@ -116,17 +133,37 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         />
       </div>
 
-      <input
-        type="radio"
-        name="session_tabs"
-        class="tab"
-        aria-label="Chat"
-        checked={@selected_tab == :chat}
+      <button
+        type="button"
+        id="session-tab-chat"
+        role="tab"
+        aria-controls="session-tab-panel-chat"
+        aria-selected={@selected_tab == :chat}
+        aria-disabled={@room_state.status != :break}
         disabled={@room_state.status != :break}
         phx-click="switch_tab"
         phx-value-tab="chat"
-      />
-      <div role="tabpanel" class="tab-content bg-base-100 border-base-300 p-6">
+        class={[
+          "tab flex items-center gap-2 px-4 py-2 transition-colors",
+          @selected_tab == :chat && "tab-active text-primary",
+          (@selected_tab != :chat and @room_state.status == :break) &&
+            "text-base-content/60 hover:text-base-content",
+          @room_state.status != :break && "opacity-40 cursor-not-allowed"
+        ]}
+      >
+        <Icons.chat class="w-5 h-5 fill-current" />
+        <span class="text-sm font-semibold">Chat</span>
+      </button>
+      <div
+        id="session-tab-panel-chat"
+        role="tabpanel"
+        aria-labelledby="session-tab-chat"
+        class={[
+          "tab-content bg-base-100 border-base-300 p-6",
+          @selected_tab == :chat && "block",
+          @selected_tab != :chat && "hidden"
+        ]}
+      >
         <div class="flex flex-col gap-4 items-center w-full max-w-md mx-auto">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
           <%= if length(user_messages) > 0 do %>

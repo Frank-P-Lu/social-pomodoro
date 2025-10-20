@@ -13,7 +13,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
     user_messages =
       assigns.chat_messages
       |> Map.get(assigns.participant.user_id, [])
-      |> Enum.take(3)
+      |> Enum.take(-3)
 
     assigns = Map.put(assigns, :user_messages, user_messages)
 
@@ -26,7 +26,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
     >
       <div class="flex gap-4">
         <button
-          class="absolute top-2 right-2 btn btn-ghost btn-sm btn-circle collapse-toggle z-10"
+          class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-10"
           data-action="toggle"
         >
           <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
@@ -122,13 +122,12 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
   def current_user_avatar_with_status(assigns) do
     ~H"""
-    <div class="flex flex-col items-center gap-2 flex-shrink-0">
-      <p class="font-semibold text-center">{@participant.username}</p>
+    <div class="flex flex-col items-center flex-shrink-0">
       <div class="relative">
         <.avatar
           user_id={@participant.user_id}
           username={@participant.username}
-          size="w-20"
+          size="w-15"
           class="ring-primary ring-offset-base-100 rounded-full ring-2 ring-offset-2"
         />
         <%= if @participant.status_emoji do %>
@@ -141,6 +140,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
           </span>
         <% end %>
       </div>
+
+      <p class="font-semibold text-center my-1">{@participant.username}</p>
       <p class="text-sm opacity-70">You</p>
       <%= if @show_ready && @participant.ready_for_next do %>
         <p class="text-xs text-success font-semibold">Ready!</p>
