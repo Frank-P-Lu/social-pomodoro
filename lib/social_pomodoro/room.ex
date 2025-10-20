@@ -728,7 +728,8 @@ defmodule SocialPomodoro.Room do
       break_duration_minutes: div(state.break_duration_seconds, 60),
       created_at: state.created_at,
       total_cycles: state.total_cycles,
-      current_cycle: state.current_cycle
+      current_cycle: state.current_cycle,
+      chat_messages: state.chat_messages
     }
   end
 end

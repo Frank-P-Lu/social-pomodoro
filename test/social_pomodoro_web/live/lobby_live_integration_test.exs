@@ -537,6 +537,163 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       assert htmlB2 =~ "In Progress"
       assert htmlB2 =~ "Rejoin"
     end
+
+    test "original participant sees rejoin button when room is on break" do
+      connA = setup_user_conn("userA")
+
+      # User A creates room with short durations for testing
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name_from_button(htmlA)
+
+      # User A starts the session
+      lobbyA
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      sleep_short()
+
+      # Get the room PID to manually transition to break
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+
+      # Manually transition the room to break status
+      # This simulates the session completing and going to break
+      raw_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+      # Send ticks to complete the session and enter break
+      # Assuming default duration, we need to tick down to 0
+      for _ <- 1..raw_state.timer.remaining do
+        send(room_pid, :tick)
+      end
+
+      # One more tick to transition to break
+      send(room_pid, :tick)
+
+      # Wait for state to update
+      sleep_short()
+
+      # Verify room is now in break
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :break
+
+      # User A navigates back to lobby (simulating going back from session page)
+      {:ok, lobbyA2, htmlA2} = live(connA, "/")
+
+      # Room should still be visible
+      assert htmlA2 =~ room_name
+
+      # Should show "On Break" badge
+      assert htmlA2 =~ "On Break"
+
+      # Should show "Rejoin" button (user is already in the room but viewing lobby)
+      assert htmlA2 =~ "Rejoin"
+
+      assert htmlA2 =~
+               ~r/<button[^>]*phx-click="rejoin_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Rejoin\s*<\/button>/
+
+      # User A clicks Rejoin button and should be redirected to room
+      lobbyA2
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
+      |> render_click()
+
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobbyA2, "/room/#{room_name}")
+
+      # User A should be able to navigate to the room screen successfully
+      {:ok, _sessionA2, htmlSession} = live(connA, "/room/#{room_name}")
+
+      # Should see break view
+      assert htmlSession =~ "Break time"
+    end
+
+    test "original participant who left during break sees rejoin button on lobby" do
+      connA = setup_user_conn("userA")
+
+      # User A creates room
+      {:ok, lobbyA, _html} = live(connA, "/")
+
+      lobbyA
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      htmlA = render(lobbyA)
+      room_name = extract_room_name_from_button(htmlA)
+
+      # User A starts the session
+      lobbyA
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      sleep_short()
+
+      # Get the room PID to manually transition to break
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+
+      # Manually transition the room to break status
+      raw_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+      # Send ticks to complete the session and enter break
+      for _ <- 1..raw_state.timer.remaining do
+        send(room_pid, :tick)
+      end
+
+      # One more tick to transition to break
+      send(room_pid, :tick)
+
+      # Wait for state to update
+      sleep_short()
+
+      # Verify room is now in break
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Navigate to the room to join the break
+      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+
+      # User A leaves the room during break
+      sessionA
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      sleep_short()
+
+      # User A should be back in lobby
+      {:ok, lobbyA2, htmlA2} = live(connA, "/")
+
+      # Room should still be visible (user is an original participant)
+      assert htmlA2 =~ room_name
+
+      # Should show "On Break" badge
+      assert htmlA2 =~ "On Break"
+
+      # Should show "Rejoin" button (user is an original participant who left during break)
+      assert htmlA2 =~ "Rejoin"
+
+      assert htmlA2 =~
+               ~r/<button[^>]*phx-click="rejoin_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Rejoin\s*<\/button>/
+
+      # User A clicks Rejoin button and should be redirected to room
+      lobbyA2
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
+      |> render_click()
+
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobbyA2, "/room/#{room_name}")
+
+      # User A should be able to navigate to the room screen successfully
+      {:ok, _sessionA2, htmlSession} = live(connA, "/room/#{room_name}")
+
+      # Should see break view
+      assert htmlSession =~ "Break time"
+    end
   end
 
   describe "room sharing via link" do

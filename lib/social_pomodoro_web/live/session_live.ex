@@ -79,7 +79,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       text
     )
 
-    {:noreply, socket}
+    {:noreply, push_event(socket, "clear-form", %{id: "todo-form"})}
   end
 
   @impl true
@@ -129,7 +129,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       text
     )
 
-    {:noreply, socket}
+    {:noreply, push_event(socket, "clear-form", %{id: "chat-form"})}
   end
 
   @impl true
@@ -379,6 +379,7 @@ defmodule SocialPomodoroWeb.SessionLive do
               emoji_id_prefix=""
               completed_count={@completed_count}
               total_count={@total_count}
+              user_id={@user_id}
             />
           <% end %>
         </div>
@@ -493,6 +494,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             emoji_id_prefix="break-"
             completed_count={@completed_count}
             total_count={@total_count}
+            user_id={@user_id}
           />
         <% end %>
 
@@ -733,6 +735,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   attr :emoji_id_prefix, :string, default: ""
   attr :completed_count, :integer, required: true
   attr :total_count, :integer, required: true
+  attr :user_id, :string, required: true
 
   defp horizontal_session_layout(assigns) do
     ~H"""
@@ -766,6 +769,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           selected_tab={@selected_tab}
           current_participant={@current_participant}
           placeholder={@placeholder}
+          user_id={@user_id}
         />
       </div>
     </div>
@@ -895,46 +899,50 @@ defmodule SocialPomodoroWeb.SessionLive do
     <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
       <!-- Todo items -->
       <%= if @todos_count > 0 do %>
-        <div class="flex flex-col gap-2 w-full max-w-xs mb-4">
+        <ul class="list bg-base-100 rounded-box shadow-md w-full max-w-xs mb-4">
           <%= for todo <- @todos do %>
-            <div
-              class="flex items-center gap-2 bg-base-300 rounded-lg p-2 transition-all duration-200 ease-in-out"
-              id={"todo-#{todo.id}"}
-            >
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                phx-click="toggle_todo"
-                phx-value-todo_id={todo.id}
-                class="checkbox checkbox-sm transition-transform duration-200"
-              />
-
-              <span class={
-                [
-                  "flex-1 text-sm transition-all duration-200",
-                  if(todo.completed, do: "line-through opacity-50", else: "")
-                ]
-                |> Enum.join(" ")
-              }>
-                {todo.text}
-              </span>
-
+            <li class="list-row" id={"todo-#{todo.id}"}>
+              <div>
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  phx-click="toggle_todo"
+                  phx-value-todo_id={todo.id}
+                  class="checkbox checkbox-sm transition-transform duration-200"
+                />
+              </div>
+              <div class="list-col-grow">
+                <span class={
+                  [
+                    "text-sm transition-all duration-200",
+                    if(todo.completed, do: "line-through opacity-50", else: "")
+                  ]
+                  |> Enum.join(" ")
+                }>
+                  {todo.text}
+                </span>
+              </div>
               <button
                 phx-click="delete_todo"
                 phx-value-todo_id={todo.id}
                 phx-hook="MaintainWakeLock"
                 id={"delete-todo-#{todo.id}"}
-                class="btn btn-ghost btn-xs btn-square btn-ghost btn-error group"
+                class="btn btn-ghost btn-xs btn-square group"
               >
-                <Icons.trash class="w-4 h-4 fill-neutral group-hover:fill-neutral-content" />
+                <Icons.trash class="w-4 h-4 fill-neutral group-hover:fill-error" />
               </button>
-            </div>
+            </li>
           <% end %>
-        </div>
+        </ul>
       <% end %>
       
     <!-- Add todo form -->
-      <form phx-submit="add_todo" class="flex gap-2 w-full justify-center">
+      <form
+        id="todo-form"
+        phx-submit="add_todo"
+        phx-hook="ClearForm"
+        class="flex gap-2 w-full justify-center"
+      >
         <input
           type="text"
           name="text"
@@ -965,6 +973,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   attr :selected_tab, :atom, required: true
   attr :current_participant, :map, required: true
   attr :placeholder, :string, default: "What are you working on?"
+  attr :user_id, :string, required: true
 
   defp tabs_with_content(assigns) do
     ~H"""
@@ -997,8 +1006,28 @@ defmodule SocialPomodoroWeb.SessionLive do
         phx-value-tab="chat"
       />
       <div role="tabpanel" class="tab-content bg-base-100 border-base-300 p-6">
-        <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
-          <form phx-submit="send_chat_message" class="flex gap-2 w-full justify-center">
+        <div class="flex flex-col gap-4 items-center w-full max-w-md mx-auto">
+          <!-- Chat Messages Display (only current user's messages, max 3) -->
+          <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
+          <%= if length(user_messages) > 0 do %>
+            <div class="w-full max-w-xs space-y-2 mb-4">
+              <%= for message <- user_messages do %>
+                <div class="chat chat-start">
+                  <div class="chat-bubble chat-bubble-secondary">
+                    {message.text}
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+          
+    <!-- Chat Input Form -->
+          <form
+            id="chat-form"
+            phx-submit="send_chat_message"
+            phx-hook="ClearForm"
+            class="flex gap-2 w-full justify-center"
+          >
             <input
               type="text"
               name="text"

@@ -218,12 +218,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("rejoin_room", %{"room-name" => name}, socket) do
-    case join_room_and_update_state(socket, name, socket.assigns.user_id) do
-      {:ok, socket} ->
-        {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+    # If user is already in this room (my_room_name is set), just navigate
+    if socket.assigns.my_room_name == name do
+      {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+    else
+      # User needs to rejoin the room first
+      case join_room_and_update_state(socket, name, socket.assigns.user_id) do
+        {:ok, socket} ->
+          {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
 
-      {:error, socket} ->
-        {:noreply, put_flash(socket, :error, "Could not rejoin room")}
+        {:error, socket} ->
+          {:noreply, put_flash(socket, :error, "Could not rejoin room")}
+      end
     end
   end
 
@@ -619,18 +625,40 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   </button>
                 <% end %>
               <% @room.status == :break -> %>
-                <%= if @room.name == @my_room_name do %>
-                  <%!-- User is already in the room, no action needed --%>
-                <% else %>
-                  <button
-                    phx-click="join_room"
-                    phx-value-room-name={@room.name}
-                    phx-hook="RequestWakeLock"
-                    id={"join-room-btn-#{@room.name}"}
-                    class="btn btn-primary btn-outline btn-sm"
-                  >
-                    Join
-                  </button>
+                <%= cond do %>
+                  <% @room.name == @my_room_name -> %>
+                    <%!-- User is already in the room but viewing lobby - show rejoin to navigate back --%>
+                    <button
+                      phx-click="rejoin_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"rejoin-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Rejoin
+                    </button>
+                  <% can_rejoin?(@room, @user_id) -> %>
+                    <%!-- User is an original participant who left - show rejoin --%>
+                    <button
+                      phx-click="rejoin_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"rejoin-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Rejoin
+                    </button>
+                  <% true -> %>
+                    <%!-- New user joining during break --%>
+                    <button
+                      phx-click="join_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"join-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Join
+                    </button>
                 <% end %>
               <% true -> %>
                 <%= if can_rejoin?(@room, @user_id) do %>

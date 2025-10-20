@@ -1444,6 +1444,88 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
+  describe "rejoining during break" do
+    test "original participant can rejoin during break as participant (not spectator)" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 2, break_duration_seconds: 5)
+
+      # Participant joins during autostart
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start the session (locks in session_participants)
+      assert :ok = Room.start_session(room_name)
+
+      # Verify both are session participants
+      raw_state = Room.get_raw_state(room_pid)
+      assert creator_id in raw_state.session_participants
+      assert participant_id in raw_state.session_participants
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Participant leaves during break
+      assert :ok = Room.leave(room_name, participant_id)
+
+      # Verify participant left
+      state = Room.get_state(room_pid)
+      assert length(state.participants) == 1
+      refute Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+      # Original participant rejoins during break - should join as participant, not spectator
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify they rejoined as a participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert length(raw_state.participants) == 2
+      assert Enum.any?(raw_state.participants, &(&1.user_id == participant_id))
+      refute participant_id in raw_state.spectators
+
+      # Verify they are still a session participant
+      assert participant_id in raw_state.session_participants
+    end
+
+    test "non-original participant can join during break as regular participant" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 2, break_duration_seconds: 5)
+
+      # Start the session (only creator is a session participant)
+      assert :ok = Room.start_session(room_name)
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # A new user (not a session participant) joins during break
+      # During break, anyone can join as a regular participant (not spectator)
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a regular participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+      assert length(raw_state.spectators) == 0
+
+      # Verify they are NOT a session participant (they joined during break, not before session started)
+      refute new_user_id in raw_state.session_participants
+    end
+  end
+
   describe "chat messages during break" do
     test "user can send chat message during break" do
       creator_id = "user1_#{System.unique_integer([:positive])}"

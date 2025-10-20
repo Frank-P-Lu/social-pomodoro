@@ -220,6 +220,16 @@ Hooks.ReleaseWakeLock = {
   }
 }
 
+Hooks.ClearForm = {
+  mounted() {
+    this.handleEvent("clear-form", ({ id }) => {
+      if (this.el.id === id) {
+        this.el.reset()
+      }
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
