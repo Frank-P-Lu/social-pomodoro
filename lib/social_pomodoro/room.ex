@@ -300,12 +300,16 @@ defmodule SocialPomodoro.Room do
           timer = Timer.new(state.work_duration_seconds) |> Timer.start()
           timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
+          # Update session_participants to include anyone who joined during the break
+          session_participant_ids = Enum.map(new_participants, & &1.user_id)
+
           final_state = %{
             new_state
             | status: :active,
               timer: timer,
               timer_ref: timer_ref,
               current_cycle: state.current_cycle + 1,
+              session_participants: session_participant_ids,
               participants: Enum.map(new_participants, &%{&1 | ready_for_next: false}),
               status_emoji: %{},
               chat_messages: %{}
@@ -573,12 +577,16 @@ defmodule SocialPomodoro.Room do
       timer = Timer.new(state.work_duration_seconds) |> Timer.start()
       timer_ref = Process.send_after(self(), :tick, state.tick_interval)
 
+      # Update session_participants to include anyone who joined during the break
+      session_participant_ids = Enum.map(state.participants, & &1.user_id)
+
       new_state = %{
         state
         | status: :active,
           timer: timer,
           timer_ref: timer_ref,
           current_cycle: state.current_cycle + 1,
+          session_participants: session_participant_ids,
           participants: Enum.map(state.participants, &%{&1 | ready_for_next: false}),
           status_emoji: %{},
           chat_messages: %{}

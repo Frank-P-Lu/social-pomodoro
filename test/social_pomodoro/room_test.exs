@@ -1519,10 +1519,135 @@ defmodule SocialPomodoro.RoomTest do
       # Verify they joined as a regular participant (not a spectator)
       raw_state = Room.get_raw_state(room_pid)
       assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
-      assert length(raw_state.spectators) == 0
+      assert Enum.empty?(raw_state.spectators)
 
       # Verify they are NOT a session participant (they joined during break, not before session started)
       refute new_user_id in raw_state.session_participants
+    end
+
+    @tag :sync
+    test "user joining during break becomes participant (not spectator) when break ends" do
+      # This tests the bug fix: users who join during a break should be able to
+      # participate in the next cycle, not become spectators
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 2
+        )
+
+      # Start the session (only creator is a session participant)
+      assert :ok = Room.start_session(room_name)
+
+      # Verify creator is a session participant
+      raw_state = Room.get_raw_state(room_pid)
+      assert creator_id in raw_state.session_participants
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+      assert state.current_cycle == 1
+
+      # A new user joins during break
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a regular participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+      assert Enum.empty?(raw_state.spectators)
+
+      # Complete the break to start next cycle (2 -> 1 -> 0 -> active)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in the next cycle
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.current_cycle == 2
+
+        # BUG FIX: The new user should now be a session participant
+        # (not a spectator) because they joined during the break
+        raw_state = Room.get_raw_state(room_pid)
+        assert new_user_id in raw_state.session_participants
+        assert creator_id in raw_state.session_participants
+
+        # Both should be in participants list
+        assert length(state.participants) == 2
+        assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+        assert Enum.any?(state.participants, &(&1.user_id == new_user_id))
+
+        # No spectators
+        assert Enum.empty?(raw_state.spectators)
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+
+    @tag :sync
+    test "user joining during break becomes participant when break is skipped" do
+      # Similar to above test but using go_again instead of natural break end
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 10,
+          total_cycles: 2
+        )
+
+      # Start the session
+      assert :ok = Room.start_session(room_name)
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # A new user joins during break
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a participant
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+
+      # Both users skip break
+      assert :ok = Room.go_again(room_name, creator_id)
+      assert :ok = Room.go_again(room_name, new_user_id)
+
+      sleep_short()
+
+      # Verify we're in the next cycle
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.current_cycle == 2
+
+        # BUG FIX: The new user should be a session participant
+        raw_state = Room.get_raw_state(room_pid)
+        assert new_user_id in raw_state.session_participants
+        assert creator_id in raw_state.session_participants
+
+        # Both should be participants, not spectators
+        assert length(state.participants) == 2
+        assert Enum.empty?(raw_state.spectators)
+      else
+        flunk("Room terminated unexpectedly")
+      end
     end
   end
 
