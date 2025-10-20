@@ -1,8 +1,8 @@
 defmodule SocialPomodoroWeb.LobbyLive do
   use SocialPomodoroWeb, :live_view
   require Logger
-  alias SocialPomodoroWeb.Icons
   alias SocialPomodoro.Utils
+  alias SocialPomodoroWeb.Icons
 
   @impl true
   def mount(params, session, socket) do

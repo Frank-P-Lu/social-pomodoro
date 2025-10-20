@@ -1,7 +1,7 @@
 defmodule SocialPomodoroWeb.SessionLive do
   use SocialPomodoroWeb, :live_view
-  alias SocialPomodoroWeb.Icons
   alias SocialPomodoro.Utils
+  alias SocialPomodoroWeb.Icons
 
   @impl true
   def mount(params, session, socket) do
@@ -28,7 +28,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           {:ok, push_navigate(socket, to: ~p"/")}
         else
           # Check if user is a spectator
-          is_spectator = is_spectator?(room_state, user_id)
+          is_spectator = spectator?(room_state, user_id)
 
           # Set completion message if room is already in break
           completion_msg =
@@ -153,7 +153,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   # TODO: major refactor needed. Most of these are not necessary. Only tick is necessary?
   def handle_info({:room_state, room_state}, socket) do
     # Update spectator status
-    is_spectator = is_spectator?(room_state, socket.assigns.user_id)
+    is_spectator = spectator?(room_state, socket.assigns.user_id)
 
     # Update completion message only when transitioning INTO break
     # (not on every update during break, to avoid regenerating random messages)
@@ -661,7 +661,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     end
   end
 
-  defp is_spectator?(room_state, user_id) do
+  defp spectator?(room_state, user_id) do
     case room_state.status do
       :break ->
         # During break, all participants are non-spectators
