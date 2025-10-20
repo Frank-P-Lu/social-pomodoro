@@ -267,8 +267,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # Should now see break view as participant
       assert html_b =~ "Great Work!"
       assert html_b =~ "Break time remaining"
-      # Should show task count even when joining mid-session
-      assert html_b =~ "0/0 tasks"
+      # Task count display was removed, but verify the user card is present
+      assert html_b =~ "What are you working on?"
     end
   end
 
@@ -1165,8 +1165,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Chat tab should be disabled (using radio input now)
-      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*disabled/
+      # Shout tab should be disabled (using radio input now)
+      assert html =~ ~r/input[^>]*aria-label="Shout"[^>]*disabled/
     end
 
     test "chat tab is enabled during break" do
@@ -1202,8 +1202,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Chat tab should NOT be disabled (using radio input now)
-      refute html =~ ~r/input[^>]*aria-label="Chat"[^>]*disabled/
+      # Shout tab should NOT be disabled (using radio input now)
+      refute html =~ ~r/input[^>]*aria-label="Shout"[^>]*disabled/
     end
 
     test "switching tabs shows correct content" do
@@ -1244,8 +1244,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
 
-      # Chat tab should be checked
-      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*checked/
+      # Shout tab should be checked
+      assert html =~ ~r/input[^>]*aria-label="Shout"[^>]*checked/
       # Both inputs exist in DOM (daisyUI tabs behavior), but chat should be active
       assert html =~ "Say something..."
       assert html =~ "What are you working on?"
@@ -1306,8 +1306,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       html = render(session)
       assert html =~ "Say something..."
-      # Chat tab should be checked
-      assert html =~ ~r/input[^>]*aria-label="Chat"[^>]*checked/
+      # Shout tab should be checked
+      assert html =~ ~r/input[^>]*aria-label="Shout"[^>]*checked/
     end
   end
 end
