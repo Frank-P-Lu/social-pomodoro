@@ -36,22 +36,22 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
   describe "spectator mode" do
     test "spectator sees read-only view with ghost message" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      user_id_b = get_session(connB, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -59,7 +59,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -69,35 +69,35 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       SocialPomodoro.Room.join(room_name, user_id_b)
 
       # User B views the session
-      {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
+      {:ok, _session_b, html_b} = live(conn_b, "/room/#{room_name}")
 
       # Should see spectator message
-      assert htmlB =~ "You&#39;re a spectator"
-      assert htmlB =~ "Watch the session in progress"
-      assert htmlB =~ "Interactions are disabled while spectating"
+      assert html_b =~ "You&#39;re a spectator"
+      assert html_b =~ "Watch the session in progress"
+      assert html_b =~ "Interactions are disabled while spectating"
 
       # Should not see interactive elements (no emoji buttons, no working_on form)
-      refute htmlB =~ "phx-click=\"set_status\""
-      refute htmlB =~ "What are you working on?"
+      refute html_b =~ "phx-click=\"set_status\""
+      refute html_b =~ "What are you working on?"
     end
 
     test "spectator automatically becomes participant during break" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      user_id_b = get_session(connB, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -105,7 +105,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid, 1, 5)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -129,22 +129,22 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "spectator badge shows correct count" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      user_id_b = get_session(connB, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -152,14 +152,14 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
       sleep_short()
 
       # Now navigate to session page
-      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+      {:ok, session_a, _html} = live(conn_a, "/room/#{room_name}")
 
       # Initially no spectators
       room_state = SocialPomodoro.Room.get_state(room_pid)
@@ -174,27 +174,27 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       assert room_state.spectators_count == 1
 
       # Render and check badge appears
-      htmlA = render(sessionA)
-      assert htmlA =~ "1"
+      html_a = render(session_a)
+      assert html_a =~ "1"
     end
 
     test "spectator can leave room" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      user_id_b = get_session(connB, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -202,7 +202,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -224,20 +224,20 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "joining mid-session via direct link renders without errors" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -245,30 +245,30 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid, 1, 5)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
       sleep_short()
 
       # User B joins via direct link (not via lobby) - simulates sharing link
-      {:ok, sessionB, htmlB} = live(connB, "/room/#{room_name}")
+      {:ok, session_b, html_b} = live(conn_b, "/room/#{room_name}")
 
       # Should successfully render spectator view without errors
-      assert htmlB =~ "You&#39;re a spectator"
-      assert htmlB =~ "Watch the session in progress"
+      assert html_b =~ "You&#39;re a spectator"
+      assert html_b =~ "Watch the session in progress"
 
       # Advance to break and verify it still works
       tick_room(room_pid, 2)
       sleep_short()
 
-      htmlB = render(sessionB)
+      html_b = render(session_b)
 
       # Should now see break view as participant
-      assert htmlB =~ "Great Work!"
-      assert htmlB =~ "Break time remaining"
+      assert html_b =~ "Great Work!"
+      assert html_b =~ "Break time remaining"
       # Should show task count even when joining mid-session
-      assert htmlB =~ "0/0 tasks"
+      assert html_b =~ "0/0 tasks"
     end
   end
 
@@ -386,17 +386,17 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       user_id = get_session(conn, "user_id")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(conn, "/")
+      {:ok, lobby_a, _html} = live(conn, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       # Extract room_name
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -434,24 +434,24 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "spectator is removed when navigating away" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      user_id_a = get_session(connA, "user_id")
-      user_id_b = get_session(connB, "user_id")
+      user_id_a = get_session(conn_a, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       # Extract room_name
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -464,7 +464,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # Start session so B can join as spectator
       set_short_durations(room_pid)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -473,8 +473,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       # User B joins as spectator
       SocialPomodoro.Room.join(room_name, user_id_b)
 
-      {:ok, session_view_b, htmlB} = live(connB, "/room/#{room_name}")
-      assert htmlB =~ "You&#39;re a spectator"
+      {:ok, session_view_b, html_b} = live(conn_b, "/room/#{room_name}")
+      assert html_b =~ "You&#39;re a spectator"
 
       # User B is a spectator
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -492,23 +492,23 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "spectator joins as participant when timer finishes" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      _user_id_a = get_session(connA, "user_id")
-      user_id_b = get_session(connB, "user_id")
+      _user_id_a = get_session(conn_a, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -516,7 +516,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid, 1, 5, total_cycles: 1)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -524,21 +524,21 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # User B joins as spectator during active session
       SocialPomodoro.Room.join(room_name, user_id_b)
-      {:ok, sessionB, htmlB} = live(connB, "/room/#{room_name}")
+      {:ok, session_b, html_b} = live(conn_b, "/room/#{room_name}")
 
       # User B should be a spectator during active session
-      assert htmlB =~ "You&#39;re a spectator"
+      assert html_b =~ "You&#39;re a spectator"
 
       # Wait for timer to finish and transition to break
       tick_room(room_pid, 2)
       sleep_short()
 
       # User B should now see participant view (not spectator view)
-      htmlB = render(sessionB)
-      refute htmlB =~ "You&#39;re a spectator"
-      assert htmlB =~ "Amazing Work!"
+      html_b = render(session_b)
+      refute html_b =~ "You&#39;re a spectator"
+      assert html_b =~ "Amazing Work!"
       # Single cycle = final break, so no Skip Break button
-      refute htmlB =~ "Skip Break"
+      refute html_b =~ "Skip Break"
 
       # Verify in room state that B is now a participant
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
@@ -548,23 +548,23 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "completion message does not count spectators who joined during break" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      _user_id_a = get_session(connA, "user_id")
-      user_id_b = get_session(connB, "user_id")
+      _user_id_a = get_session(conn_a, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -572,7 +572,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid, 1, 5)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -580,7 +580,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # User B joins as spectator during active session
       SocialPomodoro.Room.join(room_name, user_id_b)
-      {:ok, sessionA, _htmlA} = live(connA, "/room/#{room_name}")
+      {:ok, session_a, _html_a} = live(conn_a, "/room/#{room_name}")
 
       # Wait for timer to finish and transition to break
       tick_room(room_pid, 2)
@@ -588,26 +588,26 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
 
       # Check completion message for User A
       # Should say "solo" not "with someone else" since B was a spectator
-      htmlA = render(sessionA)
-      assert htmlA =~ ~r/(You focused solo|Flying solo|Solo focus|You stayed focused)/
-      refute htmlA =~ "You focused with"
+      html_a = render(session_a)
+      assert html_a =~ ~r/(You focused solo|Flying solo|Solo focus|You stayed focused)/
+      refute html_a =~ "You focused with"
     end
 
     test "user joining during break sees break page (not spectator view)" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room and starts session
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -615,7 +615,7 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
       set_short_durations(room_pid, 1, 5, total_cycles: 1)
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
@@ -626,37 +626,37 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       sleep_short()
 
       # Verify A sees the break page
-      {:ok, sessionA, htmlA} = live(connA, "/room/#{room_name}")
-      assert htmlA =~ "Amazing Work!"
-      assert htmlA =~ "Break time remaining"
+      {:ok, session_a, html_a} = live(conn_a, "/room/#{room_name}")
+      assert html_a =~ "Amazing Work!"
+      assert html_a =~ "Break time remaining"
 
       # User B navigates to lobby and joins the room via UI
-      {:ok, lobbyB, htmlB} = live(connB, "/")
+      {:ok, lobby_b, html_b} = live(conn_b, "/")
 
       # User B should see the room in the lobby (in break status)
-      assert htmlB =~ room_name |> String.replace("-", " ")
-      assert htmlB =~ "On Break"
+      assert html_b =~ room_name |> String.replace("-", " ")
+      assert html_b =~ "On Break"
 
       # User B clicks join button - should trigger navigation to room page
-      lobbyB
+      lobby_b
       |> element("button[phx-click='join_room'][phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Should have a redirect
-      assert_redirect(lobbyB, "/room/#{room_name}")
+      assert_redirect(lobby_b, "/room/#{room_name}")
 
       # Navigate directly to the room page
-      {:ok, _sessionB, htmlB} = live(connB, "/room/#{room_name}")
+      {:ok, _session_b, html_b} = live(conn_b, "/room/#{room_name}")
 
       # User B should see the break page (not spectator view)
-      refute htmlB =~ "You&#39;re a spectator"
-      assert htmlB =~ "Amazing Work!"
-      assert htmlB =~ "Break time remaining"
+      refute html_b =~ "You&#39;re a spectator"
+      assert html_b =~ "Amazing Work!"
+      assert html_b =~ "Break time remaining"
 
       # Both users should see each other's avatars in the break view
-      htmlA = render(sessionA)
+      html_a = render(session_a)
       # Should now show 2 participants
-      assert String.contains?(htmlA, "avatar")
+      assert String.contains?(html_a, "avatar")
     end
   end
 
@@ -918,23 +918,23 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
 
     test "other participants see todos in read-only mode" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
-      _user_id_a = get_session(connA, "user_id")
-      user_id_b = get_session(connB, "user_id")
+      _user_id_a = get_session(conn_a, "user_id")
+      user_id_b = get_session(conn_b, "user_id")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
 
       room_name =
-        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, htmlA) do
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html_a) do
           [_, room_name] -> room_name
           _ -> nil
         end
@@ -946,30 +946,30 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       SocialPomodoro.Room.join(room_name, user_id_b)
 
       # Start session
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
       sleep_short()
 
-      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
-      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
+      {:ok, session_a, _html} = live(conn_a, "/room/#{room_name}")
+      {:ok, session_b, _html} = live(conn_b, "/room/#{room_name}")
 
       # User A adds a todo
-      sessionA
+      session_a
       |> element("form[phx-submit='add_todo']")
       |> render_submit(%{"text" => "User A task"})
 
       sleep_short()
 
       # User B should see User A's todo in participant display (read-only)
-      htmlB = render(sessionB)
+      html_b = render(session_b)
 
       # Should show the todo text
-      assert htmlB =~ "User A task"
+      assert html_b =~ "User A task"
 
       # Should have disabled checkbox (read-only for other participants)
-      assert htmlB =~ "disabled"
+      assert html_b =~ "disabled"
     end
   end
 
