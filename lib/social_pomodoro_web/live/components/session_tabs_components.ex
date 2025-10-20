@@ -98,27 +98,64 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
 
   def tabs_with_content(assigns) do
     ~H"""
-    <div role="tablist" class="tabs tabs-lift tabs-lg tabs-bottom">
-      <label class="tab">
-        <input
-          type="radio"
-          name="session-tabs"
-          role="tab"
-          id="session-tab-todo"
-          aria-label="Todo"
-          aria-controls="session-tab-panel-todo"
-          phx-click="switch_tab"
-          phx-value-tab="todo"
-          checked={@selected_tab == :todo}
-        />
-        <Icons.todo class="w-5 h-5 fill-current" />
-        <span class="text-sm font-semibold">Todo</span>
-      </label>
+    <div class="w-full">
+      <div role="tablist" class="flex justify-end ">
+        <label class={[
+          "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+          @selected_tab == :todo && "bg-base-100 border-b-base-100 z-10",
+          @selected_tab != :todo && "bg-base-200 border-b-transparent hover:bg-base-300"
+        ]}>
+          <input
+            type="radio"
+            name="session-tabs"
+            role="tab"
+            id="session-tab-todo"
+            aria-label="Todo"
+            aria-controls="session-tab-panel-todo"
+            phx-click="switch_tab"
+            phx-value-tab="todo"
+            checked={@selected_tab == :todo}
+            class="hidden"
+          />
+          <Icons.todo class="w-4 h-4 fill-current" />
+          <span class="font-semibold">Todo</span>
+        </label>
+
+        <label class={[
+          "px-4 py-2 gap-2 flex items-center transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+          @selected_tab == :chat && "bg-base-100 border-b-base-100 z-10 cursor-pointer",
+          @selected_tab != :chat && "bg-base-200 border-b-transparent",
+          @room_state.status == :break && @selected_tab != :chat &&
+            "hover:bg-base-300 cursor-pointer",
+          @room_state.status != :break && "opacity-40 cursor-not-allowed"
+        ]}>
+          <input
+            type="radio"
+            name="session-tabs"
+            role="tab"
+            id="session-tab-chat"
+            aria-label="Chat"
+            aria-controls="session-tab-panel-chat"
+            phx-click="switch_tab"
+            phx-value-tab="chat"
+            checked={@selected_tab == :chat}
+            disabled={@room_state.status != :break}
+            class="hidden"
+          />
+          <Icons.chat class="w-4 h-4 fill-current" />
+          <span class="font-semibold">Chat</span>
+        </label>
+      </div>
+
       <div
         id="session-tab-panel-todo"
         role="tabpanel"
         aria-labelledby="session-tab-todo"
-        class="tab-content bg-base-100 border-base-300 p-6"
+        class={[
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg rounded-tr-lg",
+          @selected_tab == :todo && "block",
+          @selected_tab != :todo && "hidden"
+        ]}
       >
         <.todo_list
           current_participant={@current_participant}
@@ -127,30 +164,15 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         />
       </div>
 
-      <label class={[
-        "tab",
-        @room_state.status != :break && "opacity-40 cursor-not-allowed"
-      ]}>
-        <input
-          type="radio"
-          name="session-tabs"
-          role="tab"
-          id="session-tab-chat"
-          aria-label="Chat"
-          aria-controls="session-tab-panel-chat"
-          phx-click="switch_tab"
-          phx-value-tab="chat"
-          checked={@selected_tab == :chat}
-          disabled={@room_state.status != :break}
-        />
-        <Icons.chat class="w-5 h-5 fill-current" />
-        <span class="text-sm font-semibold">Chat</span>
-      </label>
       <div
         id="session-tab-panel-chat"
         role="tabpanel"
         aria-labelledby="session-tab-chat"
-        class="tab-content bg-base-100 border-base-300 p-6"
+        class={[
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg",
+          @selected_tab == :chat && "block",
+          @selected_tab != :chat && "hidden"
+        ]}
       >
         <div class="flex flex-col gap-4 items-center w-full max-w-md mx-auto">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
