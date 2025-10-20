@@ -217,7 +217,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100 flex items-center justify-center p-4 md:px-8">
+    <div class="min-h-screen bg-base-100 flex items-center justify-center py-4 px-2 md:px-8">
       <div class="max-w-4xl w-full">
         <%= case view_mode(assigns) do %>
           <% :spectator -> %>
@@ -370,23 +370,23 @@ defmodule SocialPomodoroWeb.SessionLive do
             seconds_remaining={@room_state.seconds_remaining}
             label="Focus time remaining"
           />
-          
-    <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
-          <%= if @current_participant do %>
-            <SessionParticipantComponents.horizontal_session_layout
-              current_participant={@current_participant}
-              status_emojis={@active_emojis}
-              room_state={@room_state}
-              selected_tab={@selected_tab}
-              placeholder="What are you working on?"
-              show_ready={false}
-              emoji_id_prefix=""
-              completed_count={@completed_count}
-              total_count={@total_count}
-              user_id={@user_id}
-            />
-          <% end %>
         </div>
+        
+    <!-- Current User Card: Avatar, Status Emojis, Tabs -->
+        <%= if @current_participant do %>
+          <SessionParticipantComponents.current_user_card
+            current_participant={@current_participant}
+            status_emojis={@active_emojis}
+            room_state={@room_state}
+            selected_tab={@selected_tab}
+            placeholder="What are you working on?"
+            show_ready={false}
+            emoji_id_prefix=""
+            completed_count={@completed_count}
+            total_count={@total_count}
+            user_id={@user_id}
+          />
+        <% end %>
       </div>
       
     <!-- Leave Button -->
@@ -485,23 +485,25 @@ defmodule SocialPomodoroWeb.SessionLive do
           seconds_remaining={@room_state.seconds_remaining}
           label="Break time remaining"
         />
-        
-    <!-- Horizontal Layout: Avatar, Status Emojis, Tabs -->
-        <%= if @current_participant do %>
-          <SessionParticipantComponents.horizontal_session_layout
-            current_participant={@current_participant}
-            status_emojis={@break_emojis}
-            room_state={@room_state}
-            selected_tab={@selected_tab}
-            placeholder="What are you working on?"
-            show_ready={true}
-            emoji_id_prefix="break-"
-            completed_count={@completed_count}
-            total_count={@total_count}
-            user_id={@user_id}
-          />
-        <% end %>
+      </div>
+      
+    <!-- Current User Card: Avatar, Status Emojis, Tabs -->
+      <%= if @current_participant do %>
+        <SessionParticipantComponents.current_user_card
+          current_participant={@current_participant}
+          status_emojis={@break_emojis}
+          room_state={@room_state}
+          selected_tab={@selected_tab}
+          placeholder="What are you working on?"
+          show_ready={true}
+          emoji_id_prefix="break-"
+          completed_count={@completed_count}
+          total_count={@total_count}
+          user_id={@user_id}
+        />
+      <% end %>
 
+      <div class="card-body">
         <div class="card-actions justify-center gap-4">
           <%= if not @is_final_break do %>
             <button

@@ -56,6 +56,11 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
             </li>
           <% end %>
         </ul>
+      <% else %>
+        <div class="flex flex-col items-center justify-center mb-4 opacity-50">
+          <Icons.lightbulb class="w-12 h-12 fill-current mb-2" />
+          <p class="text-sm text-center">Ready to focus?</p>
+        </div>
       <% end %>
 
       <form
@@ -95,11 +100,15 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
   attr :current_participant, :map, required: true
   attr :placeholder, :string, default: "What are you working on?"
   attr :user_id, :string, required: true
+  slot :avatar_card, required: true
 
   def tabs_with_content(assigns) do
     ~H"""
     <div class="w-full">
-      <div role="tablist" class="flex justify-end ">
+      <div role="tablist" class="flex justify-end relative">
+        <div class="absolute -left-2 -top-8 z-20 -rotate-3">
+          {render_slot(@avatar_card)}
+        </div>
         <label class={[
           "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
           @selected_tab == :todo && "bg-base-100 border-b-base-100 z-10",
@@ -134,7 +143,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
             name="session-tabs"
             role="tab"
             id="session-tab-chat"
-            aria-label="Chat"
+            aria-label="Shout"
             aria-controls="session-tab-panel-chat"
             phx-click="switch_tab"
             phx-value-tab="chat"
@@ -143,7 +152,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
             class="hidden"
           />
           <Icons.chat class="w-4 h-4 fill-current" />
-          <span class="font-semibold">Chat</span>
+          <span class="font-semibold">Shout</span>
         </label>
       </div>
 
@@ -152,7 +161,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         role="tabpanel"
         aria-labelledby="session-tab-todo"
         class={[
-          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg rounded-tr-lg",
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg rounded-tr-lg min-h-48",
           @selected_tab == :todo && "block",
           @selected_tab != :todo && "hidden"
         ]}
@@ -169,7 +178,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         role="tabpanel"
         aria-labelledby="session-tab-chat"
         class={[
-          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg",
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg min-h-48",
           @selected_tab == :chat && "block",
           @selected_tab != :chat && "hidden"
         ]}
@@ -177,14 +186,27 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         <div class="flex flex-col gap-4 items-center w-full max-w-md mx-auto">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
           <%= if length(user_messages) > 0 do %>
-            <div class="w-full max-w-xs space-y-2 mb-4">
-              <%= for message <- user_messages do %>
-                <div class="chat chat-end">
-                  <div class="chat-bubble chat-bubble-secondary">
-                    {message.text}
-                  </div>
+            <div class="w-full mb-4 flex justify-center">
+              <div class="chat chat-start max-w-xs">
+                <div class="chat-bubble chat-bubble-secondary p-0">
+                  <ul class="list">
+                    <%= for message <- Enum.with_index(user_messages) do %>
+                      <% {msg, index} = message %>
+                      <li class={[
+                        "list-row py-2 px-3",
+                        index < length(user_messages) - 1 && "border-b border-base-content/10"
+                      ]}>
+                        <p class="text-sm">{msg.text}</p>
+                      </li>
+                    <% end %>
+                  </ul>
                 </div>
-              <% end %>
+              </div>
+            </div>
+          <% else %>
+            <div class="flex flex-col items-center justify-center mb-4 opacity-50">
+              <Icons.bullhorn class="w-12 h-12 fill-current mb-2" />
+              <p class="text-sm text-center">No shouts yet</p>
             </div>
           <% end %>
 
