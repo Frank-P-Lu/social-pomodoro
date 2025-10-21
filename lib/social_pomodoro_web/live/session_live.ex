@@ -155,6 +155,24 @@ defmodule SocialPomodoroWeb.SessionLive do
     current_participant =
       Enum.find(room_state.participants, &(&1.user_id == socket.assigns.user_id))
 
+    # Fallback: If current_participant is nil but we're not a spectator,
+    # create a minimal participant object to prevent UI from breaking.
+    # This handles potential race conditions (especially on Safari).
+    current_participant =
+      if current_participant == nil and not is_spectator do
+        # Create a minimal participant with empty state
+        %{
+          user_id: socket.assigns.user_id,
+          username: socket.assigns.username,
+          ready_for_next: false,
+          todos: [],
+          status_emoji: nil,
+          status_message: nil
+        }
+      else
+        current_participant
+      end
+
     # Reset tab to todo when transitioning from break to active
     selected_tab =
       if socket.assigns.room_state.status == :break and room_state.status == :active do

@@ -198,12 +198,12 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         role="tabpanel"
         aria-labelledby="session-tab-chat"
         class={[
-          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg min-h-48",
-          @selected_tab == :chat && "block",
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg min-h-48 flex flex-col",
+          @selected_tab == :chat && "flex",
           @selected_tab != :chat && "hidden"
         ]}
       >
-        <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
+        <div class="flex flex-col items-center w-full max-w-md mx-auto flex-grow">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
           <%= if length(user_messages) > 0 do %>
             <div class="w-full mb-4 flex flex-col items-center gap-2">
@@ -229,31 +229,31 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
               <p class="text-sm text-center">No shouts yet</p>
             </div>
           <% end %>
-
-          <form
-            id="chat-form"
-            phx-submit="send_chat_message"
-            phx-hook="ClearForm"
-            class="flex gap-2 w-full justify-center"
-          >
-            <input
-              type="text"
-              name="text"
-              placeholder="Say something..."
-              class="input input-bordered w-full max-w-xs text-base"
-              maxlength="50"
-              required
-            />
-            <button
-              type="submit"
-              phx-hook="MaintainWakeLock"
-              id="send-chat-button"
-              class="btn btn-square btn-primary"
-            >
-              <Icons.submit class="w-6 h-6 fill-current" />
-            </button>
-          </form>
         </div>
+
+        <form
+          id="chat-form"
+          phx-submit="send_chat_message"
+          phx-hook="ClearForm"
+          class="flex gap-2 w-full justify-center max-w-md mx-auto mt-auto"
+        >
+          <input
+            type="text"
+            name="text"
+            placeholder="Say something..."
+            class="input input-bordered w-full max-w-xs text-base"
+            maxlength="50"
+            required
+          />
+          <button
+            type="submit"
+            phx-hook="MaintainWakeLock"
+            id="send-chat-button"
+            class="btn btn-square btn-primary"
+          >
+            <Icons.submit class="w-6 h-6 fill-current" />
+          </button>
+        </form>
       </div>
     </div>
     """
