@@ -294,7 +294,7 @@ Hooks.ParticipantCard = {
 
   expand() {
     if (this.collapsibleContent) {
-      this.collapsibleContent.style.display = 'block'
+      this.collapsibleContent.style.display = 'flex'
     }
     if (this.chevronIcon) {
       this.chevronIcon.style.transform = 'rotate(0deg)' // Point left when expanded

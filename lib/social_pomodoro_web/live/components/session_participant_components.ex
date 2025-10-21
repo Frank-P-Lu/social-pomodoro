@@ -5,12 +5,12 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   alias SocialPomodoroWeb.SessionTabsComponents
 
   attr :participant, :map, required: true
-  attr :show_ready, :boolean, default: false
+  attr :is_break, :boolean, default: false
 
   def participant_display(assigns) do
     ~H"""
     <div
-      class="card bg-base-300 shadow-lg relative p-4 flex flex-row"
+      class="card bg-primary/10 shadow-lg relative flex flex-row w-full"
       phx-hook="ParticipantCard"
       id={"participant-card-#{@participant.user_id}"}
       data-participant-id={@participant.user_id}
@@ -22,10 +22,10 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
       </button>
 
-      <div class="flex flex-col items-center gap-2 w-20 self-center">
+      <div class="card p-2 md:p-4 flex flex-col items-center gap-2 self-center min-w-32">
         <div class="relative flex items-center justify-center flex-shrink-0">
-          <div class={if @show_ready, do: "indicator", else: ""}>
-            <%= if @show_ready && @participant.ready_for_next do %>
+          <div class={if @is_break, do: "indicator", else: ""}>
+            <%= if @is_break && @participant.ready_for_next do %>
               <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
                 ✓
               </span>
@@ -49,7 +49,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <p class="font-semibold text-center text-xs leading-tight flex-shrink-0">
           {@participant.username}
         </p>
-        <%= if @show_ready && @participant.ready_for_next do %>
+        <%= if @is_break && @participant.ready_for_next do %>
           <p class="text-xs text-success font-semibold">Skip</p>
         <% end %>
 
@@ -60,12 +60,12 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
           <% total_count = if @participant.todos, do: length(@participant.todos), else: 0 %>
           <div class="flex items-center gap-1">
-            <Icons.todo class="w-3 h-3 opacity-70" />
-            <span class="text-[10px] opacity-70">{completed_count}/{total_count}</span>
+            <Icons.todo class="w-3 h-3 text-base-content/70" />
+            <span class="text-[10px] text-base-content/70">{completed_count}/{total_count}</span>
           </div>
 
           <%!-- Chat indicator (only during breaks when they have messages) --%>
-          <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+          <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
             <div class="flex items-center gap-1">
               <Icons.chat class="w-3 h-3 text-secondary" />
               <span class="text-[10px] text-secondary">{length(@participant.chat_messages)}</span>
@@ -74,37 +74,35 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         </div>
       </div>
 
-      <div class="flex gap-4 collapsible-content">
-        <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
-          <div class="flex-shrink-0 min-w-0">
+      <div class="bg-base-100 rounded-lg flex flex-row gap-2 p-2 collapsible-content flex-1 min-w-64">
+        <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+          <div class="flex-shrink-0 min-w-0 w-40">
             <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
               Shouts
             </h4>
-            <div class="space-y-1">
-              <%= for message <- @participant.chat_messages do %>
-                <div class="chat chat-start">
-                  <div class="chat-bubble chat-bubble-secondary text-xs py-1 px-2 min-h-0">
-                    {message.text}
-                  </div>
-                </div>
-              <% end %>
+            <div class="chat chat-start">
+              <div class="chat-bubble chat-bubble-secondary text-xs py-2 px-3 min-h-0 space-y-1.5 break-words max-h-32 overflow-y-auto">
+                <%= for message <- @participant.chat_messages do %>
+                  <div>{message.text}</div>
+                <% end %>
+              </div>
             </div>
           </div>
 
           <div class="divider divider-horizontal mx-0"></div>
         <% end %>
 
-        <div class=" min-w-0">
+        <div class="min-w-0 flex-1">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
           <%= if @participant.todos && length(@participant.todos) > 0 do %>
-            <div class="space-y-1">
+            <div class="space-y-1 max-h-32 overflow-y-auto pr-1">
               <%= for todo <- @participant.todos do %>
                 <div class="flex items-center gap-1">
                   <input
                     type="checkbox"
                     checked={todo.completed}
                     disabled
-                    class="checkbox checkbox-xs"
+                    class="checkbox checkbox-xs checkbox-primary"
                   />
                   <span class={[
                     "text-xs",
@@ -125,7 +123,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   end
 
   attr :participant, :map, required: true
-  attr :show_ready, :boolean, default: false
+  attr :is_break, :boolean, default: false
 
   def current_user_avatar_with_status(assigns) do
     ~H"""
@@ -151,7 +149,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
       <p class="font-bold text-center mt-1 xs:mt-2 text-sm xs:text-base md:text-lg">
         {@participant.username}
       </p>
-      <%= if @show_ready && @participant.ready_for_next do %>
+      <%= if @is_break && @participant.ready_for_next do %>
         <p class="text-xs text-success font-semibold mt-1">Skip</p>
       <% end %>
     </div>
@@ -193,7 +191,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   attr :room_state, :map, required: true
   attr :selected_tab, :atom, required: true
   attr :placeholder, :string, default: "What are you working on?"
-  attr :show_ready, :boolean, default: false
+  attr :is_break, :boolean, default: false
   attr :emoji_id_prefix, :string, default: ""
   attr :completed_count, :integer, required: true
   attr :total_count, :integer, required: true
@@ -216,7 +214,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
                 <div class="card bg-gray-700 shadow-lg p-2 pt-3 xs:p-3 xs:pt-4 md:p-3 md:pt-5">
                   <.current_user_avatar_with_status
                     participant={@current_participant}
-                    show_ready={@show_ready}
+                    is_break={@is_break}
                   />
                 </div>
               </:avatar_card>
@@ -236,7 +234,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   end
 
   attr :other_participants, :list, required: true
-  attr :show_ready, :boolean, default: false
+  attr :is_break, :boolean, default: false
 
   def other_participants_section(assigns) do
     ~H"""
@@ -246,7 +244,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <div :for={participant <- @other_participants} :key={participant.user_id}>
           <.participant_display
             participant={participant}
-            show_ready={@show_ready}
+            is_break={@is_break}
           />
         </div>
       </div>

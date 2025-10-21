@@ -252,7 +252,7 @@ defmodule SocialPomodoroWeb.SessionLive do
   def spectator_view(assigns) do
     ~H"""
     <div class="card bg-base-200">
-      <div class="card-body text-center">
+      <div class="card-body text-center p-2 md:pd-4">
         <div class="text-6xl mb-6">
           <Icons.ghost class="w-24 h-24 mx-auto fill-base-content opacity-50" />
         </div>
@@ -337,7 +337,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200">
-        <div class="card-body text-center">
+        <div class="card-body text-center p-2 md:pd-4">
           <!-- Cycle Progress & Spectator Badge -->
           <div class="flex justify-center items-center gap-4 mb-4">
             <%= if @room_state.total_cycles > 1 do %>
@@ -363,7 +363,7 @@ defmodule SocialPomodoroWeb.SessionLive do
     <!-- Other Participants -->
           <SessionParticipantComponents.other_participants_section
             other_participants={@other_participants}
-            show_ready={false}
+            is_break={false}
           />
           
     <!-- Timer Display -->
@@ -449,7 +449,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
     ~H"""
     <div class="card bg-base-200">
-      <div class="card-body text-center">
+      <div class="card-body text-center p-2 md:pd-4">
         <!-- Cycle Progress -->
         <%= if @room_state.total_cycles > 1 do %>
           <div class="text-sm opacity-70 mb-2 flex items-center justify-center gap-1">
@@ -478,7 +478,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
         <SessionParticipantComponents.other_participants_section
           other_participants={@other_participants}
-          show_ready={true}
+          is_break={true}
         />
 
         <SessionTimerComponents.timer_display
