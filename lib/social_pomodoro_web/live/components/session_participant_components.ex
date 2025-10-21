@@ -147,7 +147,14 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             phx-value-emoji={emoji.code}
             phx-hook="MaintainWakeLock"
             id={"#{@id_prefix}emoji-#{emoji.code}"}
-            class="btn btn-square join-item bg-gray-700 hover:bg-gray-600 border-gray-600"
+            class={[
+              "btn btn-square join-item border transition-colors duration-200",
+              @current_participant.status_emoji == emoji.code &&
+                "bg-base-300 border-base-300 text-base-content",
+              @current_participant.status_emoji != emoji.code &&
+                "bg-base-100 border-base-200 hover:bg-base-200 hover:border-base-300"
+            ]}
+            aria-pressed={@current_participant.status_emoji == emoji.code}
           >
             <img src={emoji.path} class="w-7 h-7" alt={emoji.alt} />
           </button>

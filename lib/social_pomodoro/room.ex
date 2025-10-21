@@ -29,7 +29,8 @@ defmodule SocialPomodoro.Room do
     :status_emoji,
     :total_cycles,
     :current_cycle,
-    :chat_messages
+    :chat_messages,
+    :completion_message
   ]
 
   def start_link(opts) do
@@ -554,6 +555,13 @@ defmodule SocialPomodoro.Room do
       )
     end)
 
+    # Generate completion message once for all participants
+    completion_msg =
+      generate_completion_message(
+        div(state.work_duration_seconds, 60),
+        length(state.session_participants)
+      )
+
     new_state = %{
       state
       | status: :break,
@@ -561,7 +569,8 @@ defmodule SocialPomodoro.Room do
         timer_ref: timer_ref,
         participants: state.participants ++ promoted_participants,
         spectators: [],
-        status_emoji: %{}
+        status_emoji: %{},
+        completion_message: completion_msg
     }
 
     broadcast_room_update(new_state)
@@ -589,7 +598,8 @@ defmodule SocialPomodoro.Room do
           session_participants: session_participant_ids,
           participants: Enum.map(state.participants, &%{&1 | ready_for_next: false}),
           status_emoji: %{},
-          chat_messages: %{}
+          chat_messages: %{},
+          completion_message: nil
       }
 
       # Emit telemetry event for next cycle start
@@ -704,6 +714,25 @@ defmodule SocialPomodoro.Room do
     )
   end
 
+  defp generate_completion_message(duration_minutes, participant_count) do
+    cond do
+      participant_count == 1 ->
+        # Random message for solo sessions
+        Enum.random([
+          "You focused solo for #{duration_minutes} minutes!",
+          "Flying solo today - nice work!",
+          "Solo focus session complete!",
+          "You stayed focused for #{duration_minutes} minutes!"
+        ])
+
+      true ->
+        # Message for group sessions
+        other_count = participant_count - 1
+
+        "You focused with #{SocialPomodoro.Utils.other_people(other_count)} for #{duration_minutes} minutes!"
+    end
+  end
+
   defp serialize_state(state) do
     # Add usernames, todos, status_emoji, and chat_messages to participants for display
     participants_with_usernames =
@@ -737,7 +766,8 @@ defmodule SocialPomodoro.Room do
       created_at: state.created_at,
       total_cycles: state.total_cycles,
       current_cycle: state.current_cycle,
-      chat_messages: state.chat_messages
+      chat_messages: state.chat_messages,
+      completion_message: state.completion_message
     }
   end
 end

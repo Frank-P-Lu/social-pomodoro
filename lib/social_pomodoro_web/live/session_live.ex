@@ -1,6 +1,5 @@
 defmodule SocialPomodoroWeb.SessionLive do
   use SocialPomodoroWeb, :live_view
-  alias SocialPomodoro.Utils
   alias SocialPomodoroWeb.Icons
   alias SocialPomodoroWeb.SessionParticipantComponents
   alias SocialPomodoroWeb.SessionTimerComponents
@@ -32,16 +31,8 @@ defmodule SocialPomodoroWeb.SessionLive do
           # Check if user is a spectator
           is_spectator = spectator?(room_state, user_id)
 
-          # Set completion message if room is already in break
-          completion_msg =
-            if room_state.status == :break do
-              completion_message(
-                room_state.duration_minutes,
-                length(room_state.session_participants)
-              )
-            else
-              nil
-            end
+          # Use completion message from room state
+          completion_msg = room_state.completion_message
 
           # Find current participant
           current_participant =
@@ -157,15 +148,8 @@ defmodule SocialPomodoroWeb.SessionLive do
     # Update spectator status
     is_spectator = spectator?(room_state, socket.assigns.user_id)
 
-    # Update completion message only when transitioning INTO break
-    # (not on every update during break, to avoid regenerating random messages)
-    completion_msg =
-      if socket.assigns.room_state.status != :break and room_state.status == :break do
-        completion_message(room_state.duration_minutes, length(room_state.session_participants))
-      else
-        # Keep existing message if already in break
-        socket.assigns.completion_message
-      end
+    # Use completion message from room state (generated once on the server)
+    completion_msg = room_state.completion_message
 
     # Find current participant
     current_participant =
@@ -532,25 +516,6 @@ defmodule SocialPomodoroWeb.SessionLive do
       </div>
     </div>
     """
-  end
-
-  defp completion_message(duration_minutes, participant_count) do
-    cond do
-      participant_count == 1 ->
-        # Random message for solo sessions
-        Enum.random([
-          "You focused solo for #{duration_minutes} minutes!",
-          "Flying solo today - nice work!",
-          "Solo focus session complete!",
-          "You stayed focused for #{duration_minutes} minutes!"
-        ])
-
-      true ->
-        # Message for group sessions
-        other_count = participant_count - 1
-
-        "You focused with #{Utils.other_people(other_count)} for #{duration_minutes} minutes!"
-    end
   end
 
   defp maybe_show_break_ending_flash(socket, room_state) do
