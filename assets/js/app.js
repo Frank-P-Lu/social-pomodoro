@@ -239,6 +239,7 @@ Hooks.ParticipantCard = {
     this.collapseButton = this.el.querySelector('.collapse-toggle')
     this.collapsibleContent = this.el.querySelector('.collapsible-content')
     this.chevronIcon = this.el.querySelector('.chevron-icon')
+    this.collapsedPreview = this.el.querySelector('.collapsed-preview')
 
     // Load saved state from sessionStorage (auto-clears when tab closes)
     const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
@@ -270,6 +271,7 @@ Hooks.ParticipantCard = {
     // Re-get elements in case DOM was replaced
     this.collapsibleContent = this.el.querySelector('.collapsible-content')
     this.chevronIcon = this.el.querySelector('.chevron-icon')
+    this.collapsedPreview = this.el.querySelector('.collapsed-preview')
 
     if (isCollapsed) {
       this.collapse()
@@ -285,6 +287,9 @@ Hooks.ParticipantCard = {
     if (this.chevronIcon) {
       this.chevronIcon.style.transform = 'rotate(180deg)' // Point right when collapsed
     }
+    if (this.collapsedPreview) {
+      this.collapsedPreview.style.display = 'flex' // Show preview when collapsed
+    }
   },
 
   expand() {
@@ -293,6 +298,9 @@ Hooks.ParticipantCard = {
     }
     if (this.chevronIcon) {
       this.chevronIcon.style.transform = 'rotate(0deg)' // Point left when expanded
+    }
+    if (this.collapsedPreview) {
+      this.collapsedPreview.style.display = 'none' // Hide preview when expanded
     }
   }
 }

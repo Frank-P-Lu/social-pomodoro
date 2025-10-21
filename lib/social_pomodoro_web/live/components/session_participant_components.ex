@@ -10,94 +10,114 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   def participant_display(assigns) do
     ~H"""
     <div
-      class="card bg-base-300 shadow-lg relative p-4"
+      class="card bg-base-300 shadow-lg relative p-4 flex flex-row"
       phx-hook="ParticipantCard"
       id={"participant-card-#{@participant.user_id}"}
       data-participant-id={@participant.user_id}
     >
-      <div class="flex gap-4 items-start">
-        <button
-          class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-10"
-          data-action="toggle"
-        >
-          <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
-        </button>
+      <button
+        class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-10"
+        data-action="toggle"
+      >
+        <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
+      </button>
 
-        <div class="flex flex-col items-center gap-2 flex-shrink-0 w-20">
-          <div class="relative">
-            <div class={if @show_ready, do: "indicator", else: ""}>
-              <%= if @show_ready && @participant.ready_for_next do %>
-                <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
-                  ✓
-                </span>
-              <% end %>
-              <.avatar
-                user_id={@participant.user_id}
-                username={@participant.username}
-                size="w-14"
-              />
-            </div>
-            <%= if @participant.status_emoji do %>
-              <span class="absolute -bottom-1 -right-1 bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
-                <img
-                  src={emoji_to_openmoji(@participant.status_emoji)}
-                  class="w-7 h-7"
-                  alt={@participant.status_emoji}
-                />
+      <div class="flex flex-col items-center gap-2 w-20 self-center">
+        <div class="relative flex items-center justify-center flex-shrink-0">
+          <div class={if @show_ready, do: "indicator", else: ""}>
+            <%= if @show_ready && @participant.ready_for_next do %>
+              <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
+                ✓
               </span>
             <% end %>
+            <.avatar
+              user_id={@participant.user_id}
+              username={@participant.username}
+              size="w-14"
+            />
           </div>
-          <p class="font-semibold text-center text-xs leading-tight">{@participant.username}</p>
-          <%= if @show_ready && @participant.ready_for_next do %>
-            <p class="text-xs text-success font-semibold">Skip</p>
+          <%= if @participant.status_emoji do %>
+            <span class="absolute -bottom-1 -right-1 bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
+              <img
+                src={emoji_to_openmoji(@participant.status_emoji)}
+                class="w-7 h-7"
+                alt={@participant.status_emoji}
+              />
+            </span>
           <% end %>
         </div>
+        <p class="font-semibold text-center text-xs leading-tight flex-shrink-0">
+          {@participant.username}
+        </p>
+        <%= if @show_ready && @participant.ready_for_next do %>
+          <p class="text-xs text-success font-semibold">Skip</p>
+        <% end %>
 
-        <div class="flex-grow overflow-hidden flex gap-4 collapsible-content">
-          <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
-            <div class="flex-shrink-0 min-w-0">
-              <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
-                Shouts
-              </h4>
-              <div class="space-y-1">
-                <%= for message <- @participant.chat_messages do %>
-                  <div class="chat chat-start">
-                    <div class="chat-bubble chat-bubble-secondary text-xs py-1 px-2 min-h-0">
-                      {message.text}
-                    </div>
-                  </div>
-                <% end %>
-              </div>
-            </div>
-
-            <div class="divider divider-horizontal mx-0"></div>
-          <% end %>
-
-          <div class="flex-grow min-w-0">
-            <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
-            <%= if @participant.todos && length(@participant.todos) > 0 do %>
-              <div class="space-y-1">
-                <%= for todo <- @participant.todos do %>
-                  <div class="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={todo.completed}
-                      disabled
-                      class="checkbox checkbox-xs"
-                    />
-                    <span class={[
-                      "text-xs",
-                      if(todo.completed, do: "line-through opacity-50", else: nil)
-                    ]}>
-                      {todo.text}
-                    </span>
-                  </div>
-                <% end %>
-              </div>
-            <% else %>
-              <p class="text-xs opacity-50">No tasks yet</p>
-            <% end %>
+        <%!-- Preview section (shown when collapsed) --%>
+        <div class="collapsed-preview hidden flex-col gap-1 items-center mt-1">
+          <%!-- Task count --%>
+          <% completed_count =
+            if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
+          <% total_count = if @participant.todos, do: length(@participant.todos), else: 0 %>
+          <div class="flex items-center gap-1">
+            <Icons.todo class="w-3 h-3 opacity-70" />
+            <span class="text-[10px] opacity-70">{completed_count}/{total_count}</span>
           </div>
+
+          <%!-- Chat indicator (only during breaks when they have messages) --%>
+          <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+            <div class="flex items-center gap-1">
+              <Icons.chat class="w-3 h-3 text-secondary" />
+              <span class="text-[10px] text-secondary">{length(@participant.chat_messages)}</span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="flex gap-4 collapsible-content">
+        <%= if @show_ready && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+          <div class="flex-shrink-0 min-w-0">
+            <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
+              Shouts
+            </h4>
+            <div class="space-y-1">
+              <%= for message <- @participant.chat_messages do %>
+                <div class="chat chat-start">
+                  <div class="chat-bubble chat-bubble-secondary text-xs py-1 px-2 min-h-0">
+                    {message.text}
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="divider divider-horizontal mx-0"></div>
+        <% end %>
+
+        <div class=" min-w-0">
+          <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
+          <%= if @participant.todos && length(@participant.todos) > 0 do %>
+            <div class="space-y-1">
+              <%= for todo <- @participant.todos do %>
+                <div class="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={todo.completed}
+                    disabled
+                    class="checkbox checkbox-xs"
+                  />
+                  <span class={[
+                    "text-xs",
+                    if(todo.completed, do: "line-through opacity-50", else: nil)
+                  ]}>
+                    {todo.text}
+                  </span>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-xs opacity-50">No tasks yet</p>
+          <% end %>
         </div>
       </div>
     </div>
