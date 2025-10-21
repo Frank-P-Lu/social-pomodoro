@@ -183,7 +183,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
           @selected_tab != :chat && "hidden"
         ]}
       >
-        <div class="flex flex-col gap-4 items-center w-full max-w-md mx-auto">
+        <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
           <%= if length(user_messages) > 0 do %>
             <div class="w-full mb-4 flex justify-center">
