@@ -107,7 +107,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
     ~H"""
     <div class="w-full">
       <div class="relative">
-        <div class="absolute -left-2 -top-2 z-20 -rotate-3">
+        <div class="absolute -left-5 xs:-left-2 -top-2 z-20 -rotate-3">
           {render_slot(@avatar_card)}
         </div>
 
@@ -125,7 +125,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
 
           <div
             role="tablist"
-            class="flex justify-end relative z-10 gap-2"
+            class="flex justify-end relative z-10 "
           >
             <label class={[
               "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
@@ -149,11 +149,11 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
             </label>
 
             <label class={[
-              "px-4 py-2 gap-2 flex items-center transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
-              @selected_tab == :chat && "bg-base-100 border-b-base-100 z-10 cursor-pointer",
+              "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+              @selected_tab == :chat && "bg-base-100 border-b-base-100 z-10",
               @selected_tab != :chat && "bg-base-200 border-b-transparent",
               @room_state.status == :break && @selected_tab != :chat &&
-                "hover:bg-base-300 cursor-pointer",
+                "hover:bg-base-300",
               @room_state.status != :break && "opacity-40 cursor-not-allowed"
             ]}>
               <input
@@ -181,7 +181,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         role="tabpanel"
         aria-labelledby="session-tab-todo"
         class={[
-          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg rounded-tr-lg min-h-48",
+          "bg-base-100 border-x border-b border-t border-base-300 p-6 rounded-b-lg rounded-tl-lg min-h-48",
           @selected_tab == :todo && "block",
           @selected_tab != :todo && "hidden"
         ]}
