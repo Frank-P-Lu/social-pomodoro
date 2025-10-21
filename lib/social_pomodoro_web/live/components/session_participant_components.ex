@@ -27,7 +27,9 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
           <div class="relative">
             <div class={if @show_ready, do: "indicator", else: ""}>
               <%= if @show_ready && @participant.ready_for_next do %>
-                <span class="indicator-item badge badge-success badge-sm">✓</span>
+                <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
+                  ✓
+                </span>
               <% end %>
               <.avatar
                 user_id={@participant.user_id}
@@ -47,7 +49,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
           </div>
           <p class="font-semibold text-center text-xs leading-tight">{@participant.username}</p>
           <%= if @show_ready && @participant.ready_for_next do %>
-            <p class="text-xs text-success font-semibold">Ready!</p>
+            <p class="text-xs text-success font-semibold">Skip</p>
           <% end %>
         </div>
 
@@ -130,7 +132,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         {@participant.username}
       </p>
       <%= if @show_ready && @participant.ready_for_next do %>
-        <p class="text-xs text-success font-semibold mt-1">Ready!</p>
+        <p class="text-xs text-success font-semibold mt-1">Skip</p>
       <% end %>
     </div>
     """
@@ -151,11 +153,10 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             phx-hook="MaintainWakeLock"
             id={"#{@id_prefix}emoji-#{emoji.code}"}
             class={[
-              "btn btn-square join-item border transition-colors duration-200 btn-sm xs:btn-md",
+              "btn btn-square join-item border btn-sm xs:btn-md transition-colors duration-150 bg-base-100 border-transparent hover:bg-base-200 hover:border-base-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-base-300 focus-visible:ring-offset-2 focus-visible:ring-offset-base-200",
               @current_participant.status_emoji == emoji.code &&
-                "bg-base-300 border-base-300 text-base-content",
-              @current_participant.status_emoji != emoji.code &&
-                "bg-base-100 border-base-200 hover:bg-base-200 hover:border-base-300"
+                "bg-base-200 border-base-300 text-base-content shadow-sm",
+              @current_participant.status_emoji != emoji.code && "text-base-content/80"
             ]}
             aria-pressed={@current_participant.status_emoji == emoji.code}
           >
@@ -182,7 +183,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
     ~H"""
     <div class="flex flex-col w-full h-full relative">
       <div class="w-full h-full flex flex-col">
-        <div class="card bg-base-300 px-4 pb-4 pt-2 flex-grow flex flex-col md:p-4">
+        <div class="card bg-base-300 px-4 pb-4 pt-2 flex-grow flex flex-col md:py-6">
           <div class="flex-grow">
             <SessionTabsComponents.tabs_with_content
               room_state={@room_state}

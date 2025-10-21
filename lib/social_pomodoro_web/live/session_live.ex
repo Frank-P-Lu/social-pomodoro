@@ -457,8 +457,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <p class="text-xl mb-8">
           {@completion_message}
         </p>
-        
-    <!-- Other Participants -->
+
         <SessionParticipantComponents.other_participants_section
           other_participants={@other_participants}
           show_ready={true}
@@ -470,8 +469,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           label="Break time remaining"
         />
       </div>
-      
-    <!-- Current User Card: Avatar, Status Emojis, Tabs -->
+
       <%= if @current_participant do %>
         <SessionParticipantComponents.current_user_card
           current_participant={@current_participant}
@@ -486,34 +484,34 @@ defmodule SocialPomodoroWeb.SessionLive do
           user_id={@user_id}
         />
       <% end %>
+    </div>
 
-      <div class="card-body">
-        <div class="card-actions justify-center gap-4">
-          <%= if not @is_final_break do %>
-            <button
-              phx-click="go_again"
-              class="btn btn-primary"
-            >
-              Skip Break
-            </button>
-          <% end %>
+    <div class="mt-10 flex flex-col items-center gap-6">
+      <div class="flex flex-col sm:flex-row justify-center gap-4 w-full sm:w-auto">
+        <%= if not @is_final_break do %>
           <button
-            phx-click="leave_room"
-            phx-hook="ReleaseWakeLock"
-            id="leave-room-break"
-            class="btn text-error"
+            phx-click="go_again"
+            class="btn btn-primary w-full sm:w-auto"
           >
-            <Icons.leave class="w-5 h-5 fill-error" />
-            <span class="text-error">Return to Lobby</span>
+            Skip Break
           </button>
-        </div>
-
-        <%= if not @is_final_break and Enum.any?(@room_state.participants, & &1.ready_for_next) do %>
-          <p class="text-sm opacity-50 mt-6">
-            Waiting for everyone to skip break...
-          </p>
         <% end %>
+        <button
+          phx-click="leave_room"
+          phx-hook="ReleaseWakeLock"
+          id="leave-room-break"
+          class="btn text-error w-full sm:w-auto"
+        >
+          <Icons.leave class="w-5 h-5 fill-error" />
+          <span class="text-error">Return to Lobby</span>
+        </button>
       </div>
+
+      <%= if not @is_final_break and Enum.any?(@room_state.participants, & &1.ready_for_next) do %>
+        <p class="text-sm opacity-50 text-center">
+          Waiting for everyone to skip break...
+        </p>
+      <% end %>
     </div>
     """
   end

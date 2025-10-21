@@ -154,7 +154,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
               @selected_tab != :chat && "bg-base-200 border-b-transparent",
               @room_state.status == :break && @selected_tab != :chat &&
                 "hover:bg-base-300",
-              @room_state.status != :break && "opacity-40 cursor-not-allowed"
+              @room_state.status != :break && "opacity-40 cursor-not-allowed pointer-events-none"
             ]}>
               <input
                 type="radio"
@@ -206,22 +206,22 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
         <div class="flex flex-col gap-2 items-center w-full max-w-md mx-auto">
           <% user_messages = Map.get(@room_state.chat_messages, @user_id, []) %>
           <%= if length(user_messages) > 0 do %>
-            <div class="w-full mb-4 flex justify-center">
-              <div class="chat chat-start max-w-xs">
-                <div class="chat-bubble chat-bubble-secondary p-0">
-                  <ul class="list">
-                    <%= for message <- Enum.with_index(user_messages) do %>
-                      <% {msg, index} = message %>
-                      <li class={[
-                        "list-row py-2 px-3",
-                        index < length(user_messages) - 1 && "border-b border-base-content/10"
-                      ]}>
-                        <p class="text-sm">{msg.text}</p>
-                      </li>
-                    <% end %>
-                  </ul>
+            <div class="w-full mb-4 flex flex-col items-center gap-2">
+              <%= for message <- Enum.with_index(user_messages) do %>
+                <% {msg, index} = message %>
+                <div
+                  id={"shout-msg-#{msg.timestamp}"}
+                  phx-hook="ShoutMessage"
+                  class={[
+                    "badge badge-soft badge-secondary py-3 px-4 transition-all duration-500",
+                    index == 0 && "text-xs ml-2",
+                    index == 1 && "text-sm -ml-3",
+                    index == 2 && "text-base ml-1"
+                  ]}
+                >
+                  {msg.text}
                 </div>
-              </div>
+              <% end %>
             </div>
           <% else %>
             <div class="flex flex-col items-center justify-center mb-4 opacity-50">

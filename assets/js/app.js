@@ -297,6 +297,23 @@ Hooks.ParticipantCard = {
   }
 }
 
+Hooks.ShoutMessage = {
+  mounted() {
+    // Trigger slide-in animation
+    this.el.style.animation = 'slide-in 0.3s ease-out'
+  },
+  beforeDestroy() {
+    // Prevent removal until animation completes
+    const animationDuration = 300 // ms
+    this.el.style.animation = 'slide-out 0.3s ease-out'
+
+    // Delay the actual removal
+    return new Promise(resolve => {
+      setTimeout(resolve, animationDuration)
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
