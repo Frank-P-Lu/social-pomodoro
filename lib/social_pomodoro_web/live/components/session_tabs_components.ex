@@ -101,59 +101,79 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
   attr :placeholder, :string, default: "What are you working on?"
   attr :user_id, :string, required: true
   slot :avatar_card, required: true
+  slot :left_controls
 
   def tabs_with_content(assigns) do
     ~H"""
     <div class="w-full">
-      <div role="tablist" class="flex justify-end relative">
-        <div class="absolute -left-2 -top-8 z-20 -rotate-3">
+      <div class="relative">
+        <div class="absolute -left-2 -top-2 z-20 -rotate-3">
           {render_slot(@avatar_card)}
         </div>
-        <label class={[
-          "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
-          @selected_tab == :todo && "bg-base-100 border-b-base-100 z-10",
-          @selected_tab != :todo && "bg-base-200 border-b-transparent hover:bg-base-300"
-        ]}>
-          <input
-            type="radio"
-            name="session-tabs"
-            role="tab"
-            id="session-tab-todo"
-            aria-label="Todo"
-            aria-controls="session-tab-panel-todo"
-            phx-click="switch_tab"
-            phx-value-tab="todo"
-            checked={@selected_tab == :todo}
-            class="hidden"
-          />
-          <Icons.todo class="w-4 h-4 fill-current" />
-          <span class="font-semibold">Todo</span>
-        </label>
 
-        <label class={[
-          "px-4 py-2 gap-2 flex items-center transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
-          @selected_tab == :chat && "bg-base-100 border-b-base-100 z-10 cursor-pointer",
-          @selected_tab != :chat && "bg-base-200 border-b-transparent",
-          @room_state.status == :break && @selected_tab != :chat &&
-            "hover:bg-base-300 cursor-pointer",
-          @room_state.status != :break && "opacity-40 cursor-not-allowed"
+        <div class={[
+          "flex flex-col gap-2 md:flex-row md:items-end md:justify-end",
+          @left_controls != [] && "md:pl-32"
         ]}>
-          <input
-            type="radio"
-            name="session-tabs"
-            role="tab"
-            id="session-tab-chat"
-            aria-label="Shout"
-            aria-controls="session-tab-panel-chat"
-            phx-click="switch_tab"
-            phx-value-tab="chat"
-            checked={@selected_tab == :chat}
-            disabled={@room_state.status != :break}
-            class="hidden"
-          />
-          <Icons.chat class="w-4 h-4 fill-current" />
-          <span class="font-semibold">Shout</span>
-        </label>
+          <%= if @left_controls != [] do %>
+            <div class="flex justify-end md:justify-start md:mr-auto">
+              <div class="md:-mt-2">
+                {render_slot(@left_controls)}
+              </div>
+            </div>
+          <% end %>
+
+          <div
+            role="tablist"
+            class="flex justify-end relative z-10 gap-2"
+          >
+            <label class={[
+              "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+              @selected_tab == :todo && "bg-base-100 border-b-base-100 z-10",
+              @selected_tab != :todo && "bg-base-200 border-b-transparent hover:bg-base-300"
+            ]}>
+              <input
+                type="radio"
+                name="session-tabs"
+                role="tab"
+                id="session-tab-todo"
+                aria-label="Todo"
+                aria-controls="session-tab-panel-todo"
+                phx-click="switch_tab"
+                phx-value-tab="todo"
+                checked={@selected_tab == :todo}
+                class="hidden"
+              />
+              <Icons.todo class="w-4 h-4 fill-current" />
+              <span class="font-semibold">Todo</span>
+            </label>
+
+            <label class={[
+              "px-4 py-2 gap-2 flex items-center transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+              @selected_tab == :chat && "bg-base-100 border-b-base-100 z-10 cursor-pointer",
+              @selected_tab != :chat && "bg-base-200 border-b-transparent",
+              @room_state.status == :break && @selected_tab != :chat &&
+                "hover:bg-base-300 cursor-pointer",
+              @room_state.status != :break && "opacity-40 cursor-not-allowed"
+            ]}>
+              <input
+                type="radio"
+                name="session-tabs"
+                role="tab"
+                id="session-tab-chat"
+                aria-label="Shout"
+                aria-controls="session-tab-panel-chat"
+                phx-click="switch_tab"
+                phx-value-tab="chat"
+                checked={@selected_tab == :chat}
+                disabled={@room_state.status != :break}
+                class="hidden"
+              />
+              <Icons.chat class="w-4 h-4 fill-current" />
+              <span class="font-semibold">Shout</span>
+            </label>
+          </div>
+        </div>
       </div>
 
       <div

@@ -148,7 +148,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             phx-hook="MaintainWakeLock"
             id={"#{@id_prefix}emoji-#{emoji.code}"}
             class={[
-              "btn btn-square join-item border transition-colors duration-200",
+              "btn btn-square join-item border transition-colors duration-200 btn-sm xs:btn-md",
               @current_participant.status_emoji == emoji.code &&
                 "bg-base-300 border-base-300 text-base-content",
               @current_participant.status_emoji != emoji.code &&
@@ -156,7 +156,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
             ]}
             aria-pressed={@current_participant.status_emoji == emoji.code}
           >
-            <img src={emoji.path} class="w-7 h-7" alt={emoji.alt} />
+            <img src={emoji.path} class="w-6 h-6 xs:w-7 xs:h-7" alt={emoji.alt} />
           </button>
         <% end %>
       </div>
@@ -179,18 +179,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
     ~H"""
     <div class="flex flex-col w-full h-full relative">
       <div class="w-full h-full flex flex-col">
-        <div class="card bg-base-300 p-4 flex-grow flex flex-col">
-          <div class="flex flex-col gap-3">
-            <div class="flex flex-row items-center justify-end">
-              <.status_emoji_selector
-                current_participant={@current_participant}
-                status_emojis={@status_emojis}
-                id_prefix={@emoji_id_prefix}
-              />
-            </div>
-          </div>
-
-          <div class="mt-2 flex-grow">
+        <div class="card bg-base-300 px-4 pb-4 pt-2 flex-grow flex flex-col md:p-4">
+          <div class="flex-grow">
             <SessionTabsComponents.tabs_with_content
               room_state={@room_state}
               selected_tab={@selected_tab}
@@ -199,13 +189,20 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               user_id={@user_id}
             >
               <:avatar_card>
-                <div class="card bg-gray-700 shadow-lg p-2 pt-3 md:p-3 md:pt-5">
+                <div class="card bg-gray-700 shadow-lg p-1.5 pt-2.5 xs:p-2 xs:pt-3 md:p-3 md:pt-5">
                   <.current_user_avatar_with_status
                     participant={@current_participant}
                     show_ready={@show_ready}
                   />
                 </div>
               </:avatar_card>
+              <:left_controls>
+                <.status_emoji_selector
+                  current_participant={@current_participant}
+                  status_emojis={@status_emojis}
+                  id_prefix={@emoji_id_prefix}
+                />
+              </:left_controls>
             </SessionTabsComponents.tabs_with_content>
           </div>
         </div>
