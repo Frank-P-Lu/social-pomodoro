@@ -39,6 +39,12 @@ defmodule SocialPomodoroWeb.Router do
     # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
+    scope "/dev", SocialPomodoroWeb do
+      pipe_through :browser
+
+      live "/component", ComponentDevLive
+    end
+
     scope "/dev" do
       pipe_through :browser
 

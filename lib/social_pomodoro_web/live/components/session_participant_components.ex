@@ -10,7 +10,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   def participant_display(assigns) do
     ~H"""
     <div
-      class="card bg-primary/10 shadow-lg relative flex flex-row w-full"
+      class="participant-card card bg-primary/10 shadow-lg relative flex flex-col w-full md:max-w-2xl"
       phx-hook="ParticipantCard"
       id={"participant-card-#{@participant.user_id}"}
       data-participant-id={@participant.user_id}
@@ -19,80 +19,83 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-10"
         data-action="toggle"
       >
-        <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 chevron-icon" />
+        <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 rotate-on-collapse" />
       </button>
 
-      <div class="card p-2 md:p-4 flex flex-col items-center gap-2 self-center min-w-32">
-        <div class="relative flex items-center justify-center flex-shrink-0">
-          <div class={if @is_break, do: "indicator", else: ""}>
-            <%= if @is_break && @participant.ready_for_next do %>
-              <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
-                ✓
+      <div class={"card p-2 flex flex-row gap-2 items-center collapse-avatar-row #{if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0, do: "", else: "justify-center"}"}>
+        <div class="flex flex-col items-center gap-1 flex-shrink-0">
+          <div class="relative flex items-center justify-center flex-shrink-0">
+            <div class={if @is_break, do: "indicator", else: ""}>
+              <%= if @is_break && @participant.ready_for_next do %>
+                <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
+                  ✓
+                </span>
+              <% end %>
+              <.avatar
+                user_id={@participant.user_id}
+                username={@participant.username}
+                size="w-10 md:w-14"
+              />
+            </div>
+            <%= if @participant.status_emoji do %>
+              <span class="absolute -bottom-1 -right-1 bg-base-100 rounded-full w-5 h-5 md:w-7 md:h-7 flex items-center justify-center border-2 border-base-100">
+                <img
+                  src={emoji_to_openmoji(@participant.status_emoji)}
+                  class="w-5 h-5 md:w-7 md:h-7"
+                  alt={@participant.status_emoji}
+                />
               </span>
             <% end %>
-            <.avatar
-              user_id={@participant.user_id}
-              username={@participant.username}
-              size="w-14"
-            />
           </div>
-          <%= if @participant.status_emoji do %>
-            <span class="absolute -bottom-1 -right-1 bg-base-100 rounded-full w-7 h-7 flex items-center justify-center border-2 border-base-100">
-              <img
-                src={emoji_to_openmoji(@participant.status_emoji)}
-                class="w-7 h-7"
-                alt={@participant.status_emoji}
-              />
-            </span>
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 show-on-collapse">
+            {@participant.username}
+          </p>
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate hide-on-collapse hidden">
+            {@participant.username}
+          </p>
+          <%= if @is_break && @participant.ready_for_next do %>
+            <p class="text-xs text-success font-semibold">Skip</p>
           <% end %>
-        </div>
-        <p class="font-semibold text-center text-xs leading-tight flex-shrink-0">
-          {@participant.username}
-        </p>
-        <%= if @is_break && @participant.ready_for_next do %>
-          <p class="text-xs text-success font-semibold">Skip</p>
-        <% end %>
 
-        <%!-- Preview section (shown when collapsed) --%>
-        <div class="collapsed-preview hidden flex-col gap-1 items-center mt-1">
-          <%!-- Task count --%>
-          <% completed_count =
-            if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
-          <% total_count = if @participant.todos, do: length(@participant.todos), else: 0 %>
-          <div class="flex items-center gap-1">
-            <Icons.todo class="w-3 h-3 text-base-content/70" />
-            <span class="text-[10px] text-base-content/70">{completed_count}/{total_count}</span>
-          </div>
-
-          <%!-- Chat indicator (only during breaks when they have messages) --%>
-          <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+          <%!-- Preview section (shown when collapsed) --%>
+          <div class="show-on-collapse-flex hidden flex-col gap-1 items-center mt-1">
+            <%!-- Task count --%>
+            <% completed_count =
+              if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
+            <% total_count = if @participant.todos, do: length(@participant.todos), else: 0 %>
             <div class="flex items-center gap-1">
-              <Icons.chat class="w-3 h-3 text-secondary" />
-              <span class="text-[10px] text-secondary">{length(@participant.chat_messages)}</span>
+              <Icons.todo class="w-3 h-3 text-base-content/70" />
+              <span class="text-[10px] text-base-content/70">{completed_count}/{total_count}</span>
             </div>
-          <% end %>
+
+            <%!-- Chat indicator (only during breaks when they have messages) --%>
+            <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+              <div class="flex items-center gap-1">
+                <Icons.chat class="w-3 h-3 text-secondary" />
+                <span class="text-[10px] text-secondary">{length(@participant.chat_messages)}</span>
+              </div>
+            <% end %>
+          </div>
         </div>
+
+        <%!-- Shouts section (next to avatar) --%>
+        <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
+          <div class="min-w-0 flex-1 hide-on-collapse h-24">
+            <.comment_bubble class="w-full h-full">
+              <:body>
+                <div class="space-y-1.5 text-xs leading-snug break-words h-full overflow-y-auto pr-1">
+                  <%= for message <- @participant.chat_messages do %>
+                    <div>{message.text}</div>
+                  <% end %>
+                </div>
+              </:body>
+            </.comment_bubble>
+          </div>
+        <% end %>
       </div>
 
-      <div class="bg-base-100 rounded-lg flex flex-row gap-2 p-2 collapsible-content flex-1 min-w-64">
-        <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
-          <div class="flex-shrink-0 min-w-0 w-40">
-            <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">
-              Shouts
-            </h4>
-            <div class="chat chat-start">
-              <div class="chat-bubble chat-bubble-secondary text-xs py-2 px-3 min-h-0 space-y-1.5 break-words max-h-32 overflow-y-auto">
-                <%= for message <- @participant.chat_messages do %>
-                  <div>{message.text}</div>
-                <% end %>
-              </div>
-            </div>
-          </div>
-
-          <div class="divider divider-horizontal mx-0"></div>
-        <% end %>
-
-        <div class="min-w-0 flex-1">
+      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 hide-on-collapse flex-1">
+        <div class="min-w-0">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
           <%= if @participant.todos && length(@participant.todos) > 0 do %>
             <div class="space-y-1 max-h-32 overflow-y-auto pr-1">

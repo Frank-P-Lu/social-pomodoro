@@ -81,6 +81,7 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -92,10 +93,47 @@
       opacity: 1;
       transform: translateY(0);
     }
+
     to {
       opacity: 0;
       transform: translateY(-30px);
     }
+  }
+}
+
+/* Participant card collapsed state */
+@layer components {
+  .participant-card[data-collapsed="true"] {
+
+    /* Hide elements when collapsed */
+    & .hide-on-collapse {
+      display: none;
+    }
+
+    /* Show elements when collapsed */
+    & .show-on-collapse {
+      display: block;
+    }
+
+    & .show-on-collapse-flex {
+      display: flex;
+    }
+
+    /* Avatar row styling when collapsed */
+    & .collapse-avatar-row {
+      width: 10rem;
+      height: auto;
+    }
+
+    /* Rotate chevron icon when collapsed */
+    & .rotate-on-collapse {
+      transform: rotate(180deg);
+    }
+  }
+
+  /* Smooth transitions */
+  .participant-card .rotate-on-collapse {
+    transition: transform 0.2s ease;
   }
 }
 

@@ -232,76 +232,21 @@ Hooks.ClearForm = {
 
 Hooks.ParticipantCard = {
   mounted() {
-    this.participantId = this.el.dataset.participantId
-    this.storageKey = `participant-card-collapsed-${this.participantId}`
-
-    // Get elements
-    this.collapseButton = this.el.querySelector('.collapse-toggle')
-    this.collapsibleContent = this.el.querySelector('.collapsible-content')
-    this.chevronIcon = this.el.querySelector('.chevron-icon')
-    this.collapsedPreview = this.el.querySelector('.collapsed-preview')
+    this.storageKey = `participant-card-collapsed-${this.el.dataset.participantId}`
 
     // Load saved state from sessionStorage (auto-clears when tab closes)
     const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
-
-    // Apply initial state
     if (isCollapsed) {
-      this.collapse()
+      this.el.dataset.collapsed = 'true'
     }
 
     // Add click handler for collapse button
-    this.collapseButton.addEventListener('click', (e) => {
+    this.el.querySelector('.collapse-toggle').addEventListener('click', (e) => {
       e.preventDefault()
-      const currentlyCollapsed = this.collapsibleContent.style.display === 'none'
-
-      if (currentlyCollapsed) {
-        this.expand()
-        sessionStorage.setItem(this.storageKey, 'false')
-      } else {
-        this.collapse()
-        sessionStorage.setItem(this.storageKey, 'true')
-      }
+      const currentlyCollapsed = this.el.dataset.collapsed === 'true'
+      this.el.dataset.collapsed = !currentlyCollapsed
+      sessionStorage.setItem(this.storageKey, !currentlyCollapsed)
     })
-  },
-
-  updated() {
-    // Re-apply collapse state after LiveView updates
-    const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
-
-    // Re-get elements in case DOM was replaced
-    this.collapsibleContent = this.el.querySelector('.collapsible-content')
-    this.chevronIcon = this.el.querySelector('.chevron-icon')
-    this.collapsedPreview = this.el.querySelector('.collapsed-preview')
-
-    if (isCollapsed) {
-      this.collapse()
-    } else {
-      this.expand()
-    }
-  },
-
-  collapse() {
-    if (this.collapsibleContent) {
-      this.collapsibleContent.style.display = 'none'
-    }
-    if (this.chevronIcon) {
-      this.chevronIcon.style.transform = 'rotate(180deg)' // Point right when collapsed
-    }
-    if (this.collapsedPreview) {
-      this.collapsedPreview.style.display = 'flex' // Show preview when collapsed
-    }
-  },
-
-  expand() {
-    if (this.collapsibleContent) {
-      this.collapsibleContent.style.display = 'flex'
-    }
-    if (this.chevronIcon) {
-      this.chevronIcon.style.transform = 'rotate(0deg)' // Point left when expanded
-    }
-    if (this.collapsedPreview) {
-      this.collapsedPreview.style.display = 'none' // Hide preview when expanded
-    }
   }
 }
 
