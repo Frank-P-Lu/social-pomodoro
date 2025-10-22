@@ -16,14 +16,15 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
       data-participant-id={@participant.user_id}
     >
       <button
-        class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-10"
+        class="absolute -top-2 -right-2 btn btn-neutral btn-sm btn-circle collapse-toggle z-50"
         data-action="toggle"
       >
         <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 rotate-on-collapse" />
       </button>
 
-      <div class="card p-2 flex flex-row items-start justify-center w-full ">
-        <div class="flex flex-col items-center gap-1 flex-shrink-0">
+      <div class="card p-2 flex flex-row items-center justify-center w-full ">
+        <%!-- Avatar + username --%>
+        <div class="flex flex-col items-center gap-1 flex-shrink-0 p-1 pr-2">
           <div class="relative flex items-center justify-center flex-shrink-0">
             <div class={if @is_break, do: "indicator", else: ""}>
               <%= if @is_break && @participant.ready_for_next do %>
@@ -47,7 +48,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               </span>
             <% end %>
           </div>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate">
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 truncate">
             {@participant.username}
           </p>
           <%= if @is_break && @participant.ready_for_next do %>
@@ -55,7 +56,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
           <% end %>
 
           <%!-- Preview section --%>
-          <div class="content-short flex-col gap-1 items-center mt-1">
+          <div class="content-short flex-row gap-2 items-center mt-1">
             <%!-- Task count --%>
             <% completed_count =
               if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
@@ -91,7 +92,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 content-full flex-1">
+      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 content-full">
         <div class="min-w-0 flex flex-col items-center">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
           <%= if @participant.todos && length(@participant.todos) > 0 do %>

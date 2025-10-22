@@ -136,6 +136,48 @@ defmodule SocialPomodoroWeb.ComponentDevLive do
           </div>
         </div>
       </section>
+
+      <section aria-labelledby="participant-grid-preview" class="space-y-6">
+        <div class="flex items-center gap-3">
+          <span class="size-2 rounded-full bg-secondary" />
+          <h2 id="participant-grid-preview" class="text-lg font-semibold text-base-content">
+            Participant cards - Horizontal Layout
+          </h2>
+        </div>
+        <div class="rounded-3xl border border-base-300/60 bg-base-200/40 p-8">
+          <div class="flex flex-row gap-6 overflow-x-auto p-4 items-start">
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={@sample_participant}
+              is_break={false}
+            />
+
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={@busy_participant}
+              is_break={true}
+            />
+
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={@sample_participant}
+              is_break={true}
+            />
+
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={@busy_participant}
+              is_break={false}
+            />
+
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={@sample_participant}
+              is_break={false}
+            />
+
+            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+              participant={%{@sample_participant | ready_for_next: true}}
+              is_break={false}
+            />
+          </div>
+        </div>
+      </section>
     </div>
     """
   end
