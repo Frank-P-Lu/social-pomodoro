@@ -134,6 +134,17 @@ defmodule SocialPomodoroWeb.ComponentDevLive do
               />
             </div>
           </div>
+          <div class="space-y-2">
+            <p class="text-xs font-semibold text-base-content/60">
+              isBreak=true (ready_for_next=true)
+            </p>
+            <div class="flex-shrink-0 max-w-2xl">
+              <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+                participant={%{@sample_participant | ready_for_next: true}}
+                is_break={true}
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -168,11 +179,6 @@ defmodule SocialPomodoroWeb.ComponentDevLive do
 
             <SocialPomodoroWeb.SessionParticipantComponents.participant_display
               participant={@sample_participant}
-              is_break={false}
-            />
-
-            <SocialPomodoroWeb.SessionParticipantComponents.participant_display
-              participant={%{@sample_participant | ready_for_next: true}}
               is_break={false}
             />
           </div>

@@ -28,7 +28,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
           <div class="relative flex items-center justify-center flex-shrink-0">
             <div class={if @is_break, do: "indicator", else: ""}>
               <%= if @is_break && @participant.ready_for_next do %>
-                <span class="indicator-item indicator-start indicator-top badge badge-success badge-sm">
+                <span class="indicator-item indicator-start indicator-top badge badge-success badge-xs md:badge-sm">
                   ✓
                 </span>
               <% end %>
@@ -108,7 +108,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
                     class="checkbox checkbox-xs checkbox-primary"
                   />
                   <span class={[
-                    "text-xs",
+                    "text-xs md:text-sm",
                     if(todo.completed, do: "line-through opacity-50", else: nil)
                   ]}>
                     {todo.text}
@@ -242,7 +242,12 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   def other_participants_section(assigns) do
     ~H"""
     <%= if length(@other_participants) > 0 do %>
-      <div class="divider">Other Participants</div>
+      <div class="divider">
+        <div class="flex items-center gap-2">
+          <Icons.users class="w-4 h-4 fill-current opacity-70" />
+          <span>Other Participants ({length(@other_participants)})</span>
+        </div>
+      </div>
       <div class="flex flex-col items-center gap-4 mb-4">
         <div :for={participant <- @other_participants} :key={participant.user_id}>
           <.participant_display
