@@ -126,8 +126,9 @@
     min-height: 0;
   }
 
-  /* Smooth width transition */
+  /* Prevent cards from shrinking in flex containers and smooth transitions */
   .participant-card {
+    flex-shrink: 0;
     transition: max-width 0.3s ease;
   }
 
