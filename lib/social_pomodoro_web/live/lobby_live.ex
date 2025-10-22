@@ -384,7 +384,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
 
-    <div class="bg-base-100 p-4 md:p-8">
+    <div class="bg-base-100 p-2 xs:p-4 md:p-8">
       <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
@@ -435,34 +435,32 @@ defmodule SocialPomodoroWeb.LobbyLive do
           </div>
         </div>
 
-        <div class="card bg-base-200">
+        <div class="card bg-base-200 ">
           <div class="card-body">
             <h2 class="card-title">Lobby</h2>
 
-            <div class="space-y-4">
-              <%= if Enum.empty?(@rooms) do %>
-                <div class="text-center py-12">
-                  <p class="text-lg">
-                    No one is here yet
-                    <img
-                      src="/images/emojis/1F97A.svg"
-                      class="w-6 h-6 inline align-middle"
-                      alt="🥺"
-                    /> <br /> That's okay! You can focus solo!
-                  </p>
-                </div>
-              <% else %>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <%= for room <- @rooms do %>
-                    <.room_card
-                      room={room}
-                      user_id={@user_id}
-                      my_room_name={@my_room_name}
-                    />
-                  <% end %>
-                </div>
-              <% end %>
-            </div>
+            <%= if Enum.empty?(@rooms) do %>
+              <div class="text-center py-12">
+                <p class="text-lg">
+                  No one is here yet
+                  <img
+                    src="/images/emojis/1F97A.svg"
+                    class="w-6 h-6 inline align-middle"
+                    alt="🥺"
+                  /> <br /> That's okay! You can focus solo!
+                </p>
+              </div>
+            <% else %>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <%= for room <- @rooms do %>
+                  <.room_card
+                    room={room}
+                    user_id={@user_id}
+                    my_room_name={@my_room_name}
+                  />
+                <% end %>
+              </div>
+            <% end %>
           </div>
         </div>
       </div>
@@ -494,12 +492,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   defp room_card(assigns) do
     ~H"""
-    <div class={"card bg-base-100
+    <div class={"card bg-base-100 p-2 xs:p-4
     bg-[repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0,rgba(255,255,255,0.05)_2px,transparent_1px,transparent_20px)]
     bg-[size:20px_20px]
     " <>
       if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
-      <div class="card-body p-4 gap-3 flex flex-col justify-between min-h-48">
+      <div class="card-body p-2 md:p-4 gap-3 flex flex-col justify-between min-h-48">
         <div>
           <div class="flex items-center justify-between gap-2">
             <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
@@ -610,7 +608,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                       id={"start-room-btn-#{@room.name}"}
                       class="btn btn-primary btn-sm"
                     >
-                      Start Now
+                      Start
                     </button>
                   <% end %>
                 <% else %>

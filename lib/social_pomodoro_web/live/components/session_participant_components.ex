@@ -92,13 +92,13 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 content-full min-h-0">
+      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 md:p-4 content-full min-h-0">
         <div class="min-w-0 flex flex-col items-center flex-1 min-h-0">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1 flex-shrink-0">
             Tasks
           </h4>
           <%= if @participant.todos && length(@participant.todos) > 0 do %>
-            <div class="space-y-1 flex-1 overflow-y-auto pr-1 min-h-0 w-full">
+            <div class="space-y-1 flex-1 overflow-y-auto min-h-0 w-full">
               <%= for todo <- @participant.todos do %>
                 <div class="flex items-center gap-1">
                   <input
