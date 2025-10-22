@@ -232,20 +232,19 @@ Hooks.ClearForm = {
 
 Hooks.ParticipantCard = {
   mounted() {
-    this.storageKey = `participant-card-collapsed-${this.el.dataset.participantId}`
+    this.storageKey = `participant-card-expanded-${this.el.dataset.participantId}`
 
     // Load saved state from sessionStorage (auto-clears when tab closes)
-    const isCollapsed = sessionStorage.getItem(this.storageKey) === 'true'
-    if (isCollapsed) {
-      this.el.dataset.collapsed = 'true'
-    }
+    // Default to expanded (true), unless explicitly set to collapsed (false)
+    const isExpanded = sessionStorage.getItem(this.storageKey) !== 'false'
+    this.el.dataset.expanded = String(isExpanded)
 
-    // Add click handler for collapse button
+    // Add click handler for toggle button
     this.el.querySelector('.collapse-toggle').addEventListener('click', (e) => {
       e.preventDefault()
-      const currentlyCollapsed = this.el.dataset.collapsed === 'true'
-      this.el.dataset.collapsed = !currentlyCollapsed
-      sessionStorage.setItem(this.storageKey, !currentlyCollapsed)
+      const currentlyExpanded = this.el.dataset.expanded === 'true'
+      this.el.dataset.expanded = String(!currentlyExpanded)
+      sessionStorage.setItem(this.storageKey, String(!currentlyExpanded))
     })
   }
 }

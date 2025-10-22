@@ -26,6 +26,42 @@ defmodule SocialPomodoroWeb.ComponentDevLive do
            %{text: "Making great progress on the UI!"},
            %{text: "Almost done with this task"}
          ]
+       },
+       busy_participant: %{
+         user_id: "busy_demo_789",
+         username: "Jordan",
+         status_emoji: "1F389",
+         ready_for_next: false,
+         todos: [
+           %{
+             text: "Refactor the entire authentication system to use OAuth 2.0 with PKCE flow",
+             completed: true
+           },
+           %{
+             text:
+               "Write comprehensive unit tests for all edge cases in the payment processing module",
+             completed: true
+           },
+           %{
+             text:
+               "Implement real-time websocket synchronization across multiple server instances with Redis pub/sub",
+             completed: false
+           },
+           %{
+             text:
+               "Optimize database queries and add proper indexes to reduce page load time from 3s to under 500ms",
+             completed: false
+           },
+           %{
+             text: "Create detailed API documentation with examples for all 50+ endpoints",
+             completed: false
+           }
+         ],
+         chat_messages: [
+           %{text: "This is taking longer than expected but making steady progress"},
+           %{text: "Found a few edge cases we need to handle carefully"},
+           %{text: "Almost there, just need to finish up the last few items"}
+         ]
        }
      )}
   end
@@ -83,6 +119,17 @@ defmodule SocialPomodoroWeb.ComponentDevLive do
             <div class="flex-shrink-0 max-w-2xl">
               <SocialPomodoroWeb.SessionParticipantComponents.participant_display
                 participant={@sample_participant}
+                is_break={true}
+              />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <p class="text-xs font-semibold text-base-content/60">
+              isBreak=true (3 comments, long todos)
+            </p>
+            <div class="flex-shrink-0 max-w-2xl">
+              <SocialPomodoroWeb.SessionParticipantComponents.participant_display
+                participant={@busy_participant}
                 is_break={true}
               />
             </div>

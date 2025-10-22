@@ -10,7 +10,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   def participant_display(assigns) do
     ~H"""
     <div
-      class="participant-card card bg-primary/10 shadow-lg relative flex flex-col w-full md:max-w-2xl"
+      class="participant-card card bg-primary/10 shadow-lg relative flex flex-col"
       phx-hook="ParticipantCard"
       id={"participant-card-#{@participant.user_id}"}
       data-participant-id={@participant.user_id}
@@ -22,7 +22,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 rotate-on-collapse" />
       </button>
 
-      <div class="card p-2 flex flex-row gap-2 items-center justify-center w-full ">
+      <div class="card p-2 flex flex-row items-start justify-center w-full ">
         <div class="flex flex-col items-center gap-1 flex-shrink-0">
           <div class="relative flex items-center justify-center flex-shrink-0">
             <div class={if @is_break, do: "indicator", else: ""}>
@@ -47,18 +47,15 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               </span>
             <% end %>
           </div>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 hidden show-on-collapse">
-            {@participant.username}
-          </p>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate hide-on-collapse">
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate">
             {@participant.username}
           </p>
           <%= if @is_break && @participant.ready_for_next do %>
             <p class="text-xs text-success font-semibold">Skip</p>
           <% end %>
 
-          <%!-- Preview section (shown when collapsed) --%>
-          <div class="show-on-collapse-flex hidden flex-col gap-1 items-center mt-1">
+          <%!-- Preview section --%>
+          <div class="content-short flex-col gap-1 items-center mt-1">
             <%!-- Task count --%>
             <% completed_count =
               if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
@@ -80,10 +77,10 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
         <%!-- Shouts section (next to avatar) --%>
         <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
-          <div class="min-w-0 flex-1 hide-on-collapse h-24">
-            <.comment_bubble class="w-full h-full">
+          <div class="min-w-0 flex-1 content-full self-center max-h-24 overflow-y-auto pl-4">
+            <.comment_bubble class="w-full">
               <:body>
-                <div class="space-y-1.5 text-xs leading-snug break-words h-full overflow-y-auto pr-1">
+                <div class="space-y-1.5 text-xs leading-snug break-words">
                   <%= for message <- @participant.chat_messages do %>
                     <div>{message.text}</div>
                   <% end %>
@@ -94,8 +91,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 hide-on-collapse flex-1">
-        <div class="min-w-0">
+      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 content-full flex-1">
+        <div class="min-w-0 flex flex-col items-center">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Tasks</h4>
           <%= if @participant.todos && length(@participant.todos) > 0 do %>
             <div class="space-y-1 max-h-32 overflow-y-auto pr-1">

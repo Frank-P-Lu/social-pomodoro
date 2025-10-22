@@ -101,29 +101,46 @@
   }
 }
 
-/* Participant card collapsed state */
+/* Participant card expanded/collapsed state */
 @layer components {
-  .participant-card[data-collapsed="true"] {
+  /* Width control based on expanded state */
 
-    /* Hide elements when collapsed */
-    & .hide-on-collapse {
-      display: none !important;
-    }
+  .participant-card[data-expanded="false"] {
+    max-width: 6rem;
 
-    /* Show elements when collapsed */
-    & .show-on-collapse {
-      display: block !important;
-    }
+  }
 
-    & .show-on-collapse-flex {
-      display: flex !important;
-    }
+  .participant-card[data-expanded="true"] {
+    max-width: 20rem;
 
+  }
 
-    /* Rotate chevron icon when collapsed */
-    & .rotate-on-collapse {
-      transform: rotate(180deg);
-    }
+  /* Smooth width transition */
+  .participant-card {
+    transition: max-width 0.3s ease;
+  }
+
+  /* 1. HIDE the full content when the card is CLOSED */
+  /* The full content should be hidden by default */
+  .participant-card[data-expanded="false"] .content-full {
+    display: none !important;
+  }
+
+  /* 2. HIDE the short summary when the card is EXPANDED */
+  /* The short summary is shown by default */
+  .participant-card[data-expanded="true"] .content-short {
+    display: none !important;
+  }
+
+  /* 3. SHOW the short summary when the card is CLOSED */
+  /* Override the hidden class to show content-short elements */
+  .participant-card[data-expanded="false"] .content-short {
+    display: flex !important;
+  }
+
+  /* 4. Rotate chevron icon when collapsed (not expanded) */
+  .participant-card[data-expanded="false"] .rotate-on-collapse {
+    transform: rotate(180deg);
   }
 
   /* Smooth transitions */

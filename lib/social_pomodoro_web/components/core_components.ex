@@ -125,7 +125,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
   def comment_bubble(assigns) do
     ~H"""
     <article class={["relative inline-block", @class]}>
-      <div class="relative z-10 max-w-md rounded-[2rem] bg-secondary px-8 py-6 text-secondary-content shadow-2xl">
+      <div class="relative z-10 max-w-md rounded-[2rem] bg-secondary p-3 text-secondary-content shadow-2xl">
         <div class="space-y-2 text-sm leading-relaxed">
           {render_slot(@body)}
         </div>
