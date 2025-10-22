@@ -274,7 +274,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           <%= for participant <- @room_state.participants do %>
             <SessionParticipantComponents.participant_display
               participant={participant}
-              show_ready={@room_state.status == :break}
+              is_break={@room_state.status == :break}
             />
           <% end %>
         </div>
@@ -382,7 +382,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             room_state={@room_state}
             selected_tab={@selected_tab}
             placeholder="What are you working on?"
-            show_ready={false}
+            is_break={false}
             emoji_id_prefix=""
             completed_count={@completed_count}
             total_count={@total_count}
@@ -495,7 +495,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           room_state={@room_state}
           selected_tab={@selected_tab}
           placeholder="What are you working on?"
-          show_ready={true}
+          is_break={true}
           emoji_id_prefix="break-"
           completed_count={@completed_count}
           total_count={@total_count}

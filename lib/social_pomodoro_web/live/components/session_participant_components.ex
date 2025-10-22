@@ -22,7 +22,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <Icons.chevron_left class="w-5 h-5 fill-current transition-transform duration-200 rotate-on-collapse" />
       </button>
 
-      <div class={"card p-2 flex flex-row gap-2 items-center collapse-avatar-row #{if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0, do: "", else: "justify-center"}"}>
+      <div class="card p-2 flex flex-row gap-2 items-center justify-center w-full ">
         <div class="flex flex-col items-center gap-1 flex-shrink-0">
           <div class="relative flex items-center justify-center flex-shrink-0">
             <div class={if @is_break, do: "indicator", else: ""}>
@@ -47,10 +47,10 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               </span>
             <% end %>
           </div>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 show-on-collapse">
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 hidden show-on-collapse">
             {@participant.username}
           </p>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate hide-on-collapse hidden">
+          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 w-20 truncate hide-on-collapse">
             {@participant.username}
           </p>
           <%= if @is_break && @participant.ready_for_next do %>
@@ -64,14 +64,14 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               if @participant.todos, do: Enum.count(@participant.todos, & &1.completed), else: 0 %>
             <% total_count = if @participant.todos, do: length(@participant.todos), else: 0 %>
             <div class="flex items-center gap-1">
-              <Icons.todo class="w-3 h-3 text-base-content/70" />
+              <Icons.todo class="w-3 h-3 fill-base-content/70" />
               <span class="text-[10px] text-base-content/70">{completed_count}/{total_count}</span>
             </div>
 
             <%!-- Chat indicator (only during breaks when they have messages) --%>
             <%= if @is_break && @participant.chat_messages && length(@participant.chat_messages) > 0 do %>
               <div class="flex items-center gap-1">
-                <Icons.chat class="w-3 h-3 text-secondary" />
+                <Icons.chat class="w-3 h-3 fill-secondary" />
                 <span class="text-[10px] text-secondary">{length(@participant.chat_messages)}</span>
               </div>
             <% end %>

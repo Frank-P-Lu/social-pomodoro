@@ -107,23 +107,18 @@
 
     /* Hide elements when collapsed */
     & .hide-on-collapse {
-      display: none;
+      display: none !important;
     }
 
     /* Show elements when collapsed */
     & .show-on-collapse {
-      display: block;
+      display: block !important;
     }
 
     & .show-on-collapse-flex {
-      display: flex;
+      display: flex !important;
     }
 
-    /* Avatar row styling when collapsed */
-    & .collapse-avatar-row {
-      width: 10rem;
-      height: auto;
-    }
 
     /* Rotate chevron icon when collapsed */
     & .rotate-on-collapse {
