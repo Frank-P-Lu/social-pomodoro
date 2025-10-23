@@ -271,6 +271,98 @@ Hooks.ShoutMessage = {
   }
 }
 
+Hooks.AmbientAudio = {
+  mounted() {
+    // Initialize audio element
+    this.audio = new Audio()
+    this.audio.loop = true
+
+    // Load saved preferences
+    const savedSound = sessionStorage.getItem('ambient_sound') || 'none'
+    const savedVolume = sessionStorage.getItem('ambient_volume') || '50'
+
+    this.currentSound = savedSound
+    this.audio.volume = parseInt(savedVolume) / 100
+
+    // Listen for session status changes from LiveView
+    this.handleEvent("session_status_changed", ({ status }) => {
+      this.handleStatusChange(status)
+    })
+
+    // Listen for sound selection changes from slide-over
+    this.handleEvent("ambient_sound_changed", ({ sound }) => {
+      this.changeSound(sound)
+    })
+
+    // Listen for volume changes from slide-over
+    this.handleEvent("ambient_volume_changed", ({ volume }) => {
+      this.changeVolume(volume)
+    })
+  },
+
+  handleStatusChange(status) {
+    // Play during :active and :break, stop during :autostart
+    if (status === 'active' || status === 'break') {
+      this.playCurrentSound()
+    } else {
+      this.stopSound()
+    }
+  },
+
+  changeSound(sound) {
+    this.currentSound = sound
+    sessionStorage.setItem('ambient_sound', sound)
+
+    // If already playing, switch to new sound
+    if (!this.audio.paused) {
+      this.playCurrentSound()
+    }
+  },
+
+  changeVolume(volume) {
+    this.audio.volume = parseInt(volume) / 100
+    sessionStorage.setItem('ambient_volume', volume)
+  },
+
+  playCurrentSound() {
+    if (this.currentSound === 'none') {
+      this.stopSound()
+      return
+    }
+
+    const soundFiles = {
+      'rain': '/sounds/fwc-rain.mp3',
+      'cafe': '/sounds/fwc-cafe.mp3',
+      'white_noise': '/sounds/fwc-white-noise.mp3'
+    }
+
+    const soundFile = soundFiles[this.currentSound]
+    if (!soundFile) {
+      this.stopSound()
+      return
+    }
+
+    // Only change source if different
+    if (this.audio.src !== window.location.origin + soundFile) {
+      this.audio.src = soundFile
+    }
+
+    // Play or resume
+    this.audio.play().catch(err => {
+      console.error('Failed to play ambient audio:', err)
+    })
+  },
+
+  stopSound() {
+    this.audio.pause()
+    this.audio.currentTime = 0
+  },
+
+  destroyed() {
+    this.stopSound()
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,

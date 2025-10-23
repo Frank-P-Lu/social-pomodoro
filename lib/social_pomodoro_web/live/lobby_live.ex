@@ -466,10 +466,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
 
-    <!-- Attribution Footer -->
+    <!-- Footer -->
     <div class="text-center py-4 text-xs opacity-50">
-      Emoji graphics by <a href="https://openmoji.org" target="_blank" class="link">OpenMoji</a>
-      (CC BY-SA 4.0)
+      <.link navigate="/about" class="link">About</.link>
     </div>
 
     <.feedback_modal id="feedback-modal" username={@username}>
