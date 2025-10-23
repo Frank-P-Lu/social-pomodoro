@@ -246,6 +246,11 @@ Hooks.ParticipantCard = {
       this.el.dataset.expanded = String(!currentlyExpanded)
       sessionStorage.setItem(this.storageKey, String(!currentlyExpanded))
     })
+  },
+  updated() {
+    // Restore the expanded state after LiveView patches the DOM
+    const isExpanded = sessionStorage.getItem(this.storageKey) !== 'false'
+    this.el.dataset.expanded = String(isExpanded)
   }
 }
 
