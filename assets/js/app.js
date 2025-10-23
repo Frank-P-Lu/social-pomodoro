@@ -20,8 +20,8 @@
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
-import {Socket} from "phoenix"
-import {LiveSocket} from "phoenix_live_view"
+import { Socket } from "phoenix"
+import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
 // Wake Lock functionality
@@ -90,6 +90,7 @@ Hooks.Timer = {
   mounted() {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
+    this.segmentTargets = this.getSegmentTargets()
     this.updateTimer()
     this.interval = setInterval(() => {
       this.seconds--
@@ -109,6 +110,7 @@ Hooks.Timer = {
     // Reset timer on update from server
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
+    this.segmentTargets = this.getSegmentTargets()
     this.updateTimer()
   },
   destroyed() {
@@ -116,11 +118,41 @@ Hooks.Timer = {
     // Reset title when leaving the page
     document.title = APP_TITLE
   },
+  getSegmentTargets() {
+    const segments = {}
+      ;['minutes', 'seconds'].forEach((unit) => {
+        const valueEl = this.el.querySelector(`[data-countdown-segment="${unit}"] [data-countdown-value]`)
+        if (valueEl) {
+          segments[unit] = valueEl
+        }
+      })
+    return segments
+  },
+  updateSegment(unit, value) {
+    const target = this.segmentTargets?.[unit]
+    if (!target) return
+
+    const safeValue = Math.max(0, Math.floor(value))
+    target.style.setProperty('--value', safeValue)
+    target.textContent = `${safeValue}`
+    target.setAttribute('aria-label', `${safeValue}`)
+  },
+  breakdown(seconds) {
+    const safeSeconds = Math.max(0, seconds)
+    const minutes = Math.floor(safeSeconds / 60)
+    const secs = safeSeconds % 60
+
+    return { minutes, seconds: secs }
+  },
   updateTimer() {
-    const minutes = Math.floor(this.seconds / 60)
-    const secs = this.seconds % 60
-    const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`
-    this.el.textContent = timeStr
+    const { minutes, seconds } = this.breakdown(this.seconds)
+
+    this.updateSegment('minutes', minutes)
+    this.updateSegment('seconds', seconds)
+
+    const displayMinutes = Math.floor(this.seconds / 60)
+    const displaySeconds = this.seconds % 60
+    const timeStr = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`
 
     // Update tab title
     if (this.isBreak) {
@@ -188,15 +220,158 @@ Hooks.ReleaseWakeLock = {
   }
 }
 
+Hooks.ClearForm = {
+  mounted() {
+    this.handleEvent("clear-form", ({ id }) => {
+      if (this.el.id === id) {
+        this.el.reset()
+      }
+    })
+  }
+}
+
+Hooks.ParticipantCard = {
+  mounted() {
+    this.storageKey = `participant-card-expanded-${this.el.dataset.participantId}`
+
+    // Load saved state from sessionStorage (auto-clears when tab closes)
+    // Default to expanded (true), unless explicitly set to collapsed (false)
+    const isExpanded = sessionStorage.getItem(this.storageKey) !== 'false'
+    this.el.dataset.expanded = String(isExpanded)
+
+    // Add click handler for toggle button
+    this.el.querySelector('.collapse-toggle').addEventListener('click', (e) => {
+      e.preventDefault()
+      const currentlyExpanded = this.el.dataset.expanded === 'true'
+      this.el.dataset.expanded = String(!currentlyExpanded)
+      sessionStorage.setItem(this.storageKey, String(!currentlyExpanded))
+    })
+  },
+  updated() {
+    // Restore the expanded state after LiveView patches the DOM
+    const isExpanded = sessionStorage.getItem(this.storageKey) !== 'false'
+    this.el.dataset.expanded = String(isExpanded)
+  }
+}
+
+Hooks.ShoutMessage = {
+  mounted() {
+    // Trigger slide-in animation
+    this.el.style.animation = 'slide-in 0.3s ease-out'
+  },
+  beforeDestroy() {
+    // Prevent removal until animation completes
+    const animationDuration = 300 // ms
+    this.el.style.animation = 'slide-out 0.3s ease-out'
+
+    // Delay the actual removal
+    return new Promise(resolve => {
+      setTimeout(resolve, animationDuration)
+    })
+  }
+}
+
+Hooks.AmbientAudio = {
+  mounted() {
+    // Initialize audio element
+    this.audio = new Audio()
+    this.audio.loop = true
+
+    // Load saved preferences
+    const savedSound = sessionStorage.getItem('ambient_sound') || 'none'
+    const savedVolume = sessionStorage.getItem('ambient_volume') || '50'
+
+    this.currentSound = savedSound
+    this.audio.volume = parseInt(savedVolume) / 100
+
+    // Listen for session status changes from LiveView
+    this.handleEvent("session_status_changed", ({ status }) => {
+      this.handleStatusChange(status)
+    })
+
+    // Listen for sound selection changes from slide-over
+    this.handleEvent("ambient_sound_changed", ({ sound }) => {
+      this.changeSound(sound)
+    })
+
+    // Listen for volume changes from slide-over
+    this.handleEvent("ambient_volume_changed", ({ volume }) => {
+      this.changeVolume(volume)
+    })
+  },
+
+  handleStatusChange(status) {
+    // Play during :active and :break, stop during :autostart
+    if (status === 'active' || status === 'break') {
+      this.playCurrentSound()
+    } else {
+      this.stopSound()
+    }
+  },
+
+  changeSound(sound) {
+    this.currentSound = sound
+    sessionStorage.setItem('ambient_sound', sound)
+
+    // If already playing, switch to new sound
+    if (!this.audio.paused) {
+      this.playCurrentSound()
+    }
+  },
+
+  changeVolume(volume) {
+    this.audio.volume = parseInt(volume) / 100
+    sessionStorage.setItem('ambient_volume', volume)
+  },
+
+  playCurrentSound() {
+    if (this.currentSound === 'none') {
+      this.stopSound()
+      return
+    }
+
+    const soundFiles = {
+      'rain': '/sounds/fwc-rain.mp3',
+      'cafe': '/sounds/fwc-cafe.mp3',
+      'white_noise': '/sounds/fwc-white-noise.mp3'
+    }
+
+    const soundFile = soundFiles[this.currentSound]
+    if (!soundFile) {
+      this.stopSound()
+      return
+    }
+
+    // Only change source if different
+    if (this.audio.src !== window.location.origin + soundFile) {
+      this.audio.src = soundFile
+    }
+
+    // Play or resume
+    this.audio.play().catch(err => {
+      console.error('Failed to play ambient audio:', err)
+    })
+  },
+
+  stopSound() {
+    this.audio.pause()
+    this.audio.currentTime = 0
+  },
+
+  destroyed() {
+    this.stopSound()
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
+  params: { _csrf_token: csrfToken },
   hooks: Hooks,
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
@@ -216,7 +391,7 @@ window.liveSocket = liveSocket
 //     2. click on elements to jump to their definitions in your code editor
 //
 if (process.env.NODE_ENV === "development") {
-  window.addEventListener("phx:live_reload:attached", ({detail: reloader}) => {
+  window.addEventListener("phx:live_reload:attached", ({ detail: reloader }) => {
     // Enable server log streaming to client.
     // Disable with reloader.disableServerLogs()
     reloader.enableServerLogs()
@@ -229,11 +404,11 @@ if (process.env.NODE_ENV === "development") {
     window.addEventListener("keydown", e => keyDown = e.key)
     window.addEventListener("keyup", e => keyDown = null)
     window.addEventListener("click", e => {
-      if(keyDown === "c"){
+      if (keyDown === "c") {
         e.preventDefault()
         e.stopImmediatePropagation()
         reloader.openEditorAtCaller(e.target)
-      } else if(keyDown === "d"){
+      } else if (keyDown === "d") {
         e.preventDefault()
         e.stopImmediatePropagation()
         reloader.openEditorAtDef(e.target)

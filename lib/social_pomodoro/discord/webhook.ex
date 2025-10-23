@@ -75,9 +75,9 @@ defmodule SocialPomodoro.Discord.Webhook do
 
   defp build_analytics_payload(event_type, data) do
     formatted_data =
-      data
-      |> Enum.map(fn {key, value} -> "**#{format_key(key)}:** #{format_value(key, value)}" end)
-      |> Enum.join("\n")
+      Enum.map_join(data, "\n", fn {key, value} ->
+        "**#{format_key(key)}:** #{format_value(key, value)}"
+      end)
 
     content = """
     **📊 Analytics Event: #{event_type}**
@@ -95,8 +95,7 @@ defmodule SocialPomodoro.Discord.Webhook do
     key
     |> Atom.to_string()
     |> String.split("_")
-    |> Enum.map(&String.capitalize/1)
-    |> Enum.join(" ")
+    |> Enum.map_join(" ", &String.capitalize/1)
   end
 
   defp format_value(:wait_time_seconds, seconds) when is_integer(seconds) do

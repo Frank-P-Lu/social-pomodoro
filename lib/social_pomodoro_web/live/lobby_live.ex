@@ -1,8 +1,8 @@
 defmodule SocialPomodoroWeb.LobbyLive do
   use SocialPomodoroWeb, :live_view
   require Logger
-  alias SocialPomodoroWeb.Icons
   alias SocialPomodoro.Utils
+  alias SocialPomodoroWeb.Icons
 
   @impl true
   def mount(params, session, socket) do
@@ -26,14 +26,16 @@ defmodule SocialPomodoroWeb.LobbyLive do
         {:error, :not_found} -> nil
       end
 
+    default_duration = SocialPomodoro.Config.default_pomodoro_duration()
+
     socket =
       socket
       |> assign(:user_id, user_id)
       |> assign(:username, username)
       |> assign(:rooms, rooms)
-      |> assign(:duration_minutes, 25)
       |> assign(:creating, false)
       |> assign(:my_room_name, my_room_name)
+      |> assign_timer_defaults(default_duration)
 
     # Handle direct room link (/at/:room_name) - only during connected mount
     socket =
@@ -128,7 +130,45 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_event("set_duration", %{"minutes" => minutes}, socket) do
     duration = String.to_integer(minutes)
-    {:noreply, assign(socket, :duration_minutes, duration)}
+    {:noreply, assign_timer_defaults(socket, duration)}
+  end
+
+  @impl true
+  def handle_event("set_cycles", %{"cycles" => cycles}, socket) do
+    num_cycles = String.to_integer(cycles)
+
+    socket =
+      socket
+      |> assign(:num_cycles, num_cycles)
+      |> assign(:break_options_disabled, num_cycles == 1)
+
+    socket =
+      if num_cycles == 1 do
+        assign(
+          socket,
+          :break_duration_minutes,
+          SocialPomodoro.Config.single_cycle_break_duration()
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event(
+        "set_break_duration",
+        _params,
+        %{assigns: %{break_options_disabled: true}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("set_break_duration", %{"minutes" => minutes}, socket) do
+    break_duration = String.to_integer(minutes)
+    {:noreply, assign(socket, :break_duration_minutes, break_duration)}
   end
 
   @impl true
@@ -136,7 +176,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
     {:ok, name} =
       SocialPomodoro.RoomRegistry.create_room(
         socket.assigns.user_id,
-        socket.assigns.duration_minutes
+        socket.assigns.duration_minutes,
+        socket.assigns.num_cycles,
+        socket.assigns.break_duration_minutes
       )
 
     socket = assign(socket, :my_room_name, name)
@@ -153,7 +195,21 @@ defmodule SocialPomodoroWeb.LobbyLive do
   def handle_event("join_room", %{"room-name" => name}, socket) do
     case join_room_and_update_state(socket, name, socket.assigns.user_id) do
       {:ok, socket} ->
-        {:noreply, socket}
+        # Check if room is already in progress (active or break)
+        # If so, navigate to room page. If in autostart, stay on lobby
+        case SocialPomodoro.RoomRegistry.get_room(name) do
+          {:ok, room_pid} ->
+            room_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+            if room_state.status in [:active, :break] do
+              {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+            else
+              {:noreply, socket}
+            end
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
 
       {:error, socket} ->
         {:noreply, put_flash(socket, :error, "Could not join room")}
@@ -162,12 +218,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   @impl true
   def handle_event("rejoin_room", %{"room-name" => name}, socket) do
-    case join_room_and_update_state(socket, name, socket.assigns.user_id) do
-      {:ok, socket} ->
-        {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+    # If user is already in this room (my_room_name is set), just navigate
+    if socket.assigns.my_room_name == name do
+      {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
+    else
+      # User needs to rejoin the room first
+      case join_room_and_update_state(socket, name, socket.assigns.user_id) do
+        {:ok, socket} ->
+          {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
 
-      {:error, socket} ->
-        {:noreply, put_flash(socket, :error, "Could not rejoin room")}
+        {:error, socket} ->
+          {:noreply, put_flash(socket, :error, "Could not rejoin room")}
+      end
     end
   end
 
@@ -251,8 +313,34 @@ defmodule SocialPomodoroWeb.LobbyLive do
     end)
   end
 
-  defp min_timer_minutes do
-    SocialPomodoro.Config.min_timer_minutes()
+  defp assign_timer_defaults(socket, duration_minutes) do
+    defaults = SocialPomodoro.Config.defaults_for_duration(duration_minutes)
+    cycles = defaults.cycles
+
+    break_minutes =
+      if cycles == 1 do
+        SocialPomodoro.Config.single_cycle_break_duration()
+      else
+        defaults.break_minutes
+      end
+
+    socket
+    |> assign(:duration_minutes, duration_minutes)
+    |> assign(:num_cycles, cycles)
+    |> assign(:break_duration_minutes, break_minutes)
+    |> assign(:break_options_disabled, cycles == 1)
+  end
+
+  defp pomodoro_duration_options do
+    SocialPomodoro.Config.pomodoro_duration_options()
+  end
+
+  defp cycle_count_options do
+    SocialPomodoro.Config.cycle_count_options()
+  end
+
+  defp break_duration_options do
+    SocialPomodoro.Config.break_duration_options()
   end
 
   @impl true
@@ -296,7 +384,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       </div>
     </div>
 
-    <div class="bg-base-100 p-4 md:p-8">
+    <div class="bg-base-100 p-2 xs:p-4 md:p-8">
       <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
           <!-- Left Column: Explanation -->
@@ -326,10 +414,8 @@ defmodule SocialPomodoroWeb.LobbyLive do
                     Create a room, set your timer, and get things done together.
                   </p>
 
-                  <div class="flex gap-4 flex-wrap text-lg">
-                    <span class="text-primary font-semibold">No webcam</span>
-                    <span class="text-secondary font-semibold">No chat</span>
-                    <span class="text-accent font-semibold">Just work</span>
+                  <div class="text-secondary italic text-lg">
+                    No webcam. No chat. Just work
                   </div>
                 </div>
               </div>
@@ -342,47 +428,47 @@ defmodule SocialPomodoroWeb.LobbyLive do
               username={@username}
               my_room_name={@my_room_name}
               duration_minutes={@duration_minutes}
+              num_cycles={@num_cycles}
+              break_duration_minutes={@break_duration_minutes}
+              break_options_disabled={@break_options_disabled}
             />
           </div>
         </div>
 
-        <div class="card bg-base-200">
+        <div class="card bg-base-200 ">
           <div class="card-body">
             <h2 class="card-title">Lobby</h2>
 
-            <div class="space-y-4">
-              <%= if Enum.empty?(@rooms) do %>
-                <div class="text-center py-12">
-                  <p class="text-lg">
-                    No one is here yet
-                    <img
-                      src="/images/emojis/1F97A.svg"
-                      class="w-6 h-6 inline align-middle"
-                      alt="🥺"
-                    /> <br /> That's okay! You can focus solo!
-                  </p>
-                </div>
-              <% else %>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <%= for room <- @rooms do %>
-                    <.room_card
-                      room={room}
-                      user_id={@user_id}
-                      my_room_name={@my_room_name}
-                    />
-                  <% end %>
-                </div>
-              <% end %>
-            </div>
+            <%= if Enum.empty?(@rooms) do %>
+              <div class="text-center py-12">
+                <p class="text-lg">
+                  No one is here yet
+                  <img
+                    src="/images/emojis/1F97A.svg"
+                    class="w-6 h-6 inline align-middle"
+                    alt="🥺"
+                  /> <br /> That's okay! You can focus solo!
+                </p>
+              </div>
+            <% else %>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <%= for room <- @rooms do %>
+                  <.room_card
+                    room={room}
+                    user_id={@user_id}
+                    my_room_name={@my_room_name}
+                  />
+                <% end %>
+              </div>
+            <% end %>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Attribution Footer -->
+    <!-- Footer -->
     <div class="text-center py-4 text-xs opacity-50">
-      Emoji graphics by <a href="https://openmoji.org" target="_blank" class="link">OpenMoji</a>
-      (CC BY-SA 4.0)
+      <.link navigate="/about" class="link">About</.link>
     </div>
 
     <.feedback_modal id="feedback-modal" username={@username}>
@@ -405,12 +491,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
   defp room_card(assigns) do
     ~H"""
-    <div class={"card bg-base-100
+    <div class={"card bg-base-100 p-2 xs:p-4
     bg-[repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0,rgba(255,255,255,0.05)_2px,transparent_1px,transparent_20px)]
     bg-[size:20px_20px]
     " <>
       if @room.name == @my_room_name, do: "border-2 border-primary", else: ""}>
-      <div class="card-body p-4 gap-3 flex flex-col justify-between min-h-48">
+      <div class="card-body p-2 md:p-4 gap-3 flex flex-col justify-between min-h-48">
         <div>
           <div class="flex items-center justify-between gap-2">
             <h3 class="card-title font-semibold">{String.replace(@room.name, "-", " ")}</h3>
@@ -439,7 +525,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% end %>
           </div>
           <div class="text-sm opacity-70">
-            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting · {@room.duration_minutes} min
+            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting ·
+            <%= if @room.total_cycles > 1 do %>
+              {@room.total_cycles} × {@room.duration_minutes} min · {@room.break_duration_minutes} min breaks
+            <% else %>
+              {@room.duration_minutes} min
+            <% end %>
           </div>
         </div>
         
@@ -516,7 +607,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                       id={"start-room-btn-#{@room.name}"}
                       class="btn btn-primary btn-sm"
                     >
-                      Start Now
+                      Start
                     </button>
                   <% end %>
                 <% else %>
@@ -531,18 +622,40 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   </button>
                 <% end %>
               <% @room.status == :break -> %>
-                <%= if @room.name == @my_room_name do %>
-                  <%!-- User is already in the room, no action needed --%>
-                <% else %>
-                  <button
-                    phx-click="join_room"
-                    phx-value-room-name={@room.name}
-                    phx-hook="RequestWakeLock"
-                    id={"join-room-btn-#{@room.name}"}
-                    class="btn btn-primary btn-outline btn-sm"
-                  >
-                    Join
-                  </button>
+                <%= cond do %>
+                  <% @room.name == @my_room_name -> %>
+                    <%!-- User is already in the room but viewing lobby - show rejoin to navigate back --%>
+                    <button
+                      phx-click="rejoin_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"rejoin-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Rejoin
+                    </button>
+                  <% can_rejoin?(@room, @user_id) -> %>
+                    <%!-- User is an original participant who left - show rejoin --%>
+                    <button
+                      phx-click="rejoin_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"rejoin-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Rejoin
+                    </button>
+                  <% true -> %>
+                    <%!-- New user joining during break --%>
+                    <button
+                      phx-click="join_room"
+                      phx-value-room-name={@room.name}
+                      phx-hook="RequestWakeLock"
+                      id={"join-room-btn-#{@room.name}"}
+                      class="btn btn-primary btn-outline btn-sm"
+                    >
+                      Join
+                    </button>
                 <% end %>
               <% true -> %>
                 <%= if can_rejoin?(@room, @user_id) do %>
@@ -566,6 +679,9 @@ defmodule SocialPomodoroWeb.LobbyLive do
   attr :username, :string, required: true
   attr :my_room_name, :string, default: nil
   attr :duration_minutes, :integer, required: true
+  attr :num_cycles, :integer, required: true
+  attr :break_duration_minutes, :integer, required: true
+  attr :break_options_disabled, :boolean, default: false
 
   defp user_card(assigns) do
     ~H"""
@@ -626,56 +742,79 @@ defmodule SocialPomodoroWeb.LobbyLive do
         <div class="flex flex-col mx-auto w-full lg:w-xs relative">
           <div class="relative z-0 bg-base-200/50 p-4 rounded-box">
             <h2 class="card-title mb-4">Set your timer</h2>
-            <!-- Duration Presets -->
-            <%!-- TODO: make this client side --%>
-            <div class="join w-full mb-2">
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="25"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 25, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                25 min
-              </button>
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="50"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 50, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                50 min
-              </button>
-              <button
-                phx-click="set_duration"
-                phx-value-minutes="75"
-                disabled={@my_room_name != nil}
-                class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == 75, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
-              >
-                75 min
-              </button>
+            
+    <!-- Pomodoro Duration -->
+            <label class="label">
+              <span class="label-text">Pomodoro time</span>
+            </label>
+            <div class="join w-full mb-4">
+              <%= for minutes <- pomodoro_duration_options() do %>
+                <button
+                  phx-click="set_duration"
+                  phx-value-minutes={minutes}
+                  disabled={@my_room_name != nil}
+                  class={"join-item btn flex-1 !border-2 " <> if @duration_minutes == minutes, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+                >
+                  {minutes} min
+                </button>
+              <% end %>
             </div>
             
-    <!-- Duration Slider -->
-            <div class="mb-4">
-              <form phx-change="set_duration">
-                <input
-                  type="range"
-                  id="duration-slider"
-                  min={min_timer_minutes()}
-                  max="180"
-                  value={@duration_minutes}
-                  name="minutes"
+    <!-- Number of Cycles -->
+            <label class="label">
+              <span class="label-text">Number of pomodoros</span>
+            </label>
+            <div class="join w-full mb-4">
+              <%= for cycles <- cycle_count_options() do %>
+                <button
+                  phx-click="set_cycles"
+                  phx-value-cycles={cycles}
                   disabled={@my_room_name != nil}
-                  class="range range-neutral"
-                />
-              </form>
-              <div class="flex justify-between text-xs opacity-50 mt-1">
-                <span>{min_timer_minutes()} min</span>
-                <span>3 hours</span>
+                  class={"join-item btn flex-1 !border-2 " <> if @num_cycles == cycles, do: "btn-primary btn-outline", else: "btn-neutral btn-outline"}
+                >
+                  {cycles}
+                </button>
+              <% end %>
+            </div>
+            
+    <!-- Break Duration -->
+            <label class="label">
+              <span class="label-text">Break time</span>
+            </label>
+            <div class="relative mb-4">
+              <div class="join w-full">
+                <%= for minutes <- break_duration_options() do %>
+                  <button
+                    phx-click="set_break_duration"
+                    phx-value-minutes={minutes}
+                    disabled={@my_room_name != nil or @break_options_disabled}
+                    class={[
+                      "join-item btn flex-1 !border-2",
+                      if(@break_duration_minutes == minutes,
+                        do: "btn-primary btn-outline",
+                        else: "btn-neutral btn-outline"
+                      ),
+                      if(@my_room_name != nil or @break_options_disabled,
+                        do: "btn-disabled",
+                        else: nil
+                      )
+                    ]}
+                  >
+                    {minutes} min
+                  </button>
+                <% end %>
               </div>
-              <label for="duration-slider" class="label w-full">
-                <span class="label-text mx-auto">Duration: {@duration_minutes} minutes</span>
-              </label>
+
+              <%= if @break_options_disabled do %>
+                <div
+                  class="absolute inset-0 z-20 flex items-center justify-center p-4 rounded-box border border-base-content/5 bg-gradient-to-br from-base-200/35 via-base-200/20 to-base-100/10 backdrop-blur-lg shadow-lg pointer-events-none"
+                  role="alert"
+                >
+                  <div class="pointer-events-auto flex items-center gap-2 text-xs text-sm text-base-content/90">
+                    <span>No breaks for a single pomodoro.</span>
+                  </div>
+                </div>
+              <% end %>
             </div>
 
             <div class="card-actions">

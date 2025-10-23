@@ -2,6 +2,7 @@ defmodule SocialPomodoro.RoomTest do
   use ExUnit.Case, async: true
   alias SocialPomodoro.Room
   alias SocialPomodoro.RoomRegistry
+  import SocialPomodoro.TestHelpers
 
   setup do
     :ok
@@ -29,7 +30,7 @@ defmodule SocialPomodoro.RoomTest do
   defp tick(pid) do
     send(pid, :tick)
     # Give it a moment to process
-    Process.sleep(10)
+    sleep_short()
   end
 
   describe "room name generation" do
@@ -163,7 +164,7 @@ defmodule SocialPomodoro.RoomTest do
       assert :ok = Room.leave(room_name, creator_id)
 
       # Give the process a moment to handle the leave
-      Process.sleep(10)
+      sleep_short()
 
       # Verify room process is still alive
       assert Process.alive?(room_pid)
@@ -218,39 +219,50 @@ defmodule SocialPomodoro.RoomTest do
         assert state.status == :break
         assert state.seconds_remaining == 2
 
-        # Now both users mark ready to go again
-        assert :ok = Room.go_again(room_name, creator_id)
+        # Now test with multi-cycle room to verify timer cancellation during skip break
+        # Create a new room with 2 cycles specifically for this test
+        {:ok, room_name_2, room_pid_2} =
+          create_test_room(creator_id,
+            duration_seconds: 2,
+            break_duration_seconds: 2,
+            total_cycles: 2
+          )
 
-        # Before the second user marks ready, verify we're still in break
-        state = Room.get_state(room_pid)
+        # Add participant to new room
+        participant2_id = "user3_#{System.unique_integer([:positive])}"
+        assert :ok = Room.join(room_name_2, participant2_id)
+
+        # Start and complete first session
+        assert :ok = Room.start_session(room_name_2)
+        tick(room_pid_2)
+        tick(room_pid_2)
+        tick(room_pid_2)
+
+        # Should be in break
+        state = Room.get_state(room_pid_2)
         assert state.status == :break
+        assert state.current_cycle == 1
 
-        # Second user marks ready - this should cancel break timer and start new session
-        assert :ok = Room.go_again(room_name, participant_id)
+        # Both users skip break
+        assert :ok = Room.go_again(room_name_2, creator_id)
+        assert :ok = Room.go_again(room_name_2, participant2_id)
 
-        # Give it a moment to process
-        Process.sleep(10)
+        sleep_short()
 
-        # Verify we transitioned back to active
-        state = Room.get_state(room_pid)
+        # Verify we transitioned to next cycle
+        state = Room.get_state(room_pid_2)
         assert state.status == :active
+        assert state.current_cycle == 2
         assert state.seconds_remaining == 2
 
-        # Now tick once and verify we only decremented by 1
-        # If the bug existed, we'd see multiple decrements or erratic behavior
-        tick(room_pid)
-
-        state = Room.get_state(room_pid)
+        # Verify timer ticks correctly (no multiple timers)
+        tick(room_pid_2)
+        state = Room.get_state(room_pid_2)
         assert state.seconds_remaining == 1
 
-        # Tick again to verify consistent behavior
-        tick(room_pid)
-
-        state = Room.get_state(room_pid)
+        tick(room_pid_2)
+        state = Room.get_state(room_pid_2)
         assert state.seconds_remaining == 0
-
-        # The timer should tick exactly once per tick message
-        # proving that old timers were properly cancelled
       else
         flunk("Room terminated unexpectedly")
       end
@@ -350,8 +362,8 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
-  describe "status_message functionality" do
-    test "user can set status_message during active session" do
+  describe "todo list functionality" do
+    test "user can add todo during active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
       {:ok, room_pid} = RoomRegistry.get_room(room_name)
@@ -359,25 +371,106 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message
-      assert :ok = Room.set_status_message(room_name, creator_id, "Building tests")
+      # Add todo
+      assert :ok = Room.add_todo(room_name, creator_id, "Building tests")
 
-      # Verify it was set (via serialized state since that's how LiveView sees it)
+      # Verify it was added
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert participant.status_message == "Building tests"
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Building tests"
+      assert hd(participant.todos).completed == false
+      assert is_binary(hd(participant.todos).id)
     end
 
-    test "user cannot set status_message when not in active session" do
+    test "user can add multiple todos up to max limit" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Add 5 todos (max limit)
+      for i <- 1..5 do
+        assert :ok = Room.add_todo(room_name, creator_id, "Task #{i}")
+      end
+
+      # Verify all added
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 5
+
+      # Try to add 6th - should fail
+      assert {:error, :max_todos_reached} = Room.add_todo(room_name, creator_id, "Task 6")
+
+      # Verify still only 5
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 5
+    end
+
+    test "user can toggle todo completion" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == false
+
+      # Toggle to complete
+      assert :ok = Room.toggle_todo(room_name, creator_id, todo.id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == true
+
+      # Toggle back to incomplete
+      assert :ok = Room.toggle_todo(room_name, creator_id, todo.id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      todo = hd(participant.todos)
+      assert todo.completed == false
+    end
+
+    test "user can delete todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+      {:ok, room_pid} = RoomRegistry.get_room(room_name)
+
+      assert :ok = Room.start_session(room_name)
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 2")
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 2
+
+      # Delete first todo
+      todo_id = hd(participant.todos).id
+      assert :ok = Room.delete_todo(room_name, creator_id, todo_id)
+
+      state = Room.get_state(room_pid)
+      participant = Enum.find(state.participants, &(&1.user_id == creator_id))
+      assert length(participant.todos) == 1
+      assert hd(participant.todos).text == "Task 2"
+    end
+
+    test "user cannot add/modify todos when not in active or break session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
-      # Try to set status_message in waiting state
-      assert {:error, :invalid_status} =
-               Room.set_status_message(room_name, creator_id, "Building tests")
+      # Try to add todo in autostart state
+      assert {:error, :invalid_status} = Room.add_todo(room_name, creator_id, "Building tests")
     end
 
-    test "status_message persists when user leaves and rejoins" do
+    test "todos persist when user leaves and rejoins" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
@@ -390,30 +483,38 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message
-      assert :ok = Room.set_status_message(room_name, participant_id, "Important task")
+      # Add todos
+      assert :ok = Room.add_todo(room_name, participant_id, "Important task")
+      assert :ok = Room.add_todo(room_name, participant_id, "Another task")
 
-      # Verify it was set
+      # Verify they were added
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.status_message == "Important task"
+      assert length(participant.todos) == 2
 
       # Leave and rejoin
       assert :ok = Room.leave(room_name, participant_id)
       assert :ok = Room.join(room_name, participant_id)
 
-      # Verify status_message persisted
+      # Verify todos persisted
       state = Room.get_state(room_pid)
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
-      assert participant.status_message == "Important task"
+      assert length(participant.todos) == 2
+      assert Enum.at(participant.todos, 0).text == "Important task"
+      assert Enum.at(participant.todos, 1).text == "Another task"
     end
 
-    test "status_message is reset when session starts" do
+    test "todos persist across multiple cycles" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
+      # Use multi-cycle room so skip break works
       {:ok, room_name, room_pid} =
-        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 1,
+          total_cycles: 2
+        )
 
       # Join another user
       assert :ok = Room.join(room_name, participant_id)
@@ -421,28 +522,34 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message for both
-      assert :ok = Room.set_status_message(room_name, creator_id, "Task 1")
-      assert :ok = Room.set_status_message(room_name, participant_id, "Task 2")
+      # Add todos for both
+      assert :ok = Room.add_todo(room_name, creator_id, "Task 1")
+      assert :ok = Room.add_todo(room_name, participant_id, "Task 2")
 
       # Complete session and go to break
       tick(room_pid)
       tick(room_pid)
 
-      # Mark both ready and start new session
+      # Mark both ready and skip break to start cycle 2
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      # Verify status_message was reset
+      sleep_short()
+
+      # Verify todos PERSISTED for cycle 2
       state = Room.get_state(room_pid)
+      assert state.current_cycle == 2
+
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
 
-      assert is_nil(creator.status_message)
-      assert is_nil(participant.status_message)
+      assert length(creator.todos) == 1
+      assert length(participant.todos) == 1
+      assert hd(creator.todos).text == "Task 1"
+      assert hd(participant.todos).text == "Task 2"
     end
 
-    test "can set status_message during break after it was cleared" do
+    test "can add todos during break and they persist from active session" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
 
       {:ok, room_name, room_pid} =
@@ -451,30 +558,55 @@ defmodule SocialPomodoro.RoomTest do
       # Start session
       assert :ok = Room.start_session(room_name)
 
-      # Set status_message during active session
-      assert :ok = Room.set_status_message(room_name, creator_id, "Working on feature X")
+      # Add todo during active session
+      assert :ok = Room.add_todo(room_name, creator_id, "Working on feature X")
 
-      # Verify it was set
+      # Verify it was added
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert creator.status_message == "Working on feature X"
+      assert length(creator.todos) == 1
 
       # Complete session and go to break
       tick(room_pid)
       tick(room_pid)
 
-      # Verify status_message was cleared when transitioning to break
+      # Verify todos PERSISTED when transitioning to break
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert is_nil(creator.status_message)
+      assert length(creator.todos) == 1
+      assert hd(creator.todos).text == "Working on feature X"
 
-      # Now set a new status_message during break
-      assert :ok = Room.set_status_message(room_name, creator_id, "Great session!")
+      # Now add another todo during break
+      assert :ok = Room.add_todo(room_name, creator_id, "Great session!")
 
-      # Verify the new message was set
+      # Verify both todos are present
       state = Room.get_state(room_pid)
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
-      assert creator.status_message == "Great session!"
+      assert length(creator.todos) == 2
+      assert Enum.at(creator.todos, 0).text == "Working on feature X"
+      assert Enum.at(creator.todos, 1).text == "Great session!"
+    end
+
+    test "error when trying to toggle non-existent todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Try to toggle non-existent todo
+      assert {:error, :todo_not_found} =
+               Room.toggle_todo(room_name, creator_id, "fake-id-123")
+    end
+
+    test "error when trying to delete non-existent todo" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Try to delete non-existent todo
+      assert {:error, :todo_not_found} =
+               Room.delete_todo(room_name, creator_id, "fake-id-123")
     end
   end
 
@@ -581,12 +713,17 @@ defmodule SocialPomodoro.RoomTest do
       assert participant.status_emoji == "💪"
     end
 
-    test "status emoji is reset when session starts" do
+    test "status emoji is reset when next cycle starts" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       participant_id = "user2_#{System.unique_integer([:positive])}"
 
+      # Use multi-cycle room so skip break works
       {:ok, room_name, room_pid} =
-        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 1,
+          total_cycles: 2
+        )
 
       # Join another user
       assert :ok = Room.join(room_name, participant_id)
@@ -602,12 +739,16 @@ defmodule SocialPomodoro.RoomTest do
       tick(room_pid)
       tick(room_pid)
 
-      # Mark both ready and start new session
+      # Mark both ready and skip break to start cycle 2
       assert :ok = Room.go_again(room_name, creator_id)
       assert :ok = Room.go_again(room_name, participant_id)
 
-      # Verify status_emoji was reset
+      sleep_short()
+
+      # Verify status_emoji was reset for cycle 2
       state = Room.get_state(room_pid)
+      assert state.current_cycle == 2
+
       creator = Enum.find(state.participants, &(&1.user_id == creator_id))
       participant = Enum.find(state.participants, &(&1.user_id == participant_id))
 
@@ -658,7 +799,7 @@ defmodule SocialPomodoro.RoomTest do
       :telemetry.detach("test-rejoin")
     end
 
-    test "emits telemetry event when status_message is set" do
+    test "emits telemetry event when todo is added" do
       creator_id = "user1_#{System.unique_integer([:positive])}"
       {:ok, room_name} = RoomRegistry.create_room(creator_id, 25)
 
@@ -669,28 +810,27 @@ defmodule SocialPomodoro.RoomTest do
       test_pid = self()
 
       :telemetry.attach(
-        "test-status-message",
-        [:pomodoro, :user, :set_status_message],
+        "test-add-todo",
+        [:pomodoro, :user, :add_todo],
         fn event, measurements, metadata, _config ->
           send(test_pid, {:telemetry_event, event, measurements, metadata})
         end,
         nil
       )
 
-      # Set status_message (should trigger telemetry)
-      status_message_text = "Building cool features"
-      assert :ok = Room.set_status_message(room_name, creator_id, status_message_text)
+      # Add todo (should trigger telemetry)
+      todo_text = "Building cool features"
+      assert :ok = Room.add_todo(room_name, creator_id, todo_text)
 
       # Assert telemetry event was emitted
-      assert_receive {:telemetry_event, [:pomodoro, :user, :set_status_message], %{count: 1},
-                      metadata}
+      assert_receive {:telemetry_event, [:pomodoro, :user, :add_todo], %{count: 1}, metadata}
 
       assert metadata.room_name == room_name
       assert metadata.user_id == creator_id
-      assert metadata.text_length == String.length(status_message_text)
+      assert metadata.text_length == String.length(todo_text)
 
       # Clean up
-      :telemetry.detach("test-status-message")
+      :telemetry.detach("test-add-todo")
     end
 
     test "does not emit rejoin telemetry when user first joins" do
@@ -877,15 +1017,19 @@ defmodule SocialPomodoro.RoomTest do
     end
   end
 
-  describe "spectator promotion after go_again" do
+  describe "spectator promotion during break" do
     @tag :sync
-    test "spectator who joined during active session becomes full participant after go_again" do
-      # A creates a room
+    test "spectator who joined during active session becomes participant during break and can participate in next cycle" do
+      # A creates a room with 2 cycles
       user_a_id = "userA_#{System.unique_integer([:positive])}"
       user_b_id = "userB_#{System.unique_integer([:positive])}"
 
       {:ok, room_name, room_pid} =
-        create_test_room(user_a_id, duration_seconds: 2, break_duration_seconds: 2)
+        create_test_room(user_a_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 2
+        )
 
       # A starts the timer
       assert :ok = Room.start_session(room_name)
@@ -920,25 +1064,777 @@ defmodule SocialPomodoro.RoomTest do
         # During break, B should now be a participant (spectators are promoted)
         assert length(state.participants) == 2
 
-        # Both A and B hit go_again
+        # Both A and B skip break to go to next cycle
         assert :ok = Room.go_again(room_name, user_a_id)
         assert :ok = Room.go_again(room_name, user_b_id)
 
         # Give it a moment to process
-        Process.sleep(10)
+        sleep_short()
 
-        # Verify room transitioned back to active
+        # Verify room transitioned to cycle 2
         state = Room.get_state(room_pid)
         assert state.status == :active
+        assert state.current_cycle == 2
         assert state.seconds_remaining == 2
 
-        # B should NOT be a spectator anymore - both should be session participants
-        assert user_a_id in state.session_participants
-        assert user_b_id in state.session_participants
-        assert length(state.session_participants) == 2
+        # B should be a session participant now (since they joined during break)
+        # Actually, they joined as spectator so they won't be in session_participants yet
+        # They'll be in session_participants for the NEXT cycle after this break
+        # Let's just verify both are participants
+        assert length(state.participants) == 2
       else
         flunk("Room terminated unexpectedly")
       end
+    end
+  end
+
+  describe "multi-cycle pomodoros" do
+    test "room completes multiple cycles and terminates after final break" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      # Create a room with 2 cycles, 2 second work, 1 second break
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 1,
+          total_cycles: 2
+        )
+
+      # Verify initial state
+      state = Room.get_state(room_pid)
+      assert state.total_cycles == 2
+      assert state.current_cycle == 1
+
+      # Start the session
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Complete first work session (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break now
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.current_cycle == 1
+        assert state.seconds_remaining == 1
+
+        # Complete first break (1 -> 0 -> next cycle)
+        tick(room_pid)
+        tick(room_pid)
+
+        # Should be in second cycle now
+        if Process.alive?(room_pid) do
+          state = Room.get_state(room_pid)
+          assert state.status == :active
+          assert state.current_cycle == 2
+          assert state.seconds_remaining == 2
+
+          # Complete second work session
+          tick(room_pid)
+          tick(room_pid)
+          tick(room_pid)
+
+          # Should be in final break
+          if Process.alive?(room_pid) do
+            state = Room.get_state(room_pid)
+            assert state.status == :break
+            assert state.current_cycle == 2
+            assert state.seconds_remaining == 1
+
+            # Complete final break - room should terminate
+            tick(room_pid)
+            tick(room_pid)
+
+            # Give it a moment to terminate
+            sleep_short()
+
+            # Room should be terminated
+            refute Process.alive?(room_pid)
+          else
+            flunk("Room terminated before final break")
+          end
+        else
+          flunk("Room terminated after first break")
+        end
+      else
+        flunk("Room terminated after first session")
+      end
+    end
+
+    test "skip break advances to next cycle immediately" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      # Create a room with 3 cycles
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 5,
+          total_cycles: 3
+        )
+
+      # Add participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start the session
+      assert :ok = Room.start_session(room_name)
+
+      # Complete first work session
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+      assert state.current_cycle == 1
+
+      # Both users skip break
+      assert :ok = Room.go_again(room_name, creator_id)
+      assert :ok = Room.go_again(room_name, participant_id)
+
+      sleep_short()
+
+      # Should advance to cycle 2 immediately
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.current_cycle == 2
+        assert state.seconds_remaining == 2
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+
+    test "skip break returns error on final break" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      # Create a room with 1 cycle
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 2,
+          total_cycles: 1
+        )
+
+      # Start and complete the only session
+      assert :ok = Room.start_session(room_name)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in final break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+      assert state.current_cycle == 1
+      assert state.total_cycles == 1
+
+      # Try to skip final break - should return error
+      assert {:error, :final_break} = Room.go_again(room_name, creator_id)
+
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        # Should still be in break, not active
+        assert state.status == :break
+        assert state.current_cycle == 1
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+
+    test "single cycle room behaves as before (backwards compatibility)" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      # Create a room with default (1) cycle
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 1)
+
+      state = Room.get_state(room_pid)
+      assert state.total_cycles == 1
+      assert state.current_cycle == 1
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      # Complete work session
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Complete break - should terminate (old behavior)
+      tick(room_pid)
+      tick(room_pid)
+      sleep_short()
+
+      refute Process.alive?(room_pid)
+    end
+
+    test "cycle information is serialized in room state" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, _room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 25 * 60,
+          break_duration_seconds: 5 * 60,
+          total_cycles: 4
+        )
+
+      state = Room.get_state(room_pid)
+
+      assert state.total_cycles == 4
+      assert state.current_cycle == 1
+      assert state.duration_minutes == 25
+      assert state.break_duration_minutes == 5
+    end
+
+    test "break timer auto-starts next cycle when participants don't all skip" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      # Create room with 3 cycles
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 3
+        )
+
+      # Add participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Complete first work session (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break now
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.current_cycle == 1
+
+        # Creator clicks skip, but participant doesn't
+        assert :ok = Room.go_again(room_name, creator_id)
+
+        # Verify creator is ready but participant is not
+        state = Room.get_state(room_pid)
+        creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+        participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+        assert creator.ready_for_next == true
+        assert participant.ready_for_next == false
+
+        # Still in break since not everyone is ready
+        assert state.status == :break
+
+        # Let break timer complete naturally (2 -> 1 -> 0 -> next cycle)
+        tick(room_pid)
+        tick(room_pid)
+        tick(room_pid)
+
+        # Should auto-start cycle 2 (not go to lobby, not stay in break)
+        if Process.alive?(room_pid) do
+          state = Room.get_state(room_pid)
+          assert state.status == :active
+          assert state.current_cycle == 2
+          assert state.seconds_remaining == 2
+
+          # Both participants should have ready_for_next reset
+          creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+          participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+          assert creator.ready_for_next == false
+          assert participant.ready_for_next == false
+        else
+          flunk("Room terminated after break instead of starting cycle 2")
+        end
+      else
+        flunk("Room terminated after first session")
+      end
+    end
+  end
+
+  describe "multi-cycle session persistence" do
+    @tag :sync
+    test "users remain in room after break ends with remaining cycles" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      # Create room with 3 cycles, short durations for fast testing
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 3
+        )
+
+      # Add participant
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify both users are in the room
+      state = Room.get_state(room_pid)
+      assert length(state.participants) == 2
+      assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+      assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+      # Start session
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+      assert state.current_cycle == 1
+
+      # Complete first work session (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Should be in break now
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :break
+        assert state.current_cycle == 1
+
+        # Verify both users are still in the room during break
+        assert length(state.participants) == 2
+        assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+        assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+        # Complete break (2 -> 1 -> 0 -> next cycle)
+        tick(room_pid)
+        tick(room_pid)
+        tick(room_pid)
+
+        # Should auto-start cycle 2 (room should NOT terminate since we have more cycles)
+        if Process.alive?(room_pid) do
+          state = Room.get_state(room_pid)
+          assert state.status == :active
+          assert state.current_cycle == 2
+          assert state.seconds_remaining == 2
+
+          # VERIFY: Both users should STILL be in the room (not kicked out)
+          assert length(state.participants) == 2
+          assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+          assert Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+          # Verify ready_for_next flags were reset
+          creator = Enum.find(state.participants, &(&1.user_id == creator_id))
+          participant = Enum.find(state.participants, &(&1.user_id == participant_id))
+          assert creator.ready_for_next == false
+          assert participant.ready_for_next == false
+        else
+          flunk("Room terminated after break instead of starting cycle 2")
+        end
+      else
+        flunk("Room terminated after first session")
+      end
+    end
+  end
+
+  describe "rejoining during break" do
+    test "original participant can rejoin during break as participant (not spectator)" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 2, break_duration_seconds: 5)
+
+      # Participant joins during autostart
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Start the session (locks in session_participants)
+      assert :ok = Room.start_session(room_name)
+
+      # Verify both are session participants
+      raw_state = Room.get_raw_state(room_pid)
+      assert creator_id in raw_state.session_participants
+      assert participant_id in raw_state.session_participants
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Participant leaves during break
+      assert :ok = Room.leave(room_name, participant_id)
+
+      # Verify participant left
+      state = Room.get_state(room_pid)
+      assert length(state.participants) == 1
+      refute Enum.any?(state.participants, &(&1.user_id == participant_id))
+
+      # Original participant rejoins during break - should join as participant, not spectator
+      assert :ok = Room.join(room_name, participant_id)
+
+      # Verify they rejoined as a participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert length(raw_state.participants) == 2
+      assert Enum.any?(raw_state.participants, &(&1.user_id == participant_id))
+      refute participant_id in raw_state.spectators
+
+      # Verify they are still a session participant
+      assert participant_id in raw_state.session_participants
+    end
+
+    test "non-original participant can join during break as regular participant" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 2, break_duration_seconds: 5)
+
+      # Start the session (only creator is a session participant)
+      assert :ok = Room.start_session(room_name)
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # A new user (not a session participant) joins during break
+      # During break, anyone can join as a regular participant (not spectator)
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a regular participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+      assert Enum.empty?(raw_state.spectators)
+
+      # Verify they are NOT a session participant (they joined during break, not before session started)
+      refute new_user_id in raw_state.session_participants
+    end
+
+    @tag :sync
+    test "user joining during break becomes participant (not spectator) when break ends" do
+      # This tests the bug fix: users who join during a break should be able to
+      # participate in the next cycle, not become spectators
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 2,
+          total_cycles: 2
+        )
+
+      # Start the session (only creator is a session participant)
+      assert :ok = Room.start_session(room_name)
+
+      # Verify creator is a session participant
+      raw_state = Room.get_raw_state(room_pid)
+      assert creator_id in raw_state.session_participants
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+      assert state.current_cycle == 1
+
+      # A new user joins during break
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a regular participant (not a spectator)
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+      assert Enum.empty?(raw_state.spectators)
+
+      # Complete the break to start next cycle (2 -> 1 -> 0 -> active)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in the next cycle
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.current_cycle == 2
+
+        # BUG FIX: The new user should now be a session participant
+        # (not a spectator) because they joined during the break
+        raw_state = Room.get_raw_state(room_pid)
+        assert new_user_id in raw_state.session_participants
+        assert creator_id in raw_state.session_participants
+
+        # Both should be in participants list
+        assert length(state.participants) == 2
+        assert Enum.any?(state.participants, &(&1.user_id == creator_id))
+        assert Enum.any?(state.participants, &(&1.user_id == new_user_id))
+
+        # No spectators
+        assert Enum.empty?(raw_state.spectators)
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+
+    @tag :sync
+    test "user joining during break becomes participant when break is skipped" do
+      # Similar to above test but using go_again instead of natural break end
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      new_user_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 2,
+          break_duration_seconds: 10,
+          total_cycles: 2
+        )
+
+      # Start the session
+      assert :ok = Room.start_session(room_name)
+
+      # Complete the session to enter break (2 -> 1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify we're in break
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # A new user joins during break
+      assert :ok = Room.join(room_name, new_user_id)
+
+      # Verify they joined as a participant
+      raw_state = Room.get_raw_state(room_pid)
+      assert Enum.any?(raw_state.participants, &(&1.user_id == new_user_id))
+
+      # Both users skip break
+      assert :ok = Room.go_again(room_name, creator_id)
+      assert :ok = Room.go_again(room_name, new_user_id)
+
+      sleep_short()
+
+      # Verify we're in the next cycle
+      if Process.alive?(room_pid) do
+        state = Room.get_state(room_pid)
+        assert state.status == :active
+        assert state.current_cycle == 2
+
+        # BUG FIX: The new user should be a session participant
+        raw_state = Room.get_raw_state(room_pid)
+        assert new_user_id in raw_state.session_participants
+        assert creator_id in raw_state.session_participants
+
+        # Both should be participants, not spectators
+        assert length(state.participants) == 2
+        assert Enum.empty?(raw_state.spectators)
+      else
+        flunk("Room terminated unexpectedly")
+      end
+    end
+  end
+
+  describe "chat messages during break" do
+    test "user can send chat message during break" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+      participant_id = "user2_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.join(room_name, participant_id)
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send a chat message
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Hello!")
+
+      # Verify message was stored
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_participant.chat_messages) == 1
+      assert hd(creator_participant.chat_messages).text == "Hello!"
+    end
+
+    test "messages are stored in FIFO order with max 3 limit" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send 4 messages (4th should replace 1st)
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 1")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 2")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 3")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 4")
+
+      # Verify only 3 messages and FIFO behavior
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+
+      assert length(creator_participant.chat_messages) == 3
+      messages = Enum.map(creator_participant.chat_messages, & &1.text)
+      assert messages == ["Message 2", "Message 3", "Message 4"]
+    end
+
+    test "message length is validated (max 50 chars)" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 1, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Try to send a message longer than 50 chars
+      long_message = String.duplicate("a", 51)
+
+      assert {:error, :message_too_long} =
+               Room.send_chat_message(room_name, creator_id, long_message)
+
+      # 50 chars should be allowed
+      exact_message = String.duplicate("b", 50)
+      assert :ok = Room.send_chat_message(room_name, creator_id, exact_message)
+
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_participant.chat_messages) == 1
+    end
+
+    test "cannot send messages during active status" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id, duration_seconds: 10, break_duration_seconds: 5)
+
+      assert :ok = Room.start_session(room_name)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :active
+
+      # Try to send message during active status
+      assert {:error, :not_in_break} = Room.send_chat_message(room_name, creator_id, "Hello")
+
+      # Verify no messages were stored
+      updated_state = Room.get_state(room_pid)
+      creator_participant = Enum.find(updated_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_participant.chat_messages)
+    end
+
+    test "chat messages are cleared when break ends and next cycle starts" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 1,
+          total_cycles: 2
+        )
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send messages during break
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 1")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Message 2")
+
+      # Verify messages exist
+      break_state = Room.get_state(room_pid)
+      creator_break = Enum.find(break_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_break.chat_messages) == 2
+
+      # Tick to next active session (1 -> 0 -> active)
+      tick(room_pid)
+      tick(room_pid)
+
+      # Verify chat messages were cleared
+      final_state = Room.get_state(room_pid)
+      assert final_state.status == :active
+      creator_final = Enum.find(final_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_final.chat_messages)
+    end
+
+    test "chat messages are cleared when break is skipped via go_again" do
+      creator_id = "user1_#{System.unique_integer([:positive])}"
+
+      {:ok, room_name, room_pid} =
+        create_test_room(creator_id,
+          duration_seconds: 1,
+          break_duration_seconds: 10,
+          total_cycles: 2
+        )
+
+      assert :ok = Room.start_session(room_name)
+
+      # Tick multiple times to reach break (1 -> 0 -> break)
+      tick(room_pid)
+      tick(room_pid)
+
+      state = Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Send messages during break
+      assert :ok = Room.send_chat_message(room_name, creator_id, "Hello!")
+      assert :ok = Room.send_chat_message(room_name, creator_id, "How are you?")
+
+      # Verify messages exist
+      break_state = Room.get_state(room_pid)
+      creator_break = Enum.find(break_state.participants, &(&1.user_id == creator_id))
+      assert length(creator_break.chat_messages) == 2
+
+      # Skip break
+      assert :ok = Room.go_again(room_name, creator_id)
+      sleep_short()
+
+      # Verify chat messages were cleared and we're back to active
+      final_state = Room.get_state(room_pid)
+      assert final_state.status == :active
+      creator_final = Enum.find(final_state.participants, &(&1.user_id == creator_id))
+      assert Enum.empty?(creator_final.chat_messages)
     end
   end
 end

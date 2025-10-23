@@ -21,6 +21,7 @@ defmodule SocialPomodoroWeb.Router do
     live "/", LobbyLive
     live "/at/:room_name", LobbyLive
     live "/room/:name", SessionLive
+    live "/about", AboutLive
   end
 
   # Other scopes may use custom stacks.
@@ -38,6 +39,12 @@ defmodule SocialPomodoroWeb.Router do
     # you can use Plug.BasicAuth to set up some basic authentication
     # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
+
+    scope "/dev", SocialPomodoroWeb do
+      pipe_through :browser
+
+      live "/component", ComponentDevLive
+    end
 
     scope "/dev" do
       pipe_through :browser

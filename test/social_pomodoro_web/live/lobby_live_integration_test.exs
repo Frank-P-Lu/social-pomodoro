@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
   use SocialPomodoroWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
+  import SocialPomodoro.TestHelpers
 
   # Helper to create a connection with a user session
   # Adds a unique suffix to prevent test interference
@@ -41,79 +42,73 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       conn2 = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(conn1, "/")
+      {:ok, lobby_a, _html} = live(conn1, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B loads lobby and sees the room
-      {:ok, lobbyB, htmlB} = live(conn2, "/")
-      assert htmlB =~ room_name
+      {:ok, lobby_b, html_b} = live(conn2, "/")
+      assert html_b =~ room_name
 
-      # User B joins the specific room using phx-value-room-name
-      lobbyB
+      # User B joins the specific room using phx-value-room-name (room is in autostart)
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      # Both lobbies should now show 2 participants
-      htmlA = render(lobbyA)
-      htmlB = render(lobbyB)
+      # User B should stay on lobby (room is in autostart, not active/break)
+      html_b = render(lobby_b)
+      html_a = render(lobby_a)
 
       # Both should see "2 people" for the room
-      assert htmlA =~ "2 people"
-      assert htmlB =~ "2 people"
-
-      # User B should see "Starting" countdown somewhere in the page
-      assert htmlB =~ "Starting"
-      # And the room_name should exist in a button (no longer Join for this room)
-      refute htmlB =~ ~r/<button[^>]*phx-click="join_room"[^>]*phx-value-room-name="#{room_name}"/
+      assert html_a =~ "2 people"
+      assert html_b =~ "2 people"
 
       # User A should see "Start" button for their room (with room_name attribute)
-      assert htmlA =~ ~r/phx-value-room-name="#{room_name}"/
-      assert htmlA =~ "Start"
+      assert html_a =~ ~r/phx-value-room-name="#{room_name}"/
+      assert html_a =~ "Start"
 
       # User A starts the session
-      lobbyA
+      lobby_a
       |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
-      # Both should navigate to the same room
-      assert_redirect(lobbyA, "/room/#{room_name}")
-      assert_redirect(lobbyB, "/room/#{room_name}")
+      # User A should navigate to the room
+      assert_redirect(lobby_a, "/room/#{room_name}")
     end
   end
 
   describe "refresh persistence" do
     test "participant sees 'Waiting for host...' after refresh" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B joins
-      {:ok, lobbyB1, _html} = live(connB, "/")
+      {:ok, lobby_b1, _html} = live(conn_b, "/")
 
-      lobbyB1
+      lobby_b1
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      html1 = render(lobbyB1)
+      html1 = render(lobby_b1)
       assert html1 =~ "Starting"
 
       # User B refreshes
-      {:ok, _lobbyB2, html2} = live(connB, "/")
+      {:ok, _lobby_b2, html2} = live(conn_b, "/")
 
       # Should still see "Starting" countdown (not "Join")
       assert html2 =~ "Starting"
@@ -121,25 +116,25 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
     end
 
     test "non-participant still sees Join button after refresh" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B loads lobby but doesn't join
-      {:ok, _lobbyB1, html1} = live(connB, "/")
+      {:ok, _lobby_b1, html1} = live(conn_b, "/")
       assert html1 =~ "Join"
 
       # User B refreshes
-      {:ok, _lobbyB2, html2} = live(connB, "/")
+      {:ok, _lobby_b2, html2} = live(conn_b, "/")
 
       # Should still see Join button for that specific room (not in the room)
       assert html2 =~ ~r/phx-value-room-name="#{room_name}"/
@@ -149,575 +144,678 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
 
   describe "room closure broadcasts" do
     test "when last participant leaves, room disappears from all lobbies" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B loads lobby and sees the room
-      {:ok, lobbyB, htmlB} = live(connB, "/")
-      assert htmlB =~ room_name
+      {:ok, lobby_b, html_b} = live(conn_b, "/")
+      assert html_b =~ room_name
 
       # User A starts the session from the lobby
-      lobbyA
+      lobby_a
       |> element("button[phx-click='start_my_room']")
       |> render_click()
 
       # Wait for session to start
-      Process.sleep(50)
+      sleep_short()
 
       # User A should be navigated to the session page
-      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+      {:ok, session_a, _html} = live(conn_a, "/room/#{room_name}")
 
       # User A leaves the room (which should close it since they're the only participant)
-      sessionA
+      session_a
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait a moment for PubSub broadcast to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B's lobby should update and no longer show this room
-      htmlB_after = render(lobbyB)
-      refute htmlB_after =~ room_name
+      html_b_after = render(lobby_b)
+      refute html_b_after =~ room_name
     end
   end
 
   describe "room state and button interactions" do
-    test "join room disables create button" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+    test "join room in autostart stays on lobby" do
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
-      # User B joins room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      # User B joins room (in autostart)
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      # User B's Create Room button should be disabled
-      htmlB = render(lobbyB)
-      assert htmlB =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
+      # User B should stay on lobby (not redirected because room is in autostart)
+      html_b = render(lobby_b)
+      assert html_b =~ room_name
+      assert html_b =~ "2 people"
     end
 
     test "leave room from lobby re-enables create button" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B joins room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      htmlB1 = render(lobbyB)
-      assert htmlB1 =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
+      html_b1 = render(lobby_b)
+      assert html_b1 =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
 
       # User B leaves room from lobby
-      lobbyB
+      lobby_b
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Create Room button should be enabled again
-      htmlB2 = render(lobbyB)
-      refute htmlB2 =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
+      html_b2 = render(lobby_b)
+      refute html_b2 =~ ~r/<button[^>]*phx-click="create_room"[^>]*disabled/
 
       # Wait for PubSub broadcast to propagate to User A's lobby
-      Process.sleep(100)
+      sleep_short()
 
       # User B should no longer be in participants (check on User A's view)
-      htmlA = render(lobbyA)
+      html_a = render(lobby_a)
       # Room should still exist and show "1 person" (not "2 people")
-      assert htmlA =~ room_name
-      assert htmlA =~ "1 person"
+      assert html_a =~ room_name
+      assert html_a =~ "1 person"
     end
 
     test "creator leaves room from lobby closes room" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B loads lobby and sees the room
-      {:ok, lobbyB, htmlB} = live(connB, "/")
-      assert htmlB =~ room_name
+      {:ok, lobby_b, html_b} = live(conn_b, "/")
+      assert html_b =~ room_name
 
       # User A leaves room from lobby
-      lobbyA
+      lobby_a
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait a moment for PubSub broadcast
-      Process.sleep(50)
+      sleep_short()
 
       # Room should disappear from User B's lobby
-      htmlB_after = render(lobbyB)
-      refute htmlB_after =~ room_name
+      html_b_after = render(lobby_b)
+      refute html_b_after =~ room_name
     end
 
     test "creator leaves room with participants: room stays open and new creator is assigned" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
-      connC = setup_user_conn("userC")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
+      conn_c = setup_user_conn("userC")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B and C join the room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      {:ok, lobbyC, _html} = live(connC, "/")
+      {:ok, lobby_c, _html} = live(conn_c, "/")
 
-      lobbyC
+      lobby_c
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Wait for PubSub broadcasts to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # Verify 3 people in room
-      htmlA = render(lobbyA)
-      assert htmlA =~ "3 people"
+      html_a = render(lobby_a)
+      assert html_a =~ "3 people"
 
       # User A (creator) leaves room from lobby
-      lobbyA
+      lobby_a
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait for PubSub broadcast to propagate and LiveView to process it
-      Process.sleep(50)
+      sleep_short()
 
       # Room should still exist and show "2 people" (not closed)
-      htmlB_after = render(lobbyB)
-      htmlC_after = render(lobbyC)
+      html_b_after = render(lobby_b)
+      html_c_after = render(lobby_c)
 
       # At least one of them should see the room (may take time for both to update)
-      assert (htmlB_after =~ room_name and htmlB_after =~ "2 people") or
-               (htmlC_after =~ room_name and htmlC_after =~ "2 people")
+      assert (html_b_after =~ room_name and html_b_after =~ "2 people") or
+               (html_c_after =~ room_name and html_c_after =~ "2 people")
 
       # One of User B or User C should now see the Start Now button (indicating they're the new creator)
-      has_start_button_B =
-        htmlB_after =~
+      has_start_button_b =
+        html_b_after =~
           ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
 
-      has_start_button_C =
-        htmlC_after =~
+      has_start_button_c =
+        html_c_after =~
           ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
 
       # Exactly one of them should be the new creator
-      assert has_start_button_B or has_start_button_C
-      refute has_start_button_B and has_start_button_C
+      assert has_start_button_b or has_start_button_c
+      refute has_start_button_b and has_start_button_c
     end
   end
 
   describe "rejoin feature" do
     test "creator can rejoin their own session after leaving" do
-      connA = setup_user_conn("userA")
+      conn_a = setup_user_conn("userA")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User A starts the session
-      lobbyA
+      lobby_a
       |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(50)
+      sleep_short()
 
       # User A navigates to the room
-      {:ok, sessionA, _html} = live(connA, "/room/#{room_name}")
+      {:ok, session_a, _html} = live(conn_a, "/room/#{room_name}")
 
       # User A leaves the room
-      sessionA
+      session_a
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User A should be back in lobby
-      {:ok, lobbyA2, htmlA2} = live(connA, "/")
+      {:ok, lobby_a2, html_a2} = live(conn_a, "/")
 
       # Room should still be visible (creator can rejoin)
-      assert htmlA2 =~ room_name
+      assert html_a2 =~ room_name
 
       # Should show "In Progress" badge
-      assert htmlA2 =~ "In Progress"
+      assert html_a2 =~ "In Progress"
 
       # Should show "Rejoin" button (not "Start")
-      assert htmlA2 =~ "Rejoin"
+      assert html_a2 =~ "Rejoin"
 
       # User A clicks Rejoin button and should be redirected to room
-      lobbyA2
+      lobby_a2
       |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
       |> render_click()
 
       # Should redirect to /room/#{room_name}
-      assert_redirect(lobbyA2, "/room/#{room_name}")
+      assert_redirect(lobby_a2, "/room/#{room_name}")
 
       # User A should be able to navigate to the room screen successfully
-      {:ok, _sessionA2, htmlSession} = live(connA, "/room/#{room_name}")
+      {:ok, _session_a2, html_session} = live(conn_a, "/room/#{room_name}")
 
       # Should see active session
-      assert htmlSession =~ "Focus time remaining"
-      assert htmlSession =~ "Leave"
+      assert html_session =~ "Focus time remaining"
+      assert html_session =~ "Leave"
     end
 
     test "user can rejoin an in-progress room they previously left" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B joins the room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User A starts the session
-      lobbyA
+      lobby_a
       |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(50)
+      sleep_short()
 
       # User B navigates to the room
-      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
+      {:ok, session_b, _html} = live(conn_b, "/room/#{room_name}")
 
       # User B leaves the room
-      sessionB
+      session_b
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B should be back in lobby
-      {:ok, lobbyB2, htmlB2} = live(connB, "/")
+      {:ok, lobby_b2, html_b2} = live(conn_b, "/")
 
       # Room should still be visible (User A is still in it)
-      assert htmlB2 =~ room_name
+      assert html_b2 =~ room_name
 
       # Should show "In Progress" badge
-      assert htmlB2 =~ "In Progress"
+      assert html_b2 =~ "In Progress"
 
       # Should show "Rejoin" button (not "Join")
-      assert htmlB2 =~ "Rejoin"
+      assert html_b2 =~ "Rejoin"
 
-      refute htmlB2 =~
+      refute html_b2 =~
                ~r/<button[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Join\s*<\/button>/
 
       # User B clicks Rejoin button and should be redirected to room
-      lobbyB2
+      lobby_b2
       |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
       |> render_click()
 
       # Should redirect to /room/#{room_name}
-      assert_redirect(lobbyB2, "/room/#{room_name}")
+      assert_redirect(lobby_b2, "/room/#{room_name}")
 
       # User B should be able to navigate to the room screen successfully
-      {:ok, _sessionB2, htmlSession} = live(connB, "/room/#{room_name}")
+      {:ok, _session_b2, html_session} = live(conn_b, "/room/#{room_name}")
 
       # Should see active session
-      assert htmlSession =~ "Focus time remaining"
-      assert htmlSession =~ "Leave"
+      assert html_session =~ "Focus time remaining"
+      assert html_session =~ "Leave"
     end
 
     test "rejoin button only appears for rooms the user left" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name_from_button(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
 
       # User B joins the room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
       # User A starts the session
-      lobbyA
+      lobby_a
       |> element("button[phx-value-room-name='#{room_name}']", "Start")
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(100)
+      sleep_short()
 
       # User B navigates to the room
-      {:ok, sessionB, _html} = live(connB, "/room/#{room_name}")
+      {:ok, session_b, _html} = live(conn_b, "/room/#{room_name}")
 
       # User B leaves the room
-      sessionB
+      session_b
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(50)
+      sleep_short()
 
       # User B loads lobby again
-      {:ok, _lobbyB2, htmlB2} = live(connB, "/")
+      {:ok, _lobby_b2, html_b2} = live(conn_b, "/")
 
       # User B should see the room with "Rejoin" button (was an original participant)
-      assert htmlB2 =~ room_name
-      assert htmlB2 =~ "In Progress"
-      assert htmlB2 =~ "Rejoin"
+      assert html_b2 =~ room_name
+      assert html_b2 =~ "In Progress"
+      assert html_b2 =~ "Rejoin"
+    end
+
+    test "original participant sees rejoin button when room is on break" do
+      conn_a = setup_user_conn("userA")
+
+      # User A creates room with short durations for testing
+      {:ok, lobby_a, _html} = live(conn_a, "/")
+
+      lobby_a
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
+
+      # User A starts the session
+      lobby_a
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      sleep_short()
+
+      # Get the room PID to manually transition to break
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+
+      # Manually transition the room to break status
+      # This simulates the session completing and going to break
+      raw_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+      # Send ticks to complete the session and enter break
+      # Assuming default duration, we need to tick down to 0
+      for _ <- 1..raw_state.timer.remaining do
+        send(room_pid, :tick)
+      end
+
+      # One more tick to transition to break
+      send(room_pid, :tick)
+
+      # Wait for state to update
+      sleep_short()
+
+      # Verify room is now in break
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :break
+
+      # User A navigates back to lobby (simulating going back from session page)
+      {:ok, lobby_a2, html_a2} = live(conn_a, "/")
+
+      # Room should still be visible
+      assert html_a2 =~ room_name
+
+      # Should show "On Break" badge
+      assert html_a2 =~ "On Break"
+
+      # Should show "Rejoin" button (user is already in the room but viewing lobby)
+      assert html_a2 =~ "Rejoin"
+
+      assert html_a2 =~
+               ~r/<button[^>]*phx-click="rejoin_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Rejoin\s*<\/button>/
+
+      # User A clicks Rejoin button and should be redirected to room
+      lobby_a2
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
+      |> render_click()
+
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobby_a2, "/room/#{room_name}")
+
+      # User A should be able to navigate to the room screen successfully
+      {:ok, _session_a2, html_session} = live(conn_a, "/room/#{room_name}")
+
+      # Should see break view
+      assert html_session =~ "Break time"
+    end
+
+    test "original participant who left during break sees rejoin button on lobby" do
+      conn_a = setup_user_conn("userA")
+
+      # User A creates room
+      {:ok, lobby_a, _html} = live(conn_a, "/")
+
+      lobby_a
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html_a = render(lobby_a)
+      room_name = extract_room_name_from_button(html_a)
+
+      # User A starts the session
+      lobby_a
+      |> element("button[phx-value-room-name='#{room_name}']", "Start")
+      |> render_click()
+
+      # Wait for room to start
+      sleep_short()
+
+      # Get the room PID to manually transition to break
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+
+      # Manually transition the room to break status
+      raw_state = SocialPomodoro.Room.get_raw_state(room_pid)
+
+      # Send ticks to complete the session and enter break
+      for _ <- 1..raw_state.timer.remaining do
+        send(room_pid, :tick)
+      end
+
+      # One more tick to transition to break
+      send(room_pid, :tick)
+
+      # Wait for state to update
+      sleep_short()
+
+      # Verify room is now in break
+      state = SocialPomodoro.Room.get_state(room_pid)
+      assert state.status == :break
+
+      # Navigate to the room to join the break
+      {:ok, session_a, _html} = live(conn_a, "/room/#{room_name}")
+
+      # User A leaves the room during break
+      session_a
+      |> element("button[phx-click='leave_room']")
+      |> render_click()
+
+      # Wait for PubSub to propagate
+      sleep_short()
+
+      # User A should be back in lobby
+      {:ok, lobby_a2, html_a2} = live(conn_a, "/")
+
+      # Room should still be visible (user is an original participant)
+      assert html_a2 =~ room_name
+
+      # Should show "On Break" badge
+      assert html_a2 =~ "On Break"
+
+      # Should show "Rejoin" button (user is an original participant who left during break)
+      assert html_a2 =~ "Rejoin"
+
+      assert html_a2 =~
+               ~r/<button[^>]*phx-click="rejoin_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Rejoin\s*<\/button>/
+
+      # User A clicks Rejoin button and should be redirected to room
+      lobby_a2
+      |> element("button[phx-click='rejoin_room'][phx-value-room-name='#{room_name}']", "Rejoin")
+      |> render_click()
+
+      # Should redirect to /room/#{room_name}
+      assert_redirect(lobby_a2, "/room/#{room_name}")
+
+      # User A should be able to navigate to the room screen successfully
+      {:ok, _session_a2, html_session} = live(conn_a, "/room/#{room_name}")
+
+      # Should see break view
+      assert html_session =~ "Break time"
     end
   end
 
   describe "room sharing via link" do
     test "user A creates room, user B can join via direct link" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name(html_a)
 
       # User B visits the direct link /at/:room_name
       # This triggers a push_navigate during connected mount with flash
-      assert {:error, {:live_redirect, %{to: "/"}}} = live(connB, "/at/#{room_name}")
+      assert {:error, {:live_redirect, %{to: "/"}}} = live(conn_b, "/at/#{room_name}")
 
       # Follow the redirect
-      {:ok, lobbyB, htmlB} = live(connB, "/")
+      {:ok, lobby_b, html_b} = live(conn_b, "/")
 
       # Wait for PubSub to propagate
-      Process.sleep(100)
+      sleep_short()
 
       # User B should now be in the room with autostart countdown
-      assert htmlB =~ "Starting"
+      assert html_b =~ "Starting"
 
       # Both users should see 2 participants
-      htmlA_after = render(lobbyA)
-      htmlB_after = render(lobbyB)
+      html_a_after = render(lobby_a)
+      html_b_after = render(lobby_b)
 
-      assert htmlA_after =~ "2 people"
-      assert htmlB_after =~ "2 people"
+      assert html_a_after =~ "2 people"
+      assert html_b_after =~ "2 people"
     end
 
     test "share button only visible to creator" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name(html_a)
 
       # User A (creator) should see share button
-      assert htmlA =~ ~r/id="share-btn-#{room_name}"/
+      assert html_a =~ ~r/id="share-btn-#{room_name}"/
 
       # User B loads lobby (not in room)
-      {:ok, _lobbyB, htmlB} = live(connB, "/")
+      {:ok, _lobby_b, html_b} = live(conn_b, "/")
 
       # User B should NOT see share button for User A's room
-      refute htmlB =~ ~r/id="share-btn-#{room_name}"/
+      refute html_b =~ ~r/id="share-btn-#{room_name}"/
     end
 
     test "share button visible to participants" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name(html_a)
 
       # User B joins the room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      htmlB_after = render(lobbyB)
+      html_b_after = render(lobby_b)
 
       # User B (now a participant) should see share button
-      assert htmlB_after =~ ~r/id="share-btn-#{room_name}"/
+      assert html_b_after =~ ~r/id="share-btn-#{room_name}"/
     end
 
     test "share button hidden from non-participants after user leaves" do
-      connA = setup_user_conn("userA")
-      connB = setup_user_conn("userB")
+      conn_a = setup_user_conn("userA")
+      conn_b = setup_user_conn("userB")
 
       # User A creates room
-      {:ok, lobbyA, _html} = live(connA, "/")
+      {:ok, lobby_a, _html} = live(conn_a, "/")
 
-      lobbyA
+      lobby_a
       |> element("button[phx-click='create_room']")
       |> render_click()
 
-      htmlA = render(lobbyA)
-      room_name = extract_room_name(htmlA)
+      html_a = render(lobby_a)
+      room_name = extract_room_name(html_a)
 
       # User B joins the room
-      {:ok, lobbyB, _html} = live(connB, "/")
+      {:ok, lobby_b, _html} = live(conn_b, "/")
 
-      lobbyB
+      lobby_b
       |> element("button[phx-value-room-name='#{room_name}']")
       |> render_click()
 
-      htmlB_joined = render(lobbyB)
+      html_b_joined = render(lobby_b)
       # User B should see share button while in room
-      assert htmlB_joined =~ ~r/id="share-btn-#{room_name}"/
+      assert html_b_joined =~ ~r/id="share-btn-#{room_name}"/
 
       # User B leaves the room
-      lobbyB
+      lobby_b
       |> element("button[phx-click='leave_room']")
       |> render_click()
 
-      htmlB_left = render(lobbyB)
+      html_b_left = render(lobby_b)
       # User B should NOT see share button after leaving
-      refute htmlB_left =~ ~r/id="share-btn-#{room_name}"/
-    end
-  end
-
-  describe "room sorting" do
-    test "multiple user-created rooms are sorted by creation time" do
-      # Test that open rooms are sorted by creation time (oldest first)
-      # We use two other users creating rooms, then a viewer sees both
-
-      conn_viewer = setup_user_conn("viewer")
-      conn_user1 = setup_user_conn("user1")
-      conn_user2 = setup_user_conn("user2")
-
-      # User1 creates first room (older)
-      {:ok, lobby1, _html} = live(conn_user1, "/")
-
-      lobby1
-      |> element("button[phx-click='create_room']")
-      |> render_click()
-
-      html1 = render(lobby1)
-      room1 = extract_room_name_from_button(html1)
-
-      # Wait to ensure different creation timestamp (need > 1 second for system_time(:second))
-      Process.sleep(1100)
-
-      # User2 creates second room (newer)
-      {:ok, lobby2, _html} = live(conn_user2, "/")
-
-      lobby2
-      |> element("button[phx-click='create_room']")
-      |> render_click()
-
-      html2 = render(lobby2)
-      room2 = extract_room_name_from_button(html2)
-
-      # Viewer loads lobby and should see both rooms
-      # Wait for both rooms to be created before loading the viewer
-      Process.sleep(100)
-      {:ok, lobby_viewer, _html} = live(conn_viewer, "/")
-      Process.sleep(100)
-      html_viewer = render(lobby_viewer)
-
-      # Both rooms should be visible as open rooms
-      match1 = :binary.match(html_viewer, room1)
-      match2 = :binary.match(html_viewer, room2)
-
-      assert match1 != :nomatch, "First room should be visible: #{room1}"
-      assert match2 != :nomatch, "Second room should be visible: #{room2}"
-
-      pos1 = elem(match1, 0)
-      pos2 = elem(match2, 0)
-
-      # room1 (older) should appear before room2 (newer) since both are open rooms
-      assert pos1 < pos2,
-             "Older open room should appear before newer open room"
+      refute html_b_left =~ ~r/id="share-btn-#{room_name}"/
     end
   end
 end

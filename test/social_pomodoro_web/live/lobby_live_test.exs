@@ -1,6 +1,7 @@
 defmodule SocialPomodoroWeb.LobbyLiveTest do
   use SocialPomodoroWeb.ConnCase
   import Phoenix.LiveViewTest
+  import SocialPomodoro.TestHelpers
 
   # Helper to create a connection with a user session
   # Adds a unique suffix to prevent test interference
@@ -32,6 +33,69 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
     case Regex.run(~r/data-room-name="([^"]+)"/, html) do
       [_, room_name] -> room_name
       _ -> nil
+    end
+  end
+
+  describe "timer defaults" do
+    test "defaults to configured duration, cycles, and break" do
+      conn = setup_user_conn("defaults_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="25"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="4"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      refute html =~ "No breaks for a single pomodoro."
+    end
+
+    test "selecting a duration applies configured defaults" do
+      conn = setup_user_conn("duration_defaults_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='set_duration'][phx-value-minutes='50']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="50"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="2"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="10"[^>]*btn-primary/
+      refute html =~ "No breaks for a single pomodoro."
+
+      lobby
+      |> element("button[phx-click='set_duration'][phx-value-minutes='75']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="75"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "No breaks for a single pomodoro."
+      assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
+    end
+
+    test "single cycle selection locks break duration" do
+      conn = setup_user_conn("single_cycle_user")
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='set_cycles'][phx-value-cycles='1']")
+      |> render_click()
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-cycles="1"[^>]*btn-primary/
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "No breaks for a single pomodoro."
+      assert html =~ ~r/phx-value-minutes="10"[^>]*disabled/
+
+      html = render(lobby)
+
+      assert html =~ ~r/phx-value-minutes="5"[^>]*btn-primary/
+      assert html =~ "No breaks for a single pomodoro."
     end
   end
 
@@ -102,7 +166,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       # Wait for any existing rooms from other tests to be cleaned up
       # Rooms are cleaned up when they become empty, so we need to wait a bit
       # for any lingering room processes to terminate
-      Process.sleep(50)
+      sleep_short()
 
       # Set up a unique user for this test
       user_id = "empty_state_test_user_#{System.unique_integer([:positive])}"
@@ -119,7 +183,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       end
 
       # Wait a bit more for cleanup to complete
-      Process.sleep(50)
+      sleep_short()
 
       {:ok, _lobby, html} = live(conn, "/")
 
@@ -205,7 +269,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for room to start
-      Process.sleep(100)
+      sleep_short()
 
       # Now creator creates their own room
       {:ok, lobby_creator, _html} = live(conn_creator, "/")
@@ -215,7 +279,7 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       |> render_click()
 
       # Wait for PubSub to propagate
-      Process.sleep(100)
+      sleep_short()
 
       html_creator = render(lobby_creator)
       room_creator = extract_room_name_from_button(html_creator)

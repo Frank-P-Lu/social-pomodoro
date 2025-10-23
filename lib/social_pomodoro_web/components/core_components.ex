@@ -109,6 +109,37 @@ defmodule SocialPomodoroWeb.CoreComponents do
   end
 
   @doc """
+  Renders a speech-style comment bubble.
+
+  ## Examples
+
+      <.comment_bubble>
+        <:body>
+          This is a placeholder comment. Change styles, swap text, and experiment with the layout right here.
+        </:body>
+      </.comment_bubble>
+  """
+  attr :class, :any, default: nil
+  slot :body, required: true
+
+  def comment_bubble(assigns) do
+    ~H"""
+    <article class={["relative inline-block", @class]}>
+      <div class="relative z-10 max-w-md rounded-[2rem] bg-secondary p-3 text-secondary-content shadow-2xl">
+        <div class="space-y-2 text-sm leading-relaxed">
+          {render_slot(@body)}
+        </div>
+      </div>
+      <div
+        class="pointer-events-none absolute -left-4 top-6 h-6 w-6 bg-secondary shadow-xl [clip-path:polygon(0_50%,100%_0,100%_100%)]"
+        aria-hidden="true"
+      >
+      </div>
+    </article>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
