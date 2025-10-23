@@ -7,7 +7,7 @@ defmodule SocialPomodoro.Config do
   @doc """
   Available pomodoro duration options in minutes.
   """
-  def pomodoro_duration_options, do: [1, 25, 50, 75]
+  def pomodoro_duration_options, do: [25, 50, 75]
 
   @doc """
   Available cycle count options.

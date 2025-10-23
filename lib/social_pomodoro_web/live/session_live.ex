@@ -49,6 +49,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             |> assign(:completion_message, completion_msg)
             |> assign(:current_participant, current_participant)
             |> assign(:selected_tab, :todo)
+            |> push_event("session_status_changed", %{status: Atom.to_string(room_state.status)})
 
           {:ok, socket}
         end
@@ -190,6 +191,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       |> assign(:selected_tab, selected_tab)
       |> maybe_show_spectator_joining_flash(room_state, is_spectator)
       |> maybe_show_break_ending_flash(room_state)
+      |> push_event("session_status_changed", %{status: Atom.to_string(room_state.status)})
 
     {:noreply, socket}
   end
@@ -219,31 +221,37 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100 flex items-center justify-center py-4 px-2 md:px-8">
-      <div class="max-w-4xl w-full">
-        <%= case view_mode(assigns) do %>
-          <% :spectator -> %>
-            <.spectator_view room_state={@room_state} />
-          <% :active -> %>
-            <.active_session_view
-              room_state={@room_state}
-              user_id={@user_id}
-              current_participant={@current_participant}
-              selected_tab={@selected_tab}
-            />
-          <% :break -> %>
-            <.break_view
-              room_state={@room_state}
-              user_id={@user_id}
-              completion_message={@completion_message}
-              current_participant={@current_participant}
-              selected_tab={@selected_tab}
-            />
-          <% :none -> %>
-            nil
-        <% end %>
+    <div class="min-h-screen bg-base-100">
+      <div class="flex items-center justify-center min-h-screen py-4 px-2 md:px-8">
+        <div class="max-w-4xl w-full">
+          <%= case view_mode(assigns) do %>
+            <% :spectator -> %>
+              <.spectator_view room_state={@room_state} />
+            <% :active -> %>
+              <.active_session_view
+                room_state={@room_state}
+                user_id={@user_id}
+                current_participant={@current_participant}
+                selected_tab={@selected_tab}
+              />
+            <% :break -> %>
+              <.break_view
+                room_state={@room_state}
+                user_id={@user_id}
+                completion_message={@completion_message}
+                current_participant={@current_participant}
+                selected_tab={@selected_tab}
+              />
+            <% :none -> %>
+              nil
+          <% end %>
+        </div>
       </div>
     </div>
+
+    <.audio_settings id="audio-settings" mode="session" />
+
+    <div id="ambient-audio-hook" phx-hook="AmbientAudio" phx-update="ignore"></div>
     """
   end
 
@@ -251,7 +259,18 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   def spectator_view(assigns) do
     ~H"""
-    <div class="card bg-base-200">
+    <div class="card bg-base-200 relative">
+      <!-- Audio Settings Button -->
+      <div class="absolute top-4 right-4">
+        <button
+          data-open-audio-settings
+          class="btn btn-ghost btn-sm btn-circle"
+          title="Audio settings"
+        >
+          <Icons.music class="w-5 h-5 fill-current" />
+        </button>
+      </div>
+
       <div class="card-body text-center p-2 md:pd-4">
         <div class="text-6xl mb-6">
           <Icons.ghost class="w-24 h-24 mx-auto fill-base-content opacity-50" />
@@ -336,7 +355,18 @@ defmodule SocialPomodoroWeb.SessionLive do
 
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
-      <div class="card bg-base-200">
+      <div class="card bg-base-200 relative">
+        <!-- Audio Settings Button -->
+        <div class="absolute top-4 right-4">
+          <button
+            data-open-audio-settings
+            class="btn btn-ghost btn-sm btn-circle"
+            title="Audio settings"
+          >
+            <Icons.music class="w-5 h-5 fill-current" />
+          </button>
+        </div>
+
         <div class="card-body text-center p-2 md:pd-4">
           <!-- Cycle Progress & Spectator Badge -->
           <div class="flex justify-center items-center gap-4 mb-4">
@@ -448,7 +478,18 @@ defmodule SocialPomodoroWeb.SessionLive do
       |> assign(:total_count, total_count)
 
     ~H"""
-    <div class="card bg-base-200">
+    <div class="card bg-base-200 relative">
+      <!-- Audio Settings Button -->
+      <div class="absolute top-4 right-4">
+        <button
+          data-open-audio-settings
+          class="btn btn-ghost btn-sm btn-circle"
+          title="Audio settings"
+        >
+          <Icons.music class="w-5 h-5 fill-current" />
+        </button>
+      </div>
+
       <div class="card-body text-center p-2 md:pd-4">
         <!-- Cycle Progress -->
         <%= if @room_state.total_cycles > 1 do %>

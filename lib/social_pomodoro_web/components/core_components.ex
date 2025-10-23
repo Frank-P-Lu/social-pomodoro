@@ -125,7 +125,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
   def comment_bubble(assigns) do
     ~H"""
     <article class={["relative inline-block", @class]}>
-      <div class="relative z-10 max-w-md rounded-[2rem] bg-secondary p-3 text-secondary-content shadow-2xl">
+      <div class="relative z-10 min-h-16 max-w-md rounded-[2rem] bg-secondary p-3 text-secondary-content shadow-2xl">
         <div class="space-y-2 text-sm leading-relaxed">
           {render_slot(@body)}
         </div>
@@ -689,6 +689,133 @@ defmodule SocialPomodoroWeb.CoreComponents do
           src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
           alt={@username}
         />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders an audio settings slide-over panel (client-side only).
+
+  ## Examples
+
+      <.audio_settings id="audio-settings" mode="lobby" />
+      <.audio_settings id="audio-settings" mode="session" />
+  """
+  attr :id, :string, required: true
+  attr :mode, :string, default: "lobby", values: ~w(lobby session)
+
+  def audio_settings(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="AudioSettings"
+      data-audio-settings
+      data-mode={@mode}
+      class="hidden fixed inset-0 z-50"
+    >
+      <!-- Backdrop -->
+      <div
+        data-backdrop
+        class="fixed inset-0 bg-base-300/80 opacity-0 transition-opacity duration-300 ease-out"
+      >
+      </div>
+      <!-- Slide-over panel -->
+      <div
+        data-panel
+        class="fixed top-0 right-0 h-full w-80 bg-base-100 shadow-xl transform translate-x-full transition-transform duration-300 ease-out"
+      >
+        <div class="flex flex-col h-full p-6">
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Audio Settings</h2>
+            <button
+              type="button"
+              data-close
+              class="btn btn-ghost btn-sm btn-circle"
+            >
+              <.icon name="hero-x-mark" class="w-5 h-5" />
+            </button>
+          </div>
+
+          <%= if @mode == "lobby" do %>
+            <div class="alert alert-info mb-4 text-sm">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                class="stroke-current shrink-0 w-5 h-5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                >
+                </path>
+              </svg>
+              <span>Sounds will play during your session. Click to preview.</span>
+            </div>
+          <% end %>
+          
+    <!-- Sound selection -->
+          <div class="space-y-4">
+            <div>
+              <label class="label">
+                <span class="label-text font-medium">Ambient Sound</span>
+              </label>
+              <div class="flex flex-col gap-2" data-sound-options>
+                <button
+                  type="button"
+                  data-sound="none"
+                  class="btn btn-outline justify-start"
+                >
+                  No audio
+                </button>
+                <button
+                  type="button"
+                  data-sound="rain"
+                  class="btn btn-outline justify-start"
+                >
+                  Rain
+                </button>
+                <button
+                  type="button"
+                  data-sound="cafe"
+                  class="btn btn-outline justify-start"
+                >
+                  Cafe
+                </button>
+                <button
+                  type="button"
+                  data-sound="white_noise"
+                  class="btn btn-outline justify-start"
+                >
+                  White Noise
+                </button>
+              </div>
+            </div>
+            <!-- Volume slider -->
+            <div>
+              <label class="label">
+                <span class="label-text font-medium">Volume</span>
+              </label>
+              <input
+                type="range"
+                data-volume-slider
+                min="0"
+                max="100"
+                value="50"
+                class="range range-sm range-neutral"
+              />
+              <div class="flex justify-between text-xs text-base-content/60 mt-1">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     """
