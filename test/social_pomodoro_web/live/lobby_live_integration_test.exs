@@ -339,14 +339,14 @@ defmodule SocialPomodoroWeb.LobbyLiveIntegrationTest do
       assert (html_b_after =~ room_name and html_b_after =~ "2 people") or
                (html_c_after =~ room_name and html_c_after =~ "2 people")
 
-      # One of User B or User C should now see the Start Now button (indicating they're the new creator)
+      # One of User B or User C should now see the Start button (indicating they're the new creator)
       has_start_button_b =
         html_b_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
 
       has_start_button_c =
         html_c_after =~
-          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start Now\s*<\/button>/
+          ~r/<button[^>]*phx-click="start_my_room"[^>]*phx-value-room-name="#{room_name}"[^>]*>\s*Start\s*<\/button>/
 
       # Exactly one of them should be the new creator
       assert has_start_button_b or has_start_button_c
