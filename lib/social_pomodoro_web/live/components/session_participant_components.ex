@@ -92,7 +92,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 md:p-4 content-full min-h-0">
+      <div class="bg-base-100 rounded-lg flex flex-col gap-2 p-2 md:3 content-full min-h-0">
         <div class="min-w-0 flex flex-col items-center flex-1 min-h-0">
           <h4 class="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1 flex-shrink-0">
             Tasks

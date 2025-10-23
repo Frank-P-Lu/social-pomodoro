@@ -271,95 +271,241 @@ Hooks.ShoutMessage = {
   }
 }
 
-Hooks.AmbientAudio = {
+// Global audio controller (shared across lobby and session)
+let globalAudio = null
+let fadeInterval = null
+
+// Sound file mappings
+const SOUND_FILES = {
+  'rain': '/sounds/fwc-rain.mp3',
+  'cafe': '/sounds/fwc-cafe.mp3',
+  'white_noise': '/sounds/fwc-white-noise.mp3'
+}
+
+// Helper functions for sessionStorage
+function getSavedVolume() {
+  return sessionStorage.getItem('ambient_volume') || '50'
+}
+
+function getSavedSound() {
+  return sessionStorage.getItem('ambient_sound') || 'none'
+}
+
+function getGlobalAudio() {
+  if (!globalAudio) {
+    globalAudio = new Audio()
+    globalAudio.loop = true
+
+    // Set initial volume from sessionStorage
+    globalAudio.volume = parseInt(getSavedVolume()) / 100
+  }
+  return globalAudio
+}
+
+function fadeOutAudio(duration = 2000) {
+  const audio = getGlobalAudio()
+  const targetVolume = parseInt(getSavedVolume()) / 100
+  const startVolume = audio.volume
+  const startTime = Date.now()
+
+  // Clear any existing fade
+  if (fadeInterval) {
+    clearInterval(fadeInterval)
+  }
+
+  fadeInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+
+    // Linear fade from current volume to 0
+    audio.volume = startVolume * (1 - progress)
+
+    if (progress >= 1) {
+      clearInterval(fadeInterval)
+      fadeInterval = null
+      audio.pause()
+      audio.currentTime = 0
+      // Restore original volume for next playback
+      audio.volume = targetVolume
+    }
+  }, 50)
+}
+
+Hooks.AudioSettings = {
   mounted() {
-    // Initialize audio element
-    this.audio = new Audio()
-    this.audio.loop = true
+    // Get references to UI elements
+    this.container = this.el
+    this.backdrop = this.el.querySelector('[data-backdrop]')
+    this.panel = this.el.querySelector('[data-panel]')
+    this.closeBtn = this.el.querySelector('[data-close]')
+    this.soundButtons = this.el.querySelectorAll('[data-sound]')
+    this.volumeSlider = this.el.querySelector('[data-volume-slider]')
+
+    // Get mode (lobby or session)
+    this.mode = this.el.dataset.mode || 'lobby'
 
     // Load saved preferences
-    const savedSound = sessionStorage.getItem('ambient_sound') || 'none'
-    const savedVolume = sessionStorage.getItem('ambient_volume') || '50'
+    this.currentSound = getSavedSound()
+    this.currentVolume = getSavedVolume()
 
-    this.currentSound = savedSound
-    this.audio.volume = parseInt(savedVolume) / 100
+    // Update UI to reflect saved state
+    this.updateUI()
 
-    // Listen for session status changes from LiveView
-    this.handleEvent("session_status_changed", ({ status }) => {
-      this.handleStatusChange(status)
-    })
+    // Setup event listeners
+    this.setupListeners()
 
-    // Listen for sound selection changes from slide-over
-    this.handleEvent("ambient_sound_changed", ({ sound }) => {
-      this.changeSound(sound)
-    })
-
-    // Listen for volume changes from slide-over
-    this.handleEvent("ambient_volume_changed", ({ volume }) => {
-      this.changeVolume(volume)
-    })
+    // Track preview timeout
+    this.previewTimeout = null
   },
 
-  handleStatusChange(status) {
-    // Play during :active and :break, stop during :autostart
-    if (status === 'active' || status === 'break') {
-      this.playCurrentSound()
-    } else {
-      this.stopSound()
+  setupListeners() {
+    // Open button (find it in the document)
+    const openBtn = document.querySelector('[data-open-audio-settings]')
+    if (openBtn) {
+      openBtn.addEventListener('click', () => this.show())
     }
+
+    // Close button
+    this.closeBtn.addEventListener('click', () => this.hide())
+
+    // Backdrop click
+    this.backdrop.addEventListener('click', () => this.hide())
+
+    // Sound selection buttons
+    this.soundButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sound = btn.dataset.sound
+        this.selectSound(sound)
+      })
+    })
+
+    // Volume slider
+    this.volumeSlider.addEventListener('input', (e) => {
+      this.changeVolume(e.target.value)
+    })
   },
 
-  changeSound(sound) {
+  updateUI() {
+    // Update active sound button
+    this.soundButtons.forEach(btn => {
+      if (btn.dataset.sound === this.currentSound) {
+        btn.classList.add('btn-primary')
+        btn.classList.remove('btn-outline')
+      } else {
+        btn.classList.remove('btn-primary')
+        btn.classList.add('btn-outline')
+      }
+    })
+
+    // Update volume slider
+    this.volumeSlider.value = this.currentVolume
+  },
+
+  selectSound(sound) {
     this.currentSound = sound
     sessionStorage.setItem('ambient_sound', sound)
+    this.updateUI()
 
-    // If already playing, switch to new sound
-    if (!this.audio.paused) {
-      this.playCurrentSound()
+    // Clear any existing preview timeout
+    if (this.previewTimeout) {
+      clearTimeout(this.previewTimeout)
+      this.previewTimeout = null
+    }
+
+    // Update global audio
+    const audio = getGlobalAudio()
+
+    if (sound === 'none') {
+      fadeOutAudio(1000)
+    } else {
+      const soundFile = SOUND_FILES[sound]
+      if (soundFile) {
+        // Restore volume before playing
+        audio.volume = parseInt(getSavedVolume()) / 100
+
+        // Always update src and play, even if switching from 'none'
+        if (audio.src !== window.location.origin + soundFile) {
+          audio.src = soundFile
+        }
+        audio.play().catch(err => console.error('Failed to play audio:', err))
+
+        // In lobby mode, fade out after 3 seconds (preview)
+        if (this.mode === 'lobby') {
+          this.previewTimeout = setTimeout(() => {
+            fadeOutAudio(2000) // 2 second fade out
+          }, 3000)
+        }
+        // In session mode, play continuously (no timeout)
+      }
     }
   },
 
   changeVolume(volume) {
-    this.audio.volume = parseInt(volume) / 100
+    this.currentVolume = volume
     sessionStorage.setItem('ambient_volume', volume)
+    const audio = getGlobalAudio()
+    audio.volume = parseInt(volume) / 100
   },
 
-  playCurrentSound() {
-    if (this.currentSound === 'none') {
-      this.stopSound()
-      return
-    }
-
-    const soundFiles = {
-      'rain': '/sounds/fwc-rain.mp3',
-      'cafe': '/sounds/fwc-cafe.mp3',
-      'white_noise': '/sounds/fwc-white-noise.mp3'
-    }
-
-    const soundFile = soundFiles[this.currentSound]
-    if (!soundFile) {
-      this.stopSound()
-      return
-    }
-
-    // Only change source if different
-    if (this.audio.src !== window.location.origin + soundFile) {
-      this.audio.src = soundFile
-    }
-
-    // Play or resume
-    this.audio.play().catch(err => {
-      console.error('Failed to play ambient audio:', err)
+  show() {
+    this.container.classList.remove('hidden')
+    requestAnimationFrame(() => {
+      this.backdrop.classList.remove('opacity-0')
+      this.backdrop.classList.add('opacity-100')
+      this.panel.classList.remove('translate-x-full')
+      this.panel.classList.add('translate-x-0')
     })
   },
 
-  stopSound() {
-    this.audio.pause()
-    this.audio.currentTime = 0
+  hide() {
+    this.backdrop.classList.remove('opacity-100')
+    this.backdrop.classList.add('opacity-0')
+    this.panel.classList.remove('translate-x-0')
+    this.panel.classList.add('translate-x-full')
+    setTimeout(() => {
+      this.container.classList.add('hidden')
+    }, 200)
+  }
+}
+
+Hooks.AmbientAudio = {
+  mounted() {
+    // Listen for session status changes from LiveView
+    this.handleEvent("session_status_changed", ({ status }) => {
+      this.handleStatusChange(status)
+    })
+  },
+
+  handleStatusChange(status) {
+    const audio = getGlobalAudio()
+    const currentSound = getSavedSound()
+
+    // Only play during :active (work phase), not during :break or :autostart
+    if (status === 'active') {
+      if (currentSound !== 'none') {
+        // Restore volume before playing
+        audio.volume = parseInt(getSavedVolume()) / 100
+
+        const soundFile = SOUND_FILES[currentSound]
+        if (soundFile) {
+          if (audio.src !== window.location.origin + soundFile) {
+            audio.src = soundFile
+          }
+          audio.play().catch(err => console.error('Failed to play ambient audio:', err))
+        }
+      }
+    } else {
+      // Fade out during :break and :autostart transitions
+      if (!audio.paused) {
+        fadeOutAudio(2000) // 2 second fade out
+      }
+    }
   },
 
   destroyed() {
-    this.stopSound()
+    const audio = getGlobalAudio()
+    audio.pause()
+    audio.currentTime = 0
   }
 }
 

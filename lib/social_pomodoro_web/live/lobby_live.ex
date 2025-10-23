@@ -474,6 +474,10 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <.feedback_modal id="feedback-modal" username={@username}>
       <:trigger></:trigger>
     </.feedback_modal>
+
+    <.audio_settings id="audio-settings" mode="lobby" />
+
+    <div id="ambient-audio-hook" phx-hook="AmbientAudio" phx-update="ignore"></div>
     """
   end
 
@@ -691,14 +695,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
     <!-- Username Editor -->
         <div class="pb-4 border-b border-base-300">
           <!-- Avatar + username -->
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-center">
             <.participant_avatar
               user_id={@user_id}
               username={@username}
               current_user_id={@user_id}
               size="w-12"
             />
-            <div>
+            <div class="flex-1">
               <span class="label label-text">Look, it's you!</span>
 
               <div class="flex items-center gap-2">
@@ -712,6 +716,14 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 </button>
               </div>
             </div>
+            <button
+              type="button"
+              data-open-audio-settings
+              class="btn btn-ghost btn-sm btn-circle"
+              title="Audio settings"
+            >
+              <Icons.music class="w-5 h-5 fill-current" />
+            </button>
           </div>
           <form
             id="username-form"
