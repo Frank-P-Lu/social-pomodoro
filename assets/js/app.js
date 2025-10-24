@@ -117,9 +117,8 @@ Hooks.Timer = {
   },
   applyAnimationSetting() {
     const isAnimated = getSavedTimerAnimation() === 'true'
-    // Find the timer display spans (they have font-mono and text-5xl)
-    const timerSpans = this.el.querySelectorAll('.font-mono.text-5xl')
-    timerSpans.forEach(el => {
+    const timerDisplays = this.el.querySelectorAll('[data-timer-display]')
+    timerDisplays.forEach(el => {
       if (isAnimated) {
         el.classList.add('countdown')
       } else {
@@ -439,9 +438,9 @@ Hooks.SessionSettings = {
     this.timerAnimationEnabled = enabled
     sessionStorage.setItem('timer_animation', String(enabled))
 
-    // Toggle the countdown class on all timer elements
-    const countdownContainers = document.querySelectorAll('.countdown, .font-mono.text-5xl')
-    countdownContainers.forEach(el => {
+    // Toggle the countdown class on all timer display elements
+    const timerDisplays = document.querySelectorAll('[data-timer-display]')
+    timerDisplays.forEach(el => {
       if (enabled) {
         el.classList.add('countdown')
       } else {
