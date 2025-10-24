@@ -709,8 +709,8 @@ defmodule SocialPomodoroWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      phx-hook="AudioSettings"
-      data-audio-settings
+      phx-hook="SessionSettings"
+      data-session-settings
       data-mode={@mode}
       class="hidden fixed inset-0 z-50"
     >

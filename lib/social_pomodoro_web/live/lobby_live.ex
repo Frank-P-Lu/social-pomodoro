@@ -718,7 +718,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             </div>
             <button
               type="button"
-              data-open-audio-settings
+              data-open-session-settings
               class="btn btn-ghost btn-sm btn-circle"
               title="Settings"
             >

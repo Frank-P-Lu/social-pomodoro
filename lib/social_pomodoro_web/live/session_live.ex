@@ -263,7 +263,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       <!-- Settings Button -->
       <div class="absolute top-4 right-4">
         <button
-          data-open-audio-settings
+          data-open-session-settings
           class="btn btn-ghost btn-sm btn-circle"
           title="Settings"
         >
@@ -359,7 +359,7 @@ defmodule SocialPomodoroWeb.SessionLive do
         <!-- Settings Button -->
         <div class="absolute top-4 right-4">
           <button
-            data-open-audio-settings
+            data-open-session-settings
             class="btn btn-ghost btn-sm btn-circle"
             title="Settings"
           >
@@ -482,7 +482,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       <!-- Settings Button -->
       <div class="absolute top-4 right-4">
         <button
-          data-open-audio-settings
+          data-open-session-settings
           class="btn btn-ghost btn-sm btn-circle"
           title="Settings"
         >

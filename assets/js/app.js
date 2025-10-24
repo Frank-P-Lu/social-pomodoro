@@ -351,7 +351,7 @@ function fadeOutAudio(duration = 2000) {
   }, 50)
 }
 
-Hooks.AudioSettings = {
+Hooks.SessionSettings = {
   mounted() {
     // Get references to UI elements
     this.container = this.el
@@ -382,7 +382,7 @@ Hooks.AudioSettings = {
 
   setupListeners() {
     // Open button (find it in the document)
-    const openBtn = document.querySelector('[data-open-audio-settings]')
+    const openBtn = document.querySelector('[data-open-session-settings]')
     if (openBtn) {
       openBtn.addEventListener('click', () => this.show())
     }
