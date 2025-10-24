@@ -709,8 +709,8 @@ defmodule SocialPomodoroWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      phx-hook="AudioSettings"
-      data-audio-settings
+      phx-hook="SessionSettings"
+      data-session-settings
       data-mode={@mode}
       class="hidden fixed inset-0 z-50"
     >
@@ -728,7 +728,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
         <div class="flex flex-col h-full p-6">
           <!-- Header -->
           <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-semibold">Audio Settings</h2>
+            <h2 class="text-lg font-semibold">Settings</h2>
             <button
               type="button"
               data-close
@@ -737,6 +737,29 @@ defmodule SocialPomodoroWeb.CoreComponents do
               <.icon name="hero-x-mark" class="w-5 h-5" />
             </button>
           </div>
+
+          <%= if @mode == "session" do %>
+            <!-- Timer Animation Toggle -->
+            <div class="mb-6">
+              <label class="label">
+                <span class="label-text font-medium">Timer Animation</span>
+              </label>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-base-content/70">Animated countdown</span>
+                <input
+                  type="checkbox"
+                  data-timer-animation-toggle
+                  class="toggle toggle-primary"
+                  checked
+                />
+              </div>
+              <p class="text-xs text-base-content/60 mt-2">
+                Disable for a simpler countdown display
+              </p>
+            </div>
+
+            <div class="divider"></div>
+          <% end %>
 
           <%= if @mode == "lobby" do %>
             <div class="alert alert-info mb-4 text-sm">
@@ -757,7 +780,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
               <span>Sounds will play during your session. Click to preview.</span>
             </div>
           <% end %>
-          
+
     <!-- Sound selection -->
           <div class="space-y-4">
             <div>

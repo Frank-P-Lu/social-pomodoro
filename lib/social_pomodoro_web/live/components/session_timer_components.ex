@@ -18,7 +18,7 @@ defmodule SocialPomodoroWeb.SessionTimerComponents do
       >
         <%= for {unit, value} <- @countdown_segments do %>
           <div class="flex flex-col items-center gap-1" data-countdown-segment={Atom.to_string(unit)}>
-            <span class="countdown font-mono text-5xl">
+            <span class="countdown font-mono text-5xl" data-timer-display>
               <span
                 data-countdown-value
                 style={"--value:#{value};"}

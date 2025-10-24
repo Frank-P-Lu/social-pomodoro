@@ -718,11 +718,11 @@ defmodule SocialPomodoroWeb.LobbyLive do
             </div>
             <button
               type="button"
-              data-open-audio-settings
+              data-open-session-settings
               class="btn btn-ghost btn-sm btn-circle"
-              title="Audio settings"
+              title="Settings"
             >
-              <Icons.music class="w-5 h-5 fill-current" />
+              <Icons.gear class="w-5 h-5 fill-current" />
             </button>
           </div>
           <form

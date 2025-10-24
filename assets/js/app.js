@@ -91,6 +91,7 @@ Hooks.Timer = {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
     this.segmentTargets = this.getSegmentTargets()
+    this.applyAnimationSetting()
     this.updateTimer()
     this.interval = setInterval(() => {
       this.seconds--
@@ -111,7 +112,19 @@ Hooks.Timer = {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
     this.segmentTargets = this.getSegmentTargets()
+    this.applyAnimationSetting()
     this.updateTimer()
+  },
+  applyAnimationSetting() {
+    const isAnimated = getSavedTimerAnimation() === 'true'
+    const timerDisplays = this.el.querySelectorAll('[data-timer-display]')
+    timerDisplays.forEach(el => {
+      if (isAnimated) {
+        el.classList.add('countdown')
+      } else {
+        el.classList.remove('countdown')
+      }
+    })
   },
   destroyed() {
     clearInterval(this.interval)
@@ -291,6 +304,12 @@ function getSavedSound() {
   return sessionStorage.getItem('ambient_sound') || 'none'
 }
 
+function getSavedTimerAnimation() {
+  // Default to 'true' (animated)
+  const saved = sessionStorage.getItem('timer_animation')
+  return saved === null ? 'true' : saved
+}
+
 function getGlobalAudio() {
   if (!globalAudio) {
     globalAudio = new Audio()
@@ -331,7 +350,7 @@ function fadeOutAudio(duration = 2000) {
   }, 50)
 }
 
-Hooks.AudioSettings = {
+Hooks.SessionSettings = {
   mounted() {
     // Get references to UI elements
     this.container = this.el
@@ -340,6 +359,7 @@ Hooks.AudioSettings = {
     this.closeBtn = this.el.querySelector('[data-close]')
     this.soundButtons = this.el.querySelectorAll('[data-sound]')
     this.volumeSlider = this.el.querySelector('[data-volume-slider]')
+    this.timerAnimationToggle = this.el.querySelector('[data-timer-animation-toggle]')
 
     // Get mode (lobby or session)
     this.mode = this.el.dataset.mode || 'lobby'
@@ -347,6 +367,7 @@ Hooks.AudioSettings = {
     // Load saved preferences
     this.currentSound = getSavedSound()
     this.currentVolume = getSavedVolume()
+    this.timerAnimationEnabled = getSavedTimerAnimation() === 'true'
 
     // Update UI to reflect saved state
     this.updateUI()
@@ -360,7 +381,7 @@ Hooks.AudioSettings = {
 
   setupListeners() {
     // Open button (find it in the document)
-    const openBtn = document.querySelector('[data-open-audio-settings]')
+    const openBtn = document.querySelector('[data-open-session-settings]')
     if (openBtn) {
       openBtn.addEventListener('click', () => this.show())
     }
@@ -383,6 +404,13 @@ Hooks.AudioSettings = {
     this.volumeSlider.addEventListener('input', (e) => {
       this.changeVolume(e.target.value)
     })
+
+    // Timer animation toggle (only in session mode)
+    if (this.timerAnimationToggle) {
+      this.timerAnimationToggle.addEventListener('change', (e) => {
+        this.toggleTimerAnimation(e.target.checked)
+      })
+    }
   },
 
   updateUI() {
@@ -399,6 +427,26 @@ Hooks.AudioSettings = {
 
     // Update volume slider
     this.volumeSlider.value = this.currentVolume
+
+    // Update timer animation toggle (only in session mode)
+    if (this.timerAnimationToggle) {
+      this.timerAnimationToggle.checked = this.timerAnimationEnabled
+    }
+  },
+
+  toggleTimerAnimation(enabled) {
+    this.timerAnimationEnabled = enabled
+    sessionStorage.setItem('timer_animation', String(enabled))
+
+    // Toggle the countdown class on all timer display elements
+    const timerDisplays = document.querySelectorAll('[data-timer-display]')
+    timerDisplays.forEach(el => {
+      if (enabled) {
+        el.classList.add('countdown')
+      } else {
+        el.classList.remove('countdown')
+      }
+    })
   },
 
   selectSound(sound) {
