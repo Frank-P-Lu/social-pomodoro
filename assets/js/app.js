@@ -133,8 +133,18 @@ Hooks.Timer = {
     if (!target) return
 
     const safeValue = Math.max(0, Math.floor(value))
-    target.style.setProperty('--value', safeValue)
-    target.textContent = `${safeValue}`
+    const isAnimated = getSavedTimerAnimation() === 'true'
+
+    if (isAnimated) {
+      // Use daisyUI countdown animation with --value CSS variable
+      target.style.setProperty('--value', safeValue)
+      target.textContent = `${safeValue}`
+    } else {
+      // Simple text update without animation
+      target.style.removeProperty('--value')
+      target.textContent = `${safeValue}`
+    }
+
     target.setAttribute('aria-label', `${safeValue}`)
   },
   breakdown(seconds) {
@@ -291,6 +301,12 @@ function getSavedSound() {
   return sessionStorage.getItem('ambient_sound') || 'none'
 }
 
+function getSavedTimerAnimation() {
+  // Default to 'true' (animated)
+  const saved = sessionStorage.getItem('timer_animation')
+  return saved === null ? 'true' : saved
+}
+
 function getGlobalAudio() {
   if (!globalAudio) {
     globalAudio = new Audio()
@@ -340,6 +356,7 @@ Hooks.AudioSettings = {
     this.closeBtn = this.el.querySelector('[data-close]')
     this.soundButtons = this.el.querySelectorAll('[data-sound]')
     this.volumeSlider = this.el.querySelector('[data-volume-slider]')
+    this.timerAnimationToggle = this.el.querySelector('[data-timer-animation-toggle]')
 
     // Get mode (lobby or session)
     this.mode = this.el.dataset.mode || 'lobby'
@@ -347,6 +364,7 @@ Hooks.AudioSettings = {
     // Load saved preferences
     this.currentSound = getSavedSound()
     this.currentVolume = getSavedVolume()
+    this.timerAnimationEnabled = getSavedTimerAnimation() === 'true'
 
     // Update UI to reflect saved state
     this.updateUI()
@@ -383,6 +401,13 @@ Hooks.AudioSettings = {
     this.volumeSlider.addEventListener('input', (e) => {
       this.changeVolume(e.target.value)
     })
+
+    // Timer animation toggle (only in session mode)
+    if (this.timerAnimationToggle) {
+      this.timerAnimationToggle.addEventListener('change', (e) => {
+        this.toggleTimerAnimation(e.target.checked)
+      })
+    }
   },
 
   updateUI() {
@@ -399,6 +424,29 @@ Hooks.AudioSettings = {
 
     // Update volume slider
     this.volumeSlider.value = this.currentVolume
+
+    // Update timer animation toggle (only in session mode)
+    if (this.timerAnimationToggle) {
+      this.timerAnimationToggle.checked = this.timerAnimationEnabled
+    }
+  },
+
+  toggleTimerAnimation(enabled) {
+    this.timerAnimationEnabled = enabled
+    sessionStorage.setItem('timer_animation', String(enabled))
+
+    // Force timer to update immediately
+    const timerElements = document.querySelectorAll('[data-countdown-value]')
+    timerElements.forEach(el => {
+      const currentValue = parseInt(el.textContent, 10)
+      if (!isNaN(currentValue)) {
+        if (enabled) {
+          el.style.setProperty('--value', currentValue)
+        } else {
+          el.style.removeProperty('--value')
+        }
+      }
+    })
   },
 
   selectSound(sound) {

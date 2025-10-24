@@ -260,14 +260,14 @@ defmodule SocialPomodoroWeb.SessionLive do
   def spectator_view(assigns) do
     ~H"""
     <div class="card bg-base-200 relative">
-      <!-- Audio Settings Button -->
+      <!-- Settings Button -->
       <div class="absolute top-4 right-4">
         <button
           data-open-audio-settings
           class="btn btn-ghost btn-sm btn-circle"
-          title="Audio settings"
+          title="Settings"
         >
-          <Icons.music class="w-5 h-5 fill-current" />
+          <Icons.gear class="w-5 h-5 fill-current" />
         </button>
       </div>
 
@@ -356,14 +356,14 @@ defmodule SocialPomodoroWeb.SessionLive do
     ~H"""
     <div phx-hook="MaintainWakeLock" id="active-session-view">
       <div class="card bg-base-200 relative">
-        <!-- Audio Settings Button -->
+        <!-- Settings Button -->
         <div class="absolute top-4 right-4">
           <button
             data-open-audio-settings
             class="btn btn-ghost btn-sm btn-circle"
-            title="Audio settings"
+            title="Settings"
           >
-            <Icons.music class="w-5 h-5 fill-current" />
+            <Icons.gear class="w-5 h-5 fill-current" />
           </button>
         </div>
 
@@ -479,14 +479,14 @@ defmodule SocialPomodoroWeb.SessionLive do
 
     ~H"""
     <div class="card bg-base-200 relative">
-      <!-- Audio Settings Button -->
+      <!-- Settings Button -->
       <div class="absolute top-4 right-4">
         <button
           data-open-audio-settings
           class="btn btn-ghost btn-sm btn-circle"
-          title="Audio settings"
+          title="Settings"
         >
-          <Icons.music class="w-5 h-5 fill-current" />
+          <Icons.gear class="w-5 h-5 fill-current" />
         </button>
       </div>
 
