@@ -738,28 +738,26 @@ defmodule SocialPomodoroWeb.CoreComponents do
             </button>
           </div>
 
-          <%= if @mode == "session" do %>
-            <!-- Timer Animation Toggle -->
-            <div class="mb-6">
-              <label class="label">
-                <span class="label-text font-medium">Timer Animation</span>
-              </label>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-base-content/70">Animated countdown</span>
-                <input
-                  type="checkbox"
-                  data-timer-animation-toggle
-                  class="toggle toggle-primary"
-                  checked
-                />
-              </div>
-              <p class="text-xs text-base-content/60 mt-2">
-                Disable for a simpler countdown display
-              </p>
+          <!-- Timer Animation Toggle -->
+          <div class="mb-6">
+            <label class="label">
+              <span class="label-text font-medium">Timer Animation</span>
+            </label>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-base-content/70">Animated countdown</span>
+              <input
+                type="checkbox"
+                data-timer-animation-toggle
+                class="toggle toggle-primary"
+                checked
+              />
             </div>
+            <p class="text-xs text-base-content/60 mt-2">
+              Disable for a simpler countdown display
+            </p>
+          </div>
 
-            <div class="divider"></div>
-          <% end %>
+          <div class="divider"></div>
 
           <%= if @mode == "lobby" do %>
             <div class="alert alert-info mb-4 text-sm">
