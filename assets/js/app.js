@@ -91,6 +91,7 @@ Hooks.Timer = {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
     this.segmentTargets = this.getSegmentTargets()
+    this.applyAnimationSetting()
     this.updateTimer()
     this.interval = setInterval(() => {
       this.seconds--
@@ -111,7 +112,20 @@ Hooks.Timer = {
     this.seconds = parseInt(this.el.dataset.secondsRemaining, 10)
     this.isBreak = this.el.id === 'break-timer-display'
     this.segmentTargets = this.getSegmentTargets()
+    this.applyAnimationSetting()
     this.updateTimer()
+  },
+  applyAnimationSetting() {
+    const isAnimated = getSavedTimerAnimation() === 'true'
+    // Find the timer display spans (they have font-mono and text-5xl)
+    const timerSpans = this.el.querySelectorAll('.font-mono.text-5xl')
+    timerSpans.forEach(el => {
+      if (isAnimated) {
+        el.classList.add('countdown')
+      } else {
+        el.classList.remove('countdown')
+      }
+    })
   },
   destroyed() {
     clearInterval(this.interval)
@@ -133,18 +147,8 @@ Hooks.Timer = {
     if (!target) return
 
     const safeValue = Math.max(0, Math.floor(value))
-    const isAnimated = getSavedTimerAnimation() === 'true'
-
-    if (isAnimated) {
-      // Use daisyUI countdown animation with --value CSS variable
-      target.style.setProperty('--value', safeValue)
-      target.textContent = `${safeValue}`
-    } else {
-      // Simple text update without animation
-      target.style.removeProperty('--value')
-      target.textContent = `${safeValue}`
-    }
-
+    target.style.setProperty('--value', safeValue)
+    target.textContent = `${safeValue}`
     target.setAttribute('aria-label', `${safeValue}`)
   },
   breakdown(seconds) {
@@ -435,16 +439,13 @@ Hooks.AudioSettings = {
     this.timerAnimationEnabled = enabled
     sessionStorage.setItem('timer_animation', String(enabled))
 
-    // Force timer to update immediately
-    const timerElements = document.querySelectorAll('[data-countdown-value]')
-    timerElements.forEach(el => {
-      const currentValue = parseInt(el.textContent, 10)
-      if (!isNaN(currentValue)) {
-        if (enabled) {
-          el.style.setProperty('--value', currentValue)
-        } else {
-          el.style.removeProperty('--value')
-        }
+    // Toggle the countdown class on all timer elements
+    const countdownContainers = document.querySelectorAll('.countdown, .font-mono.text-5xl')
+    countdownContainers.forEach(el => {
+      if (enabled) {
+        el.classList.add('countdown')
+      } else {
+        el.classList.remove('countdown')
       }
     })
   },
