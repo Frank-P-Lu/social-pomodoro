@@ -22,7 +22,11 @@ defmodule SocialPomodoroWeb.Plugs.UserSession do
     if is_nil(username) do
       # Generate friendly username for new users
       new_username = generate_friendly_username()
-      SocialPomodoro.UserRegistry.set_username(user_id, new_username)
+
+      # Extract metadata for bot detection and analytics
+      metadata = extract_connection_metadata(conn)
+
+      SocialPomodoro.UserRegistry.register_or_update_user(user_id, new_username, metadata)
     end
 
     # Store user_id in session and cookie
@@ -30,6 +34,36 @@ defmodule SocialPomodoroWeb.Plugs.UserSession do
     |> put_session(:user_id, user_id)
     |> assign(:user_id, user_id)
     |> put_resp_cookie(@cookie_key, user_id, max_age: @max_age, http_only: true)
+  end
+
+  defp extract_connection_metadata(conn) do
+    %{
+      user_agent: get_req_header(conn, "user-agent") |> List.first(),
+      ip_address: get_client_ip(conn),
+      referer: get_req_header(conn, "referer") |> List.first(),
+      accept_language: get_req_header(conn, "accept-language") |> List.first()
+    }
+  end
+
+  defp get_client_ip(conn) do
+    # Check X-Forwarded-For first (for proxies/load balancers)
+    case get_req_header(conn, "x-forwarded-for") do
+      [forwarded_for | _] ->
+        # Take the first IP in the chain (original client)
+        forwarded_for |> String.split(",", parts: 2) |> List.first() |> String.trim()
+
+      [] ->
+        # Fall back to remote_ip
+        format_ip_tuple(conn.remote_ip)
+    end
+  end
+
+  defp format_ip_tuple({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
+
+  defp format_ip_tuple({a, b, c, d, e, f, g, h}) do
+    [a, b, c, d, e, f, g, h]
+    |> Enum.map(&Integer.to_string(&1, 16))
+    |> Enum.join(":")
   end
 
   defp generate_user_id do

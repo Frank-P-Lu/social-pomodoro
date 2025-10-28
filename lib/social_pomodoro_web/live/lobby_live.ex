@@ -128,7 +128,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def handle_event("update_username", %{"username" => username}, socket) do
     user_id = socket.assigns.user_id
-    SocialPomodoro.UserRegistry.set_username(user_id, username)
+    SocialPomodoro.UserRegistry.register_or_update_user(user_id, username)
 
     socket =
       socket

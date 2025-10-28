@@ -329,13 +329,13 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # Register a new user - should emit telemetry
       new_user_id = "new_user_#{System.unique_integer([:positive])}"
-      SocialPomodoro.UserRegistry.set_username(new_user_id, "TestUser")
+      SocialPomodoro.UserRegistry.register_or_update_user(new_user_id, "TestUser")
 
       assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata}, 1000
       assert metadata.user_id == new_user_id
 
       # Update same user's username - should NOT emit another telemetry event
-      SocialPomodoro.UserRegistry.set_username(new_user_id, "UpdatedUser")
+      SocialPomodoro.UserRegistry.register_or_update_user(new_user_id, "UpdatedUser")
       refute_receive {:telemetry_event, [:pomodoro, :user, :connected], _, _}, 500
 
       # Clean up
@@ -357,18 +357,93 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
 
       # Register first user
       user1_id = "user1_#{System.unique_integer([:positive])}"
-      SocialPomodoro.UserRegistry.set_username(user1_id, "User1")
+      SocialPomodoro.UserRegistry.register_or_update_user(user1_id, "User1")
       assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata1}, 1000
       assert metadata1.user_id == user1_id
 
       # Register second user
       user2_id = "user2_#{System.unique_integer([:positive])}"
-      SocialPomodoro.UserRegistry.set_username(user2_id, "User2")
+      SocialPomodoro.UserRegistry.register_or_update_user(user2_id, "User2")
       assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata2}, 1000
       assert metadata2.user_id == user2_id
 
       # Clean up
       :telemetry.detach("test-multi-user-connected")
+    end
+
+    test "captures user metadata (user-agent, ip, referer) for bot detection" do
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-user-metadata",
+        [:pomodoro, :user, :connected],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Register a new user with metadata
+      new_user_id = "user_with_metadata_#{System.unique_integer([:positive])}"
+
+      metadata = %{
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0",
+        ip_address: "192.168.1.100",
+        referer: "https://google.com/search?q=pomodoro",
+        accept_language: "en-US,en;q=0.9"
+      }
+
+      SocialPomodoro.UserRegistry.register_or_update_user(
+        new_user_id,
+        "TestUserWithMetadata",
+        metadata
+      )
+
+      # Verify telemetry event includes all metadata
+      assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, received_metadata},
+                     1000
+
+      assert received_metadata.user_id == new_user_id
+      assert received_metadata.username == "TestUserWithMetadata"
+
+      assert received_metadata.user_agent ==
+               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0"
+
+      assert received_metadata.ip_address == "192.168.1.100"
+      assert received_metadata.referer == "https://google.com/search?q=pomodoro"
+      assert received_metadata.accept_language == "en-US,en;q=0.9"
+
+      # Clean up
+      :telemetry.detach("test-user-metadata")
+    end
+
+    test "handles missing metadata gracefully" do
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-user-no-metadata",
+        [:pomodoro, :user, :connected],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Register a new user without metadata (empty map)
+      new_user_id = "user_no_metadata_#{System.unique_integer([:positive])}"
+      SocialPomodoro.UserRegistry.register_or_update_user(new_user_id, "UserNoMetadata", %{})
+
+      # Verify telemetry event still fires with user_id and username
+      assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, received_metadata},
+                     1000
+
+      assert received_metadata.user_id == new_user_id
+      assert received_metadata.username == "UserNoMetadata"
+
+      # Clean up
+      :telemetry.detach("test-user-no-metadata")
     end
   end
 

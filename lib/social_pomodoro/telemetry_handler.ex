@@ -119,13 +119,29 @@ defmodule SocialPomodoro.TelemetryHandler do
 
   def handle_event([:pomodoro, :user, :connected], _measurements, metadata, _config) do
     user_id = metadata[:user_id]
-    username = SocialPomodoro.UserRegistry.get_username(user_id)
+    username = metadata[:username]
+    user_agent = metadata[:user_agent]
+    ip_address = metadata[:ip_address]
 
-    Logger.metadata(event_type: "user_connected", user_id: user_id, username: username)
-    Logger.info("EVENT user_connected user=#{username} user_id=#{user_id}")
+    Logger.metadata(
+      event_type: "user_connected",
+      user_id: user_id,
+      username: username,
+      user_agent: user_agent,
+      ip_address: ip_address
+    )
+
+    Logger.info(
+      "EVENT user_connected user=#{username} user_id=#{user_id} ip=#{ip_address} user_agent=#{user_agent}"
+    )
 
     send_analytics("User Connected", %{
-      user_id: user_id
+      user_id: user_id,
+      username: username,
+      user_agent: user_agent,
+      ip_address: ip_address,
+      referer: metadata[:referer],
+      accept_language: metadata[:accept_language]
     })
   end
 

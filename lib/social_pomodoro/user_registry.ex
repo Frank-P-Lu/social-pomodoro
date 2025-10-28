@@ -22,10 +22,11 @@ defmodule SocialPomodoro.UserRegistry do
   end
 
   @doc """
-  Sets username for a user_id.
+  Registers a new user or updates an existing user's username.
+  Optionally accepts metadata (user_agent, ip_address, etc.) for telemetry on new user registration.
   """
-  def set_username(user_id, username) do
-    GenServer.call(__MODULE__, {:set_username, user_id, username})
+  def register_or_update_user(user_id, username, metadata \\ %{}) do
+    GenServer.call(__MODULE__, {:register_or_update_user, user_id, username, metadata})
   end
 
   @doc """
@@ -63,7 +64,7 @@ defmodule SocialPomodoro.UserRegistry do
   end
 
   @impl true
-  def handle_call({:set_username, user_id, username}, _from, state) do
+  def handle_call({:register_or_update_user, user_id, username, metadata}, _from, state) do
     # Check if this is a new user (first time setting username)
     is_new_user =
       case :ets.lookup(@table_name, user_id) do
@@ -75,7 +76,13 @@ defmodule SocialPomodoro.UserRegistry do
 
     # Fire telemetry event for new users only
     if is_new_user do
-      :telemetry.execute([:pomodoro, :user, :connected], %{}, %{user_id: user_id})
+      telemetry_metadata =
+        Map.merge(metadata, %{
+          user_id: user_id,
+          username: username
+        })
+
+      :telemetry.execute([:pomodoro, :user, :connected], %{}, telemetry_metadata)
     end
 
     # Broadcast username change
