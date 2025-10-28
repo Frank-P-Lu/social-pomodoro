@@ -11,6 +11,8 @@ defmodule SocialPomodoro.Application do
       SocialPomodoroWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:social_pomodoro, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: SocialPomodoro.PubSub},
+      # Start presence tracking
+      SocialPomodoroWeb.Presence,
       # Start the user registry
       SocialPomodoro.UserRegistry,
       # Start the Finch HTTP client for sending emails

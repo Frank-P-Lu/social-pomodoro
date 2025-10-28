@@ -16,6 +16,11 @@ defmodule SocialPomodoroWeb.SessionLive do
           Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "room:#{name}")
           Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
 
+          # Track this user's presence
+          SocialPomodoroWeb.Presence.track(self(), "app:global", user_id, %{
+            username: username
+          })
+
           # Join the room when connected (handles refreshes and direct navigation)
           SocialPomodoro.Room.join(name, user_id)
         end

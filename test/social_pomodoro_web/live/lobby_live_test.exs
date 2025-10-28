@@ -371,4 +371,41 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
       :telemetry.detach("test-multi-user-connected")
     end
   end
+
+  describe "active user count" do
+    test "shows updated count when users join and leave" do
+      # User A joins
+      conn_a = setup_user_conn("user_a")
+      {:ok, lobby_a, html_a} = live(conn_a, "/")
+
+      # User A should see count of 1
+      assert html_a =~ "1 stranger online"
+
+      # User B joins
+      conn_b = setup_user_conn("user_b")
+      {:ok, lobby_b, html_b} = live(conn_b, "/")
+
+      # User B should see count of 2
+      assert html_b =~ "2 strangers online"
+
+      # User C joins
+      conn_c = setup_user_conn("user_c")
+      {:ok, lobby_c, html_c} = live(conn_c, "/")
+
+      # User C should see count of 3
+      assert html_c =~ "3 strangers online"
+
+      # Everyone should see count of 3
+      assert render(lobby_a) =~ "3 strangers online"
+      assert render(lobby_b) =~ "3 strangers online"
+
+      # User C leaves (stop the LiveView process)
+      GenServer.stop(lobby_c.pid)
+      sleep_short()
+
+      # Everyone should see count of 2
+      assert render(lobby_a) =~ "2 strangers online"
+      assert render(lobby_b) =~ "2 strangers online"
+    end
+  end
 end

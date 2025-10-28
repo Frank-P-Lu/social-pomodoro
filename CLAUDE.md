@@ -8,6 +8,8 @@ Social Pomodoro is a real-time collaborative pomodoro timer application built wi
 
 ## Commands
 
+**Note**: The development server is likely already running. Do not restart it unless there's a specific reason (e.g., dependency changes, application.ex modifications, or user requests it).
+
 ### Development
 - `mix phx.server` - Start the Phoenix server (auto-approved, runs on port 4000)
 - `iex -S mix phx.server` - Start with interactive Elixir shell

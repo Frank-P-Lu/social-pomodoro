@@ -7,13 +7,26 @@ defmodule SocialPomodoroWeb.LobbyLive do
   @impl true
   def mount(params, session, socket) do
     user_id = session["user_id"]
+    username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "rooms")
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
+      Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "app:global")
+
+      # Track this user's presence
+      SocialPomodoroWeb.Presence.track(self(), "app:global", user_id, %{
+        username: username
+      })
     end
 
-    username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"
+    active_user_count =
+      if connected?(socket) do
+        SocialPomodoroWeb.Presence.list("app:global") |> map_size()
+      else
+        0
+      end
+
     rooms = sort_rooms(SocialPomodoro.RoomRegistry.list_rooms(user_id), user_id)
 
     # Check if user is already in a room
@@ -32,6 +45,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       |> assign(:rooms, rooms)
       |> assign(:creating, false)
       |> assign(:my_room_name, my_room_name)
+      |> assign(:active_user_count, active_user_count)
       |> assign_timer_defaults(default_duration)
 
     # Handle direct room link (/at/:room_name) - only during connected mount
@@ -296,6 +310,12 @@ defmodule SocialPomodoroWeb.LobbyLive do
     {:noreply, push_navigate(socket, to: ~p"/room/#{name}")}
   end
 
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    count = SocialPomodoroWeb.Presence.list("app:global") |> map_size()
+    {:noreply, assign(socket, :active_user_count, count)}
+  end
+
   defp sort_rooms(rooms, user_id) do
     Enum.sort_by(rooms, fn room ->
       # Sort by:
@@ -434,7 +454,18 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
         <div class="card bg-base-200 ">
           <div class="card-body">
-            <h2 class="card-title">Lobby</h2>
+            <div class="flex items-center justify-between">
+              <h2 class="card-title">Lobby</h2>
+              <div
+                class="tooltip"
+                data-tip={"#{@active_user_count} #{if @active_user_count == 1, do: "stranger", else: "strangers"} online"}
+              >
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-base-100/20">
+                  <.icon name="hero-user-group" class="w-5 h-5" />
+                  <span class="font-semibold">{@active_user_count}</span>
+                </div>
+              </div>
+            </div>
 
             <%= if Enum.empty?(@rooms) do %>
               <div class="text-center py-12">
