@@ -116,11 +116,14 @@ Session-related components are split into focused modules:
 The application emits telemetry events for analytics:
 - `[:pomodoro, :room, :created]`
 - `[:pomodoro, :session, :started]` and `[:pomodoro, :session, :completed]`
+- `[:pomodoro, :user, :connected]` - Fired **once per unique user** when first registered
 - `[:pomodoro, :user, :rejoined]` and `[:pomodoro, :user, :set_working_on]`
 - `[:pomodoro, :spectator, :joined]`, `[:pomodoro, :spectator, :left]`, `[:pomodoro, :spectator, :promoted]`
 - `[:pomodoro, :cycle, :started]` and `[:pomodoro, :break, :skipped]`
 
 Handled by `SocialPomodoro.TelemetryHandler` (can send to Discord webhook or other integrations).
+
+**Visit Tracking**: The `[:pomodoro, :user, :connected]` event fires once per unique user when they are first registered in `UserRegistry`. This happens during the `UserSession` plug when a new user_id is assigned and their first username is generated. Subsequent username changes or reconnections do not trigger the event.
 
 ### User Session Management
 

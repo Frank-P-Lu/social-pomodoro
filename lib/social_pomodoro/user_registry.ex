@@ -64,7 +64,19 @@ defmodule SocialPomodoro.UserRegistry do
 
   @impl true
   def handle_call({:set_username, user_id, username}, _from, state) do
+    # Check if this is a new user (first time setting username)
+    is_new_user =
+      case :ets.lookup(@table_name, user_id) do
+        [] -> true
+        _ -> false
+      end
+
     :ets.insert(@table_name, {user_id, username})
+
+    # Fire telemetry event for new users only
+    if is_new_user do
+      :telemetry.execute([:pomodoro, :user, :connected], %{}, %{user_id: user_id})
+    end
 
     # Broadcast username change
     Phoenix.PubSub.broadcast(

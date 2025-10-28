@@ -11,9 +11,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "rooms")
       Phoenix.PubSub.subscribe(SocialPomodoro.PubSub, "user:#{user_id}")
-
-      # Track connection analytics
-      :telemetry.execute([:pomodoro, :user, :connected], %{}, %{user_id: user_id})
     end
 
     username = SocialPomodoro.UserRegistry.get_username(user_id) || "Unknown User"

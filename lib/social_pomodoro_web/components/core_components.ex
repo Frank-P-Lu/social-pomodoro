@@ -780,7 +780,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
               <span>Sounds will play during your session. Click to preview.</span>
             </div>
           <% end %>
-
+          
     <!-- Sound selection -->
           <div class="space-y-4">
             <div>

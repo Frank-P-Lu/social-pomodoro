@@ -73,6 +73,13 @@ defmodule SocialPomodoro.Application do
       &SocialPomodoro.TelemetryHandler.handle_event/4,
       nil
     )
+
+    :telemetry.attach(
+      "pomodoro-user-connected",
+      [:pomodoro, :user, :connected],
+      &SocialPomodoro.TelemetryHandler.handle_event/4,
+      nil
+    )
   end
 
   # Tell Phoenix to update the endpoint configuration

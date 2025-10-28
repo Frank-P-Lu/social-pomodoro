@@ -312,4 +312,63 @@ defmodule SocialPomodoroWeb.LobbyLiveTest do
              "User-created room should appear before open rooms"
     end
   end
+
+  describe "visit tracking telemetry" do
+    test "emits telemetry event when new user is registered" do
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-user-connected",
+        [:pomodoro, :user, :connected],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Register a new user - should emit telemetry
+      new_user_id = "new_user_#{System.unique_integer([:positive])}"
+      SocialPomodoro.UserRegistry.set_username(new_user_id, "TestUser")
+
+      assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata}, 1000
+      assert metadata.user_id == new_user_id
+
+      # Update same user's username - should NOT emit another telemetry event
+      SocialPomodoro.UserRegistry.set_username(new_user_id, "UpdatedUser")
+      refute_receive {:telemetry_event, [:pomodoro, :user, :connected], _, _}, 500
+
+      # Clean up
+      :telemetry.detach("test-user-connected")
+    end
+
+    test "tracks different users independently" do
+      # Set up telemetry handler to capture events
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-multi-user-connected",
+        [:pomodoro, :user, :connected],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      # Register first user
+      user1_id = "user1_#{System.unique_integer([:positive])}"
+      SocialPomodoro.UserRegistry.set_username(user1_id, "User1")
+      assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata1}, 1000
+      assert metadata1.user_id == user1_id
+
+      # Register second user
+      user2_id = "user2_#{System.unique_integer([:positive])}"
+      SocialPomodoro.UserRegistry.set_username(user2_id, "User2")
+      assert_receive {:telemetry_event, [:pomodoro, :user, :connected], %{}, metadata2}, 1000
+      assert metadata2.user_id == user2_id
+
+      # Clean up
+      :telemetry.detach("test-multi-user-connected")
+    end
+  end
 end
