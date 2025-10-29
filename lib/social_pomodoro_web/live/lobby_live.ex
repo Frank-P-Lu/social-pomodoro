@@ -387,9 +387,20 @@ defmodule SocialPomodoroWeb.LobbyLive do
     ~H"""
     <.flash kind={:info} flash={@flash} />
     <.flash kind={:error} flash={@flash} />
-    <div class="navbar bg-base-300 text-neutral-content">
+    <div class="navbar bg-base-300 text-neutral-content min-h-fit p-3">
       <div class="flex-1">
-        <a href="/" class="btn btn-ghost text-xl">focus with strangers</a>
+        <a href="/" class="block">
+          <img
+            src={~p"/images/logo-horizontal.png"}
+            alt="focus with strangers"
+            class="h-16 w-auto object-contain hidden sm:block"
+          />
+          <img
+            src={~p"/images/logo-square.png"}
+            alt="focus with strangers"
+            class="h-16 w-auto object-contain sm:hidden"
+          />
+        </a>
       </div>
       <div class="flex-none">
         <button
