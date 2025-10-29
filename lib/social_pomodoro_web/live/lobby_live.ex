@@ -395,7 +395,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       <div class="flex-none gap-2 flex">
         <button
           phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
-          class="btn btn-secondary btn-dash"
+          class="btn btn-secondary btn-dash text-xs md:text-sm"
         >
           Give Feedback
         </button>
@@ -504,7 +504,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     </div>
 
     <!-- Footer -->
-    <div class="text-center py-4 text-xs opacity-50">
+    <div class="bg-gradient-to-b from-base-200 to-base-300 text-center py-4 text-xs opacity-50">
       <.link navigate="/about" class="link">About</.link>
     </div>
 

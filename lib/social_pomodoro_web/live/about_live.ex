@@ -9,7 +9,7 @@ defmodule SocialPomodoroWeb.AboutLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="min-h-screen bg-base-100 flex flex-col items-center justify-center p-4">
       <div class="max-w-2xl w-full space-y-8">
         <div class="text-center">
           <h1 class="text-4xl font-bold mb-2">About</h1>

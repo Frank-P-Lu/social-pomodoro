@@ -51,6 +51,17 @@ class AudioManager {
     this.currentAmbientGainNode = null
     this.currentAmbientSoundName = null // Track which sound is currently playing
     this.fadeTimeoutId = null
+    this.isInitialized = false
+    this.isInitializing = false
+  }
+
+  safeGetVolume() {
+    const saved = getSavedVolume()
+    const parsed = parseInt(saved, 10)
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      return 50
+    }
+    return parsed
   }
 
   getContext() {
@@ -58,9 +69,7 @@ class AudioManager {
       this.context = new (window.AudioContext || window.webkitAudioContext)()
       this.masterGainNode = this.context.createGain()
       this.masterGainNode.connect(this.context.destination)
-
-      // Set initial volume from sessionStorage
-      this.masterGainNode.gain.value = parseInt(getSavedVolume()) / 100
+      this.masterGainNode.gain.value = this.safeGetVolume() / 100
     }
     return this.context
   }
@@ -80,89 +89,127 @@ class AudioManager {
   }
 
   async initialize() {
-    const ctx = this.getContext()
-
-    // Resume context if suspended (required for autoplay policy)
-    if (ctx.state === 'suspended') {
-      await ctx.resume()
+    if (this.isInitialized || this.isInitializing) {
+      console.log('[AudioManager] Already initialized or initializing')
+      return
     }
 
-    // Load alert sound
-    if (!this.buffers.alert) {
-      this.buffers.alert = await this.loadBuffer('/sounds/alert.wav')
-    }
+    this.isInitializing = true
+    console.log('[AudioManager] Starting initialization...')
 
-    // Load ambient sounds
-    if (!this.buffers.rain) {
-      this.buffers.rain = await this.loadBuffer('/sounds/fwc-rain.mp3')
-    }
-    if (!this.buffers.cafe) {
-      this.buffers.cafe = await this.loadBuffer('/sounds/fwc-cafe.mp3')
-    }
-    if (!this.buffers.white_noise) {
-      this.buffers.white_noise = await this.loadBuffer('/sounds/fwc-white-noise.mp3')
+    try {
+      const ctx = this.getContext()
+
+      if (ctx.state === 'suspended') {
+        console.log('[AudioManager] Resuming suspended context...')
+        await ctx.resume()
+        console.log('[AudioManager] Context resumed, state:', ctx.state)
+      }
+
+      if (!this.buffers.alert) {
+        console.log('[AudioManager] Loading alert.wav...')
+        this.buffers.alert = await this.loadBuffer('/sounds/alert.wav')
+      }
+
+      if (!this.buffers.rain) {
+        console.log('[AudioManager] Loading rain.mp3...')
+        this.buffers.rain = await this.loadBuffer('/sounds/fwc-rain.mp3')
+      }
+      if (!this.buffers.cafe) {
+        console.log('[AudioManager] Loading cafe.mp3...')
+        this.buffers.cafe = await this.loadBuffer('/sounds/fwc-cafe.mp3')
+      }
+      if (!this.buffers.white_noise) {
+        console.log('[AudioManager] Loading white_noise.mp3...')
+        this.buffers.white_noise = await this.loadBuffer('/sounds/fwc-white-noise.mp3')
+      }
+
+      this.isInitialized = true
+      console.log('[AudioManager] ✅ Initialization complete')
+    } catch (err) {
+      console.error('[AudioManager] ❌ Initialization failed:', err)
+    } finally {
+      this.isInitializing = false
     }
   }
 
   async playAlert() {
-    const ctx = this.getContext()
-    const buffer = this.buffers.alert
-
-    if (!buffer) {
-      console.error('Alert audio not loaded')
+    if (!this.isInitialized) {
+      console.warn('[AudioManager] playAlert() called before initialization complete')
       return
     }
 
-    // Resume context if needed (required for mobile autoplay policy)
-    if (ctx.state === 'suspended') {
-      await ctx.resume()
-    }
+    try {
+      const ctx = this.getContext()
+      const buffer = this.buffers.alert
 
-    // Create a new source each time (BufferSource can only be used once)
-    const source = ctx.createBufferSource()
-    source.buffer = buffer
-    source.connect(this.masterGainNode)
-    source.start(0)
+      if (!buffer) {
+        console.error('[AudioManager] Alert buffer not loaded')
+        return
+      }
+
+      if (ctx.state === 'suspended') {
+        console.log('[AudioManager] Resuming context for alert...')
+        await ctx.resume()
+      }
+
+      console.log('[AudioManager] Playing alert, context state:', ctx.state)
+
+      // BufferSource can only be used once, create new source each time
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(this.masterGainNode)
+      source.start(0)
+    } catch (err) {
+      console.error('[AudioManager] ❌ Failed to play alert:', err)
+    }
   }
 
   async playAmbient(soundName) {
-    // If this sound is already playing, don't restart it
+    if (!this.isInitialized) {
+      console.warn('[AudioManager] playAmbient() called before initialization complete')
+      return
+    }
+
     if (this.currentAmbientSoundName === soundName && this.currentAmbientSource) {
+      console.log('[AudioManager] Sound already playing:', soundName)
       return
     }
 
-    const ctx = this.getContext()
-    const buffer = this.buffers[soundName]
+    try {
+      const ctx = this.getContext()
+      const buffer = this.buffers[soundName]
 
-    if (!buffer) {
-      console.error('Ambient audio buffer not loaded:', soundName)
-      return
+      if (!buffer) {
+        console.error('[AudioManager] Ambient buffer not loaded:', soundName)
+        return
+      }
+
+      if (ctx.state === 'suspended') {
+        console.log('[AudioManager] Resuming context for ambient...')
+        await ctx.resume()
+      }
+
+      console.log('[AudioManager] Playing ambient:', soundName, 'context state:', ctx.state)
+
+      this.stopAmbient(0)
+
+      this.currentAmbientSource = ctx.createBufferSource()
+      this.currentAmbientGainNode = ctx.createGain()
+      this.currentAmbientSoundName = soundName
+
+      this.currentAmbientSource.buffer = buffer
+      this.currentAmbientSource.loop = true
+      this.currentAmbientGainNode.gain.value = this.safeGetVolume() / 100
+
+      // Audio graph: source → ambientGain → masterGain → destination
+      this.currentAmbientSource.connect(this.currentAmbientGainNode)
+      this.currentAmbientGainNode.connect(this.masterGainNode)
+
+      this.currentAmbientSource.start(0)
+    } catch (err) {
+      console.error('[AudioManager] ❌ Failed to play ambient:', err)
     }
-
-    // Resume context if needed (required for mobile autoplay policy)
-    if (ctx.state === 'suspended') {
-      await ctx.resume()
-    }
-
-    // Stop any currently playing ambient sound (different sound)
-    this.stopAmbient(0)
-
-    // Create new source and gain node for this ambient sound
-    this.currentAmbientSource = ctx.createBufferSource()
-    this.currentAmbientGainNode = ctx.createGain()
-    this.currentAmbientSoundName = soundName
-
-    this.currentAmbientSource.buffer = buffer
-    this.currentAmbientSource.loop = true
-
-    // Set initial gain to current volume
-    this.currentAmbientGainNode.gain.value = parseInt(getSavedVolume()) / 100
-
-    // Connect: source → ambientGain → masterGain → destination
-    this.currentAmbientSource.connect(this.currentAmbientGainNode)
-    this.currentAmbientGainNode.connect(this.masterGainNode)
-
-    this.currentAmbientSource.start(0)
   }
 
   stopAmbient(fadeDuration = 2000) {
@@ -218,13 +265,20 @@ class AudioManager {
   }
 
   setVolume(volume) {
-    if (this.masterGainNode) {
-      this.masterGainNode.gain.value = parseInt(volume) / 100
+    const parsed = parseInt(volume, 10)
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      console.warn('[AudioManager] Invalid volume value:', volume)
+      return
     }
 
-    // Also update current ambient sound gain if playing
+    const gainValue = parsed / 100
+
+    if (this.masterGainNode) {
+      this.masterGainNode.gain.value = gainValue
+    }
+
     if (this.currentAmbientGainNode) {
-      this.currentAmbientGainNode.gain.value = parseInt(volume) / 100
+      this.currentAmbientGainNode.gain.value = gainValue
     }
   }
 }
@@ -273,15 +327,14 @@ Hooks.Timer = {
     this.segmentTargets = this.getSegmentTargets()
     this.applyAnimationSetting()
     this.updateTimer()
-    this.interval = setInterval(() => {
+    this.interval = setInterval(async () => {
       this.seconds--
       if (this.seconds >= 0) {
         this.updateTimer()
       }
       if (this.seconds === 0) {
-        // Play alert sound only when transitioning from active session (not from break)
         if (!this.isBreak) {
-          audioManager.playAlert() // Fire and forget - don't block timer
+          await audioManager.playAlert()
         }
       }
     }, 1000)
@@ -390,24 +443,33 @@ Hooks.AutostartTimer = {
 
 Hooks.RequestWakeLock = {
   mounted() {
-    // Add click handler to initialize audio in response to user gesture (required for mobile)
     this.el.addEventListener('click', async () => {
-      // Initialize audio first (must be synchronous with user gesture for iOS)
-      const ctx = audioManager.getContext()
-      if (ctx.state === 'suspended') {
-        await ctx.resume()
+      try {
+        console.log('[RequestWakeLock] User gesture detected, initializing audio...')
+
+        const ctx = audioManager.getContext()
+        console.log('[RequestWakeLock] Context state:', ctx.state)
+
+        if (ctx.state === 'suspended') {
+          await ctx.resume()
+          console.log('[RequestWakeLock] Context resumed, state:', ctx.state)
+        }
+
+        // Play silent buffer through masterGainNode to unlock audio graph on iOS
+        const silentBuffer = ctx.createBuffer(1, 1, 22050)
+        const silentSource = ctx.createBufferSource()
+        silentSource.buffer = silentBuffer
+        silentSource.connect(audioManager.masterGainNode)
+        silentSource.start(0)
+        console.log('[RequestWakeLock] Silent buffer played through masterGainNode')
+
+        await audioManager.initialize()
+        await ensureWakeLock()
+
+        console.log('[RequestWakeLock] ✅ Audio and wake lock initialization complete')
+      } catch (err) {
+        console.error('[RequestWakeLock] ❌ Initialization failed:', err)
       }
-      
-      // Play silent buffer immediately in user gesture (required for iOS)
-      const silentBuffer = ctx.createBuffer(1, 1, 22050)
-      const silentSource = ctx.createBufferSource()
-      silentSource.buffer = silentBuffer
-      silentSource.connect(ctx.destination)
-      silentSource.start(0)
-      
-      // Now load the actual audio files
-      await audioManager.initialize()
-      await ensureWakeLock()
     })
   }
 }
@@ -650,30 +712,27 @@ Hooks.SessionSettings = {
 
 Hooks.AmbientAudio = {
   mounted() {
-    // Listen for session status changes from LiveView
     this.handleEvent("session_status_changed", ({ status }) => {
       this.handleStatusChange(status)
     })
   },
 
-  handleStatusChange(status) {
+  async handleStatusChange(status) {
     const currentSound = getSavedSound()
 
-    // Only play during :active (work phase), not during :break or :autostart
+    // Only play during :active phase
     if (status === 'active') {
       if (currentSound !== 'none') {
-        audioManager.playAmbient(currentSound) // Async but don't block status change
+        await audioManager.playAmbient(currentSound)
       }
     } else {
-      // Fade out during :break and :autostart transitions
       if (audioManager.currentAmbientSource) {
-        audioManager.stopAmbient(2000) // 2 second fade out
+        audioManager.stopAmbient(2000)
       }
     }
   },
 
   destroyed() {
-    // Stop ambient sound when component is destroyed
     audioManager.stopAmbient(0)
   }
 }

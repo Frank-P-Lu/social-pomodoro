@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="theme-color" content="#3d4150" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <.live_title default="focus with strangers">
       {assigns[:page_title]}
@@ -52,12 +52,13 @@
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
         window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
+
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
       })();
     </script>
   </head>
-  <body class="bg-base-100">
+  <body class="bg-base-300">
     {@inner_content}
   </body>
 </html>
