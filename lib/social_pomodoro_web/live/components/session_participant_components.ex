@@ -1,4 +1,7 @@
 defmodule SocialPomodoroWeb.SessionParticipantComponents do
+  @moduledoc """
+  Components for displaying participant information in sessions.
+  """
   use SocialPomodoroWeb, :html
 
   alias SocialPomodoroWeb.Icons

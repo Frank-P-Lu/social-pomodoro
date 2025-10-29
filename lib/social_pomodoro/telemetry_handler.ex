@@ -9,6 +9,8 @@ defmodule SocialPomodoro.TelemetryHandler do
 
   require Logger
 
+  alias SocialPomodoro.Discord.Webhook
+
   @doc """
   Handles telemetry events and sends them to Discord webhook and logs for analytics.
 
@@ -146,6 +148,6 @@ defmodule SocialPomodoro.TelemetryHandler do
   end
 
   defp send_analytics(event_type, data) do
-    SocialPomodoro.Discord.Webhook.send_analytics(event_type, data)
+    Webhook.send_analytics(event_type, data)
   end
 end

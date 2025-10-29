@@ -715,21 +715,19 @@ defmodule SocialPomodoro.Room do
   end
 
   defp generate_completion_message(duration_minutes, participant_count) do
-    cond do
-      participant_count == 1 ->
-        # Random message for solo sessions
-        Enum.random([
-          "You focused solo for #{duration_minutes} minutes!",
-          "Flying solo today - nice work!",
-          "Solo focus session complete!",
-          "You stayed focused for #{duration_minutes} minutes!"
-        ])
+    if participant_count == 1 do
+      # Random message for solo sessions
+      Enum.random([
+        "You focused solo for #{duration_minutes} minutes!",
+        "Flying solo today - nice work!",
+        "Solo focus session complete!",
+        "You stayed focused for #{duration_minutes} minutes!"
+      ])
+    else
+      # Message for group sessions
+      other_count = participant_count - 1
 
-      true ->
-        # Message for group sessions
-        other_count = participant_count - 1
-
-        "You focused with #{SocialPomodoro.Utils.other_people(other_count)} for #{duration_minutes} minutes!"
+      "You focused with #{SocialPomodoro.Utils.other_people(other_count)} for #{duration_minutes} minutes!"
     end
   end
 

@@ -61,9 +61,7 @@ defmodule SocialPomodoroWeb.Plugs.UserSession do
   defp format_ip_tuple({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
   defp format_ip_tuple({a, b, c, d, e, f, g, h}) do
-    [a, b, c, d, e, f, g, h]
-    |> Enum.map(&Integer.to_string(&1, 16))
-    |> Enum.join(":")
+    Enum.map_join([a, b, c, d, e, f, g, h], ":", &Integer.to_string(&1, 16))
   end
 
   defp generate_user_id do

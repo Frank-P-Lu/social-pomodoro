@@ -1,4 +1,7 @@
 defmodule SocialPomodoroWeb.SessionTabsComponents do
+  @moduledoc """
+  Components for session tabs including todo lists and chat.
+  """
   use SocialPomodoroWeb, :html
 
   alias SocialPomodoroWeb.Icons

@@ -1,4 +1,7 @@
 defmodule SocialPomodoroWeb.SessionTimerComponents do
+  @moduledoc """
+  Components for displaying session timers and countdowns.
+  """
   use SocialPomodoroWeb, :html
 
   attr :id, :string, required: true
