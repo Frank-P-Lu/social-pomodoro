@@ -724,9 +724,9 @@ defmodule SocialPomodoroWeb.CoreComponents do
       <!-- Slide-over panel -->
       <div
         data-panel
-        class="fixed top-0 right-0 h-full w-80 bg-base-100 shadow-xl transform translate-x-full transition-transform duration-300 ease-out"
+        class="fixed top-0 right-0 h-screen w-80 bg-base-100 shadow-xl transform translate-x-full transition-transform duration-300 ease-out"
       >
-        <div class="flex flex-col h-full p-6">
+        <div class="flex flex-col h-full p-6 overflow-y-auto">
           <!-- Header -->
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-lg font-semibold">Settings</h2>

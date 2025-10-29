@@ -104,7 +104,7 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
   attr :placeholder, :string, default: "What are you working on?"
   attr :user_id, :string, required: true
   slot :avatar_card, required: true
-  slot :left_controls
+  slot :emoji_controls, required: true
 
   def tabs_with_content(assigns) do
     ~H"""
@@ -114,24 +114,17 @@ defmodule SocialPomodoroWeb.SessionTabsComponents do
           {render_slot(@avatar_card)}
         </div>
 
-        <div class={[
-          "flex flex-col gap-2 md:flex-row md:items-end md:justify-end",
-          @left_controls != [] && "md:pl-32"
-        ]}>
-          <%= if @left_controls != [] do %>
-            <div class="flex justify-end md:justify-start md:mr-auto">
-              <div class="md:-mt-2">
-                {render_slot(@left_controls)}
-              </div>
-            </div>
-          <% end %>
+        <div class="flex flex-col gap-1 md:flex-row items-end justify-end">
+          <div class="md:mr-1 md:mb-1">
+            {render_slot(@emoji_controls)}
+          </div>
 
           <div
             role="tablist"
-            class="flex justify-end relative z-10 "
+            class="flex justify-end relative z-10"
           >
             <label class={[
-              "px-4 py-2 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
+              "px-4 py-2 md:pt-3 gap-2 flex items-center cursor-pointer transition-all border-t border-x border-base-300 rounded-t-lg -mb-px",
               @selected_tab == :todo && "bg-base-100 border-b-base-100 z-10",
               @selected_tab != :todo && "bg-base-200 border-b-transparent hover:bg-base-300"
             ]}>

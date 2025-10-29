@@ -397,12 +397,20 @@ defmodule SocialPomodoroWeb.LobbyLive do
           />
         </a>
       </div>
-      <div class="flex-none">
+      <div class="flex-none gap-2 flex">
         <button
           phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
           class="btn btn-secondary btn-dash"
         >
           Give Feedback
+        </button>
+        <button
+          type="button"
+          data-open-session-settings
+          class="btn btn-ghost btn-square"
+          title="Settings"
+        >
+          <Icons.gear class="w-5 h-5 fill-current" />
         </button>
       </div>
     </div>
@@ -523,6 +531,20 @@ defmodule SocialPomodoroWeb.LobbyLive do
     is_session_participant and not is_currently_in_room
   end
 
+  defp room_description(room) do
+    count = Utils.count_with_word(length(room.participants), "person", "people")
+    status = if room.status == :autostart, do: "waiting", else: "focusing"
+
+    duration_info =
+      if room.total_cycles > 1 do
+        "#{room.total_cycles} × #{room.duration_minutes} min · #{room.break_duration_minutes} min breaks"
+      else
+        "#{room.duration_minutes} min"
+      end
+
+    "#{count} #{status} · #{duration_info}"
+  end
+
   attr :room, :map, required: true
   attr :user_id, :string, required: true
   attr :my_room_name, :string, default: nil
@@ -563,12 +585,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
             <% end %>
           </div>
           <div class="text-sm opacity-70">
-            {Utils.count_with_word(length(@room.participants), "person", "people")} waiting ·
-            <%= if @room.total_cycles > 1 do %>
-              {@room.total_cycles} × {@room.duration_minutes} min · {@room.break_duration_minutes} min breaks
-            <% else %>
-              {@room.duration_minutes} min
-            <% end %>
+            {room_description(@room)}
           </div>
         </div>
         
@@ -750,14 +767,6 @@ defmodule SocialPomodoroWeb.LobbyLive do
                 </button>
               </div>
             </div>
-            <button
-              type="button"
-              data-open-session-settings
-              class="btn btn-ghost btn-sm btn-circle"
-              title="Settings"
-            >
-              <Icons.gear class="w-5 h-5 fill-current" />
-            </button>
           </div>
           <form
             id="username-form"
