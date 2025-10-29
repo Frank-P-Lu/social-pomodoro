@@ -393,12 +393,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
           <img
             src={~p"/images/logo-horizontal.png"}
             alt="focus with strangers"
-            class="h-16 w-auto object-contain hidden sm:block"
-          />
-          <img
-            src={~p"/images/logo-square.png"}
-            alt="focus with strangers"
-            class="h-16 w-auto object-contain sm:hidden"
+            class="h-9 w-auto object-contain block md:h-16"
           />
         </a>
       </div>
