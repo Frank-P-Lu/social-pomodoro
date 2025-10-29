@@ -1098,6 +1098,61 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
   end
 
+  describe "username update" do
+    test "user can update username in settings and see it reflected in user card" do
+      conn = setup_user_conn("userA")
+      user_id = get_session(conn, "user_id")
+
+      {:ok, lobby, _html} = live(conn, "/")
+
+      lobby
+      |> element("button[phx-click='create_room']")
+      |> render_click()
+
+      html = render(lobby)
+
+      room_name =
+        case Regex.run(~r/phx-click="start_my_room"[^>]*phx-value-room-name="([^"]+)"/, html) do
+          [_, room_name] -> room_name
+          _ -> nil
+        end
+
+      {:ok, room_pid} = SocialPomodoro.RoomRegistry.get_room(room_name)
+      set_short_durations(room_pid)
+
+      lobby
+      |> element("button[phx-click='start_my_room']")
+      |> render_click()
+
+      sleep_short()
+
+      {:ok, session, _html} = live(conn, "/room/#{room_name}")
+
+      # Get initial username from registry
+      initial_username = SocialPomodoro.UserRegistry.get_username(user_id)
+
+      # Verify initial username is displayed in user card
+      html = render(session)
+      assert html =~ initial_username
+
+      # Update username via settings form (settings panel is controlled by JS hook, 
+      # but we can directly submit the form in tests)
+      session
+      |> element("form#settings-username-form")
+      |> render_submit(%{"username" => "Bob"})
+
+      sleep_short()
+
+      # Verify updated username is displayed in user card
+      html = render(session)
+      assert html =~ "Bob"
+      refute html =~ initial_username
+
+      # Verify username was updated in UserRegistry
+      assert SocialPomodoro.UserRegistry.get_username(user_id) == "Bob"
+    end
+  end
+
   describe "tab functionality" do
     test "todo tab is selected by default during active session" do
       conn = setup_user_conn("userA")

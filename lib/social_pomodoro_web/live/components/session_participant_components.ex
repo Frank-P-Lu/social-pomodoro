@@ -135,7 +135,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
   def current_user_avatar_with_status(assigns) do
     ~H"""
-    <div class="flex flex-col items-center flex-shrink-0 min-w-24 md:min-w-32">
+    <div class="flex flex-col items-center flex-shrink-0 w-20 xs:w-28 md:w-auto md:min-w-32">
       <div class="relative">
         <.avatar
           user_id={@user_id}
@@ -154,7 +154,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <p class="font-bold text-center mt-1 xs:mt-2 text-sm md:text-base md:text-lg truncate max-w-[5rem] xs:max-w-[8rem] md:max-w-full">
+      <p class="font-bold text-center mt-1 xs:mt-2 text-sm md:text-base md:text-lg truncate max-w-full">
         {@username}
       </p>
       <%= if @is_break && @participant.ready_for_next do %>

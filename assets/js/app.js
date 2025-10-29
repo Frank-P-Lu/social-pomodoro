@@ -392,8 +392,22 @@ Hooks.RequestWakeLock = {
   mounted() {
     // Add click handler to initialize audio in response to user gesture (required for mobile)
     this.el.addEventListener('click', async () => {
-      await ensureWakeLock()
+      // Initialize audio first (must be synchronous with user gesture for iOS)
+      const ctx = audioManager.getContext()
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+      
+      // Play silent buffer immediately in user gesture (required for iOS)
+      const silentBuffer = ctx.createBuffer(1, 1, 22050)
+      const silentSource = ctx.createBufferSource()
+      silentSource.buffer = silentBuffer
+      silentSource.connect(ctx.destination)
+      silentSource.start(0)
+      
+      // Now load the actual audio files
       await audioManager.initialize()
+      await ensureWakeLock()
     })
   }
 }
