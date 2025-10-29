@@ -47,6 +47,8 @@ let alertAudio = null
 function initializeAudio() {
   if (!alertAudio) {
     alertAudio = new Audio('/sounds/alert.wav')
+    // Set initial volume from sessionStorage
+    alertAudio.volume = parseInt(getSavedVolume()) / 100
     // Load the audio file during user interaction to unlock it in Safari
     alertAudio.load()
   }
@@ -101,6 +103,8 @@ Hooks.Timer = {
       if (this.seconds === 0) {
         // Play alert sound only when transitioning from active session (not from break)
         if (alertAudio && !this.isBreak) {
+          // Ensure volume is set from current settings
+          alertAudio.volume = parseInt(getSavedVolume()) / 100
           alertAudio.currentTime = 0
           alertAudio.play().catch(err => console.error('Failed to play alert:', err))
         }
@@ -493,6 +497,11 @@ Hooks.SessionSettings = {
     sessionStorage.setItem('ambient_volume', volume)
     const audio = getGlobalAudio()
     audio.volume = parseInt(volume) / 100
+
+    // Also update alert audio volume if it exists
+    if (alertAudio) {
+      alertAudio.volume = parseInt(volume) / 100
+    }
   },
 
   show() {

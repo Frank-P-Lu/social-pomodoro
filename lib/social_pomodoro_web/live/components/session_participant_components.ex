@@ -27,7 +27,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
       <div class="card p-2 flex flex-row items-center justify-center w-full ">
         <%!-- Avatar + username --%>
-        <div class="flex flex-col items-center gap-1 flex-shrink-0 p-1 pr-2">
+        <div class="flex flex-col items-center gap-1 p-1 pr-2 min-w-0 overflow-hidden w-full">
           <div class="relative flex items-center justify-center flex-shrink-0">
             <div class={if @is_break, do: "indicator", else: ""}>
               <%= if @is_break && @participant.ready_for_next do %>
@@ -51,7 +51,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               </span>
             <% end %>
           </div>
-          <p class="font-semibold text-center text-xs leading-tight flex-shrink-0 truncate">
+          <p class="font-semibold text-center text-xs leading-tight truncate w-full">
             {@participant.username}
           </p>
           <%= if @is_break && @participant.ready_for_next do %>
@@ -152,7 +152,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
         <% end %>
       </div>
 
-      <p class="font-bold text-center mt-1 xs:mt-2 text-sm xs:text-base md:text-lg">
+      <p class="font-bold text-center mt-1 xs:mt-2 text-sm xs:text-base md:text-lg truncate max-w-[15ch] xs:max-w-full">
         {@participant.username}
       </p>
       <%= if @is_break && @participant.ready_for_next do %>
