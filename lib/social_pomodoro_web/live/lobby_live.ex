@@ -130,12 +130,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
     user_id = socket.assigns.user_id
     SocialPomodoro.UserRegistry.register_or_update_user(user_id, username)
 
-    socket =
-      socket
-      |> assign(:username, username)
-      |> put_flash(:info, "Username updated!")
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :username, username)}
   end
 
   @impl true
@@ -517,7 +512,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       <:trigger></:trigger>
     </.feedback_modal>
 
-    <.audio_settings id="audio-settings" mode="lobby" />
+    <.settings_panel id="settings-panel" mode="lobby" username={@username} user_id={@user_id} />
 
     <div id="ambient-audio-hook" phx-hook="AmbientAudio" phx-update="ignore"></div>
     """

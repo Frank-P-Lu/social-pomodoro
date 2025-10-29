@@ -104,7 +104,7 @@ class AudioManager {
     }
   }
 
-  playAlert() {
+  async playAlert() {
     const ctx = this.getContext()
     const buffer = this.buffers.alert
 
@@ -113,9 +113,9 @@ class AudioManager {
       return
     }
 
-    // Resume context if needed
+    // Resume context if needed (required for mobile autoplay policy)
     if (ctx.state === 'suspended') {
-      ctx.resume()
+      await ctx.resume()
     }
 
     // Create a new source each time (BufferSource can only be used once)
@@ -125,7 +125,7 @@ class AudioManager {
     source.start(0)
   }
 
-  playAmbient(soundName) {
+  async playAmbient(soundName) {
     // If this sound is already playing, don't restart it
     if (this.currentAmbientSoundName === soundName && this.currentAmbientSource) {
       return
@@ -139,9 +139,9 @@ class AudioManager {
       return
     }
 
-    // Resume context if needed
+    // Resume context if needed (required for mobile autoplay policy)
     if (ctx.state === 'suspended') {
-      ctx.resume()
+      await ctx.resume()
     }
 
     // Stop any currently playing ambient sound (different sound)
@@ -281,7 +281,7 @@ Hooks.Timer = {
       if (this.seconds === 0) {
         // Play alert sound only when transitioning from active session (not from break)
         if (!this.isBreak) {
-          audioManager.playAlert()
+          audioManager.playAlert() // Fire and forget - don't block timer
         }
       }
     }, 1000)
@@ -390,8 +390,11 @@ Hooks.AutostartTimer = {
 
 Hooks.RequestWakeLock = {
   mounted() {
-    ensureWakeLock()
-    audioManager.initialize()
+    // Add click handler to initialize audio in response to user gesture (required for mobile)
+    this.el.addEventListener('click', async () => {
+      await ensureWakeLock()
+      await audioManager.initialize()
+    })
   }
 }
 
@@ -591,7 +594,7 @@ Hooks.SessionSettings = {
     if (sound === 'none') {
       audioManager.stopAmbient(1000) // 1 second fade out
     } else {
-      // Play the selected ambient sound
+      // Play the selected ambient sound (async but don't block UI)
       audioManager.playAmbient(sound)
 
       // In lobby mode, fade out after 3 seconds (preview)
@@ -645,7 +648,7 @@ Hooks.AmbientAudio = {
     // Only play during :active (work phase), not during :break or :autostart
     if (status === 'active') {
       if (currentSound !== 'none') {
-        audioManager.playAmbient(currentSound)
+        audioManager.playAmbient(currentSound) // Async but don't block status change
       }
     } else {
       // Fade out during :break and :autostart transitions

@@ -149,6 +149,15 @@ defmodule SocialPomodoroWeb.SessionLive do
   end
 
   @impl true
+  def handle_event("update_username", %{"username" => username}, socket) do
+    user_id = socket.assigns.user_id
+    SocialPomodoro.UserRegistry.register_or_update_user(user_id, username)
+
+    # Just update @username - the component uses this directly now
+    {:noreply, assign(socket, :username, username)}
+  end
+
+  @impl true
   # TODO: major refactor needed. Most of these are not necessary. Only tick is necessary?
   def handle_info({:room_state, room_state}, socket) do
     # Update spectator status
@@ -204,9 +213,14 @@ defmodule SocialPomodoroWeb.SessionLive do
   @impl true
   def handle_info({:username_updated, user_id, username}, socket) do
     if socket.assigns.user_id == user_id do
+      # Current user - just update @username (used directly by component)
       {:noreply, assign(socket, :username, username)}
     else
-      {:noreply, socket}
+      # Other participant - update their username in room_state.participants
+      updated_room_state =
+        update_participant_username(socket.assigns.room_state, user_id, username)
+
+      {:noreply, assign(socket, :room_state, updated_room_state)}
     end
   end
 
@@ -214,13 +228,6 @@ defmodule SocialPomodoroWeb.SessionLive do
   def handle_info({:session_started, _room_name}, socket) do
     # Ignore if already on session page
     {:noreply, socket}
-  end
-
-  @impl true
-  def terminate(_reason, socket) do
-    # Leave room when LiveView process terminates (e.g., navigation away)
-    SocialPomodoro.Room.leave(socket.assigns.name, socket.assigns.user_id)
-    :ok
   end
 
   @impl true
@@ -236,6 +243,7 @@ defmodule SocialPomodoroWeb.SessionLive do
               <.active_session_view
                 room_state={@room_state}
                 user_id={@user_id}
+                username={@username}
                 current_participant={@current_participant}
                 selected_tab={@selected_tab}
               />
@@ -243,6 +251,7 @@ defmodule SocialPomodoroWeb.SessionLive do
               <.break_view
                 room_state={@room_state}
                 user_id={@user_id}
+                username={@username}
                 completion_message={@completion_message}
                 current_participant={@current_participant}
                 selected_tab={@selected_tab}
@@ -254,7 +263,7 @@ defmodule SocialPomodoroWeb.SessionLive do
       </div>
     </div>
 
-    <.audio_settings id="audio-settings" mode="session" />
+    <.settings_panel id="settings-panel" mode="session" username={@username} user_id={@user_id} />
 
     <div id="ambient-audio-hook" phx-hook="AmbientAudio" phx-update="ignore"></div>
     """
@@ -323,8 +332,22 @@ defmodule SocialPomodoroWeb.SessionLive do
     """
   end
 
+  defp update_participant_username(room_state, user_id, username) do
+    updated_participants =
+      Enum.map(room_state.participants, fn participant ->
+        if participant.user_id == user_id do
+          Map.put(participant, :username, username)
+        else
+          participant
+        end
+      end)
+
+    Map.put(room_state, :participants, updated_participants)
+  end
+
   attr :room_state, :map, required: true
   attr :user_id, :string, required: true
+  attr :username, :string, required: true
   attr :current_participant, :map, required: true
   attr :selected_tab, :atom, required: true
 
@@ -422,6 +445,7 @@ defmodule SocialPomodoroWeb.SessionLive do
             completed_count={@completed_count}
             total_count={@total_count}
             user_id={@user_id}
+            username={@username}
           />
         <% end %>
       </div>
@@ -444,6 +468,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
   attr :room_state, :map, required: true
   attr :user_id, :string, required: true
+  attr :username, :string, required: true
   attr :completion_message, :string, required: true
   attr :current_participant, :map, required: true
   attr :selected_tab, :atom, required: true
@@ -546,6 +571,7 @@ defmodule SocialPomodoroWeb.SessionLive do
           completed_count={@completed_count}
           total_count={@total_count}
           user_id={@user_id}
+          username={@username}
         />
       <% end %>
     </div>

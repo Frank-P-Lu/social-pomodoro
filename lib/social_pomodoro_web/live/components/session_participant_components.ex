@@ -27,8 +27,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
       <div class="card p-2 flex flex-row items-center justify-center w-full ">
         <%!-- Avatar + username --%>
-        <div class="flex flex-col items-center gap-1 flex-shrink-0 p-1 pr-2 min-w-0">
-          <div class="relative flex items-center justify-center flex-shrink-0">
+        <div class="flex flex-col items-center gap-1 p-1 pr-2 min-w-0">
+          <div class="relative flex items-center justify-center">
             <div class={if @is_break, do: "indicator", else: ""}>
               <%= if @is_break && @participant.ready_for_next do %>
                 <span class="indicator-item indicator-start indicator-top badge badge-success badge-xs md:badge-sm">
@@ -51,7 +51,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
               </span>
             <% end %>
           </div>
-          <p class="participant-username font-semibold text-center text-xs leading-tight truncate">
+          <p class="participant-username font-semibold text-center text-xs leading-tight truncate max-w-full">
             {@participant.username}
           </p>
           <%= if @is_break && @participant.ready_for_next do %>
@@ -130,14 +130,16 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
 
   attr :participant, :map, required: true
   attr :is_break, :boolean, default: false
+  attr :username, :string, required: true
+  attr :user_id, :string, required: true
 
   def current_user_avatar_with_status(assigns) do
     ~H"""
-    <div class="flex flex-col items-center flex-shrink-0">
+    <div class="flex flex-col items-center flex-shrink-0 min-w-24 md:min-w-32">
       <div class="relative">
         <.avatar
-          user_id={@participant.user_id}
-          username={@participant.username}
+          user_id={@user_id}
+          username={@username}
           size="w-11 xs:w-12 md:w-16"
           class="ring-primary ring-offset-base-100 rounded-full shadow-md ring-1 xs:ring-2 md:ring-4 ring-offset-1 md:ring-offset-2"
         />
@@ -153,7 +155,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
       </div>
 
       <p class="font-bold text-center mt-1 xs:mt-2 text-sm md:text-base md:text-lg truncate max-w-[5rem] xs:max-w-[8rem] md:max-w-full">
-        {@participant.username}
+        {@username}
       </p>
       <%= if @is_break && @participant.ready_for_next do %>
         <p class="text-xs text-success font-semibold mt-1">Skip</p>
@@ -200,6 +202,7 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   attr :completed_count, :integer, required: true
   attr :total_count, :integer, required: true
   attr :user_id, :string, required: true
+  attr :username, :string, required: true
 
   def current_user_card(assigns) do
     ~H"""
@@ -219,6 +222,8 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
                   <.current_user_avatar_with_status
                     participant={@current_participant}
                     is_break={@is_break}
+                    username={@username}
+                    user_id={@user_id}
                   />
                 </div>
               </:avatar_card>

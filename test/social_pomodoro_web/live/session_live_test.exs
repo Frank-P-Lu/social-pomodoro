@@ -380,8 +380,8 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
     end
   end
 
-  describe "auto-leave on navigation" do
-    test "user is removed from room when navigating away from session" do
+  describe "user persistence on navigation" do
+    test "user stays in room when navigating away from session (mobile-friendly)" do
       conn = setup_user_conn("userA")
       user_id = get_session(conn, "user_id")
 
@@ -422,18 +422,18 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       room_state = SocialPomodoro.Room.get_state(room_pid)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id))
 
-      # Stop the LiveView to simulate navigation away (this calls terminate/2)
+      # Stop the LiveView to simulate navigation away or temporary disconnect
       GenServer.stop(session_view.pid)
 
       # Give it a moment to process
       sleep_short()
 
-      # User should now be removed from the room
+      # User should STAY in the room (mobile-friendly behavior)
       room_state = SocialPomodoro.Room.get_state(room_pid)
-      refute Enum.any?(room_state.participants, &(&1.user_id == user_id))
+      assert Enum.any?(room_state.participants, &(&1.user_id == user_id))
     end
 
-    test "spectator is removed when navigating away" do
+    test "spectator stays in room when navigating away (mobile-friendly)" do
       conn_a = setup_user_conn("userA")
       conn_b = setup_user_conn("userB")
 
@@ -481,13 +481,13 @@ defmodule SocialPomodoroWeb.SessionLiveTest do
       assert Enum.member?(room_state.spectators, user_id_b)
       refute Enum.any?(room_state.participants, &(&1.user_id == user_id_b))
 
-      # User B navigates away
+      # User B navigates away or disconnects temporarily
       GenServer.stop(session_view_b.pid)
       sleep_short()
 
-      # User B should be removed from spectators
+      # User B should STAY as a spectator (mobile-friendly behavior)
       room_state = SocialPomodoro.Room.get_raw_state(room_pid)
-      refute Enum.member?(room_state.spectators, user_id_b)
+      assert Enum.member?(room_state.spectators, user_id_b)
       assert Enum.any?(room_state.participants, &(&1.user_id == user_id_a))
     end
 

@@ -696,17 +696,19 @@ defmodule SocialPomodoroWeb.CoreComponents do
   end
 
   @doc """
-  Renders an audio settings slide-over panel (client-side only).
+  Renders a settings slide-over panel with audio controls and user preferences.
 
   ## Examples
 
-      <.audio_settings id="audio-settings" mode="lobby" />
-      <.audio_settings id="audio-settings" mode="session" />
+      <.settings_panel id="settings-panel" mode="lobby" username={@username} user_id={@user_id} />
+      <.settings_panel id="settings-panel" mode="session" username={@username} user_id={@user_id} />
   """
   attr :id, :string, required: true
   attr :mode, :string, default: "lobby", values: ~w(lobby session)
+  attr :username, :string, required: true
+  attr :user_id, :string, required: true
 
-  def audio_settings(assigns) do
+  def settings_panel(assigns) do
     ~H"""
     <div
       id={@id}
@@ -738,6 +740,55 @@ defmodule SocialPomodoroWeb.CoreComponents do
               <.icon name="hero-x-mark" class="w-5 h-5" />
             </button>
           </div>
+          
+    <!-- Username Section -->
+          <div class="mb-6">
+            <label class="label">
+              <span class="label-text font-medium">Username</span>
+            </label>
+            <div class="flex items-center gap-2">
+              <span id="settings-username-display" class="font-semibold text-base flex-1">
+                {@username}
+              </span>
+              <button
+                type="button"
+                phx-click={
+                  JS.toggle(to: "#settings-username-form")
+                  |> JS.focus(to: "#settings-username-input")
+                }
+                class="btn btn-ghost btn-xs btn-square"
+                title="Edit username"
+              >
+                <.icon name="hero-pencil" class="w-4 h-4" />
+              </button>
+            </div>
+            <form
+              id="settings-username-form"
+              phx-submit="update_username"
+              class="mt-3 hidden"
+            >
+              <div class="flex flex-col gap-2">
+                <input
+                  type="text"
+                  id="settings-username-input"
+                  value={@username}
+                  name="username"
+                  autocomplete="username"
+                  class="input input-sm input-bordered"
+                  placeholder="Enter username"
+                />
+                <button
+                  type="submit"
+                  phx-click={JS.hide(to: "#settings-username-form")}
+                  class="btn btn-primary btn-sm"
+                >
+                  Update
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="divider"></div>
 
           <%= if @mode == "session" do %>
             <!-- Timer Animation Toggle -->
