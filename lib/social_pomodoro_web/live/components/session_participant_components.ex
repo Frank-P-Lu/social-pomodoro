@@ -248,13 +248,13 @@ defmodule SocialPomodoroWeb.SessionParticipantComponents do
   def other_participants_section(assigns) do
     ~H"""
     <%= if length(@other_participants) > 0 do %>
-      <div class="divider">
+      <div class="divider divider-start pl-4">
         <div class="flex items-center gap-2">
           <Icons.users class="w-4 h-4 fill-current opacity-70" />
           <span>Other Participants ({length(@other_participants)})</span>
         </div>
       </div>
-      <div class="flex flex-col items-center gap-4 mb-4">
+      <div class="flex items-center gap-4 mb-4 overflow-x-auto p-2">
         <div :for={participant <- @other_participants} :key={participant.user_id}>
           <.participant_display
             participant={participant}

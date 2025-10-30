@@ -62,8 +62,7 @@ if config_env() == :prod do
       port: port
     ],
     secret_key_base: secret_key_base,
-    check_origin: ["https://focuswithstrangers.com", "https://www.focuswithstrangers.com"],
-    force_ssl: [hsts: true]
+    check_origin: ["https://focuswithstrangers.com", "https://www.focuswithstrangers.com"]
 
   # ## SSL Support
   #

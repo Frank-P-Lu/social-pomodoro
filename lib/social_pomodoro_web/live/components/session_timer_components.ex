@@ -12,7 +12,7 @@ defmodule SocialPomodoroWeb.SessionTimerComponents do
     assigns = assign(assigns, :countdown_segments, countdown_segments(assigns.seconds_remaining))
 
     ~H"""
-    <div class="flex flex-col items-center gap-4">
+    <div class="flex flex-col items-center gap-4 mb-2">
       <div
         id={@id}
         class="flex justify-center gap-6"

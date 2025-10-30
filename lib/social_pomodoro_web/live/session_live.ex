@@ -397,7 +397,7 @@ defmodule SocialPomodoroWeb.SessionLive do
 
         <div class="card-body text-center p-2 md:pd-4">
           <!-- Cycle Progress & Spectator Badge -->
-          <div class="flex justify-center items-center gap-4 mb-4">
+          <div class="flex justify-center items-center gap-4 mb-2 md:mb-4">
             <%= if @room_state.total_cycles > 1 do %>
               <div class="text-sm opacity-70 flex items-center gap-1">
                 <img src="/images/emojis/1F345.svg" class="w-4 h-4 inline" alt="🍅" />
@@ -418,17 +418,17 @@ defmodule SocialPomodoroWeb.SessionLive do
             <% end %>
           </div>
           
-    <!-- Other Participants -->
-          <SessionParticipantComponents.other_participants_section
-            other_participants={@other_participants}
-            is_break={false}
-          />
-          
     <!-- Timer Display -->
           <SessionTimerComponents.timer_display
             id="timer-display"
             seconds_remaining={@room_state.seconds_remaining}
             label="Focus time remaining"
+          />
+          
+    <!-- Other Participants -->
+          <SessionParticipantComponents.other_participants_section
+            other_participants={@other_participants}
+            is_break={false}
           />
         </div>
         

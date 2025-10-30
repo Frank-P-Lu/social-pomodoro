@@ -685,7 +685,7 @@ defmodule SocialPomodoroWeb.CoreComponents do
   def avatar(assigns) do
     ~H"""
     <div class={["avatar rounded-full", @class]}>
-      <div class={[@size, "rounded-full"]}>
+      <div class={[@size, "rounded-full flex-shrink-0"]}>
         <img
           src={"https://api.dicebear.com/9.x/thumbs/svg?seed=#{@user_id}"}
           alt={@username}
