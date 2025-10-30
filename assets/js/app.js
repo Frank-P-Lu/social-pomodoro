@@ -23,6 +23,7 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import { Howl, Howler } from 'howler'
 
 // Wake Lock functionality
 let wakeLock = null
@@ -41,18 +42,12 @@ async function ensureWakeLock() {
   }
 }
 
-// ===== Web Audio API System (works on iOS) =====
+// ===== Audio System using Howler.js (handles iOS/Android automatically) =====
 class AudioManager {
   constructor() {
-    this.context = null
-    this.masterGainNode = null
-    this.buffers = {}
-    this.currentAmbientSource = null
-    this.currentAmbientGainNode = null
-    this.currentAmbientSoundName = null // Track which sound is currently playing
-    this.fadeTimeoutId = null
+    this.sounds = {}
+    this.currentAmbientSound = null
     this.isInitialized = false
-    this.isInitializing = false
   }
 
   safeGetVolume() {
@@ -64,221 +59,117 @@ class AudioManager {
     return parsed
   }
 
-  getContext() {
-    if (!this.context) {
-      this.context = new (window.AudioContext || window.webkitAudioContext)()
-      this.masterGainNode = this.context.createGain()
-      this.masterGainNode.connect(this.context.destination)
-      this.masterGainNode.gain.value = this.safeGetVolume() / 100
-    }
-    return this.context
-  }
-
-  async loadBuffer(url) {
-    const ctx = this.getContext()
-
-    try {
-      const response = await fetch(url)
-      const arrayBuffer = await response.arrayBuffer()
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-      return audioBuffer
-    } catch (err) {
-      console.error('Failed to load audio:', url, err)
-      return null
-    }
-  }
-
-  async initialize() {
-    if (this.isInitialized || this.isInitializing) {
-      console.log('[AudioManager] Already initialized or initializing')
+  initialize() {
+    if (this.isInitialized) {
       return
     }
 
-    this.isInitializing = true
-    console.log('[AudioManager] Starting initialization...')
+    // Set global volume
+    Howler.volume(this.safeGetVolume() / 100)
 
-    try {
-      const ctx = this.getContext()
+    // Create alert sound
+    this.sounds.alert = new Howl({
+      src: ['/sounds/alert.wav'],
+      preload: true,
+      onloaderror: (id, err) => {
+        console.error('[AudioManager] Failed to load alert:', err)
+      }
+    })
 
-      if (ctx.state === 'suspended') {
-        console.log('[AudioManager] Resuming suspended context...')
-        await ctx.resume()
-        console.log('[AudioManager] Context resumed, state:', ctx.state)
+    // Create ambient sounds
+    this.sounds.rain = new Howl({
+      src: ['/sounds/fwc-rain.mp3'],
+      loop: true,
+      preload: true,
+      onloaderror: (id, err) => {
+        console.error('[AudioManager] Failed to load rain:', err)
       }
+    })
 
-      if (!this.buffers.alert) {
-        console.log('[AudioManager] Loading alert.wav...')
-        this.buffers.alert = await this.loadBuffer('/sounds/alert.wav')
+    this.sounds.cafe = new Howl({
+      src: ['/sounds/fwc-cafe.mp3'],
+      loop: true,
+      preload: true,
+      onloaderror: (id, err) => {
+        console.error('[AudioManager] Failed to load cafe:', err)
       }
+    })
 
-      if (!this.buffers.rain) {
-        console.log('[AudioManager] Loading rain.mp3...')
-        this.buffers.rain = await this.loadBuffer('/sounds/fwc-rain.mp3')
+    this.sounds.white_noise = new Howl({
+      src: ['/sounds/fwc-white-noise.mp3'],
+      loop: true,
+      preload: true,
+      onloaderror: (id, err) => {
+        console.error('[AudioManager] Failed to load white_noise:', err)
       }
-      if (!this.buffers.cafe) {
-        console.log('[AudioManager] Loading cafe.mp3...')
-        this.buffers.cafe = await this.loadBuffer('/sounds/fwc-cafe.mp3')
-      }
-      if (!this.buffers.white_noise) {
-        console.log('[AudioManager] Loading white_noise.mp3...')
-        this.buffers.white_noise = await this.loadBuffer('/sounds/fwc-white-noise.mp3')
-      }
+    })
 
-      this.isInitialized = true
-      console.log('[AudioManager] ✅ Initialization complete')
-    } catch (err) {
-      console.error('[AudioManager] ❌ Initialization failed:', err)
-    } finally {
-      this.isInitializing = false
-    }
+    this.isInitialized = true
   }
 
-  async playAlert() {
+  playAlert() {
+    if (!this.isInitialized || !this.sounds.alert) {
+      return
+    }
+
+    this.sounds.alert.play()
+  }
+
+  playAmbient(soundName) {
     if (!this.isInitialized) {
-      console.warn('[AudioManager] playAlert() called before initialization complete')
       return
     }
 
-    try {
-      const ctx = this.getContext()
-      const buffer = this.buffers.alert
-
-      if (!buffer) {
-        console.error('[AudioManager] Alert buffer not loaded')
-        return
-      }
-
-      if (ctx.state === 'suspended') {
-        console.log('[AudioManager] Resuming context for alert...')
-        await ctx.resume()
-      }
-
-      console.log('[AudioManager] Playing alert, context state:', ctx.state)
-
-      // BufferSource can only be used once, create new source each time
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-      source.connect(this.masterGainNode)
-      source.start(0)
-    } catch (err) {
-      console.error('[AudioManager] ❌ Failed to play alert:', err)
-    }
-  }
-
-  async playAmbient(soundName) {
-    if (!this.isInitialized) {
-      console.warn('[AudioManager] playAmbient() called before initialization complete')
+    // If same sound is already playing, do nothing
+    if (this.currentAmbientSound === soundName) {
       return
     }
 
-    if (this.currentAmbientSoundName === soundName && this.currentAmbientSource) {
-      console.log('[AudioManager] Sound already playing:', soundName)
-      return
-    }
+    // Stop current ambient sound
+    this.stopAmbient(2000)
 
-    try {
-      const ctx = this.getContext()
-      const buffer = this.buffers[soundName]
-
-      if (!buffer) {
-        console.error('[AudioManager] Ambient buffer not loaded:', soundName)
-        return
-      }
-
-      if (ctx.state === 'suspended') {
-        console.log('[AudioManager] Resuming context for ambient...')
-        await ctx.resume()
-      }
-
-      console.log('[AudioManager] Playing ambient:', soundName, 'context state:', ctx.state)
-
-      this.stopAmbient(0)
-
-      this.currentAmbientSource = ctx.createBufferSource()
-      this.currentAmbientGainNode = ctx.createGain()
-      this.currentAmbientSoundName = soundName
-
-      this.currentAmbientSource.buffer = buffer
-      this.currentAmbientSource.loop = true
-      this.currentAmbientGainNode.gain.value = this.safeGetVolume() / 100
-
-      // Audio graph: source → ambientGain → masterGain → destination
-      this.currentAmbientSource.connect(this.currentAmbientGainNode)
-      this.currentAmbientGainNode.connect(this.masterGainNode)
-
-      this.currentAmbientSource.start(0)
-    } catch (err) {
-      console.error('[AudioManager] ❌ Failed to play ambient:', err)
+    // Play new sound
+    const sound = this.sounds[soundName]
+    if (sound) {
+      sound.play()
+      this.currentAmbientSound = soundName
+    } else {
+      console.error('[AudioManager] Sound not found:', soundName)
     }
   }
 
   stopAmbient(fadeDuration = 2000) {
-    if (!this.currentAmbientSource) {
+    if (!this.currentAmbientSound) {
       return
     }
 
-    const ctx = this.getContext()
-
-    // Clear any pending fade timeout
-    if (this.fadeTimeoutId) {
-      clearTimeout(this.fadeTimeoutId)
-      this.fadeTimeoutId = null
-    }
-
-    if (fadeDuration > 0 && this.currentAmbientGainNode) {
-      // Fade out using Web Audio API (smooth and efficient)
-      const now = ctx.currentTime
-      const fadeEndTime = now + (fadeDuration / 1000)
-
-      // Cancel any scheduled changes and set current value
-      this.currentAmbientGainNode.gain.cancelScheduledValues(now)
-      this.currentAmbientGainNode.gain.setValueAtTime(this.currentAmbientGainNode.gain.value, now)
-
-      // Schedule linear ramp to 0
-      this.currentAmbientGainNode.gain.linearRampToValueAtTime(0, fadeEndTime)
-
-      // Stop and cleanup after fade completes
-      this.fadeTimeoutId = setTimeout(() => {
-        if (this.currentAmbientSource) {
-          this.currentAmbientSource.stop()
-          this.currentAmbientSource.disconnect()
-          this.currentAmbientSource = null
-        }
-        if (this.currentAmbientGainNode) {
-          this.currentAmbientGainNode.disconnect()
-          this.currentAmbientGainNode = null
-        }
-        this.currentAmbientSoundName = null
+    const sound = this.sounds[this.currentAmbientSound]
+    if (sound) {
+      sound.fade(sound.volume(), 0, fadeDuration)
+      setTimeout(() => {
+        sound.stop()
+        sound.volume(Howler.volume()) // Reset to global volume
       }, fadeDuration)
-    } else {
-      // Stop immediately
-      this.currentAmbientSource.stop()
-      this.currentAmbientSource.disconnect()
-      this.currentAmbientSource = null
-
-      if (this.currentAmbientGainNode) {
-        this.currentAmbientGainNode.disconnect()
-        this.currentAmbientGainNode = null
-      }
-      this.currentAmbientSoundName = null
     }
+
+    this.currentAmbientSound = null
   }
 
   setVolume(volume) {
     const parsed = parseInt(volume, 10)
     if (isNaN(parsed) || parsed < 0 || parsed > 100) {
-      console.warn('[AudioManager] Invalid volume value:', volume)
       return
     }
 
-    const gainValue = parsed / 100
+    const volumeValue = parsed / 100
+    Howler.volume(volumeValue)
 
-    if (this.masterGainNode) {
-      this.masterGainNode.gain.value = gainValue
-    }
-
-    if (this.currentAmbientGainNode) {
-      this.currentAmbientGainNode.gain.value = gainValue
+    // Update volume for currently playing ambient sound
+    if (this.currentAmbientSound) {
+      const sound = this.sounds[this.currentAmbientSound]
+      if (sound) {
+        sound.volume(volumeValue)
+      }
     }
   }
 }
@@ -327,14 +218,14 @@ Hooks.Timer = {
     this.segmentTargets = this.getSegmentTargets()
     this.applyAnimationSetting()
     this.updateTimer()
-    this.interval = setInterval(async () => {
+    this.interval = setInterval(() => {
       this.seconds--
       if (this.seconds >= 0) {
         this.updateTimer()
       }
       if (this.seconds === 0) {
         if (!this.isBreak) {
-          await audioManager.playAlert()
+          audioManager.playAlert()
         }
       }
     }, 1000)
@@ -445,30 +336,11 @@ Hooks.RequestWakeLock = {
   mounted() {
     this.el.addEventListener('click', async () => {
       try {
-        console.log('[RequestWakeLock] User gesture detected, initializing audio...')
-
-        const ctx = audioManager.getContext()
-        console.log('[RequestWakeLock] Context state:', ctx.state)
-
-        if (ctx.state === 'suspended') {
-          await ctx.resume()
-          console.log('[RequestWakeLock] Context resumed, state:', ctx.state)
-        }
-
-        // Play silent buffer through masterGainNode to unlock audio graph on iOS
-        const silentBuffer = ctx.createBuffer(1, 1, 22050)
-        const silentSource = ctx.createBufferSource()
-        silentSource.buffer = silentBuffer
-        silentSource.connect(audioManager.masterGainNode)
-        silentSource.start(0)
-        console.log('[RequestWakeLock] Silent buffer played through masterGainNode')
-
-        await audioManager.initialize()
+        // Howler.js handles iOS/Android audio unlocking automatically!
+        audioManager.initialize()
         await ensureWakeLock()
-
-        console.log('[RequestWakeLock] ✅ Audio and wake lock initialization complete')
       } catch (err) {
-        console.error('[RequestWakeLock] ❌ Initialization failed:', err)
+        console.error('[RequestWakeLock] Initialization failed:', err)
       }
     })
   }
@@ -661,6 +533,11 @@ Hooks.SessionSettings = {
     sessionStorage.setItem('ambient_sound', sound)
     this.updateUI()
 
+    // Initialize audio on first interaction (user gesture required for iOS/Android)
+    if (!audioManager.isInitialized) {
+      audioManager.initialize()
+    }
+
     // Clear any existing preview timeout
     if (this.previewTimeout) {
       clearTimeout(this.previewTimeout)
@@ -668,18 +545,16 @@ Hooks.SessionSettings = {
     }
 
     if (sound === 'none') {
-      audioManager.stopAmbient(1000) // 1 second fade out
+      audioManager.stopAmbient(1000)
     } else {
-      // Play the selected ambient sound (async but don't block UI)
       audioManager.playAmbient(sound)
 
       // In lobby mode, fade out after 3 seconds (preview)
       if (this.mode === 'lobby') {
         this.previewTimeout = setTimeout(() => {
-          audioManager.stopAmbient(2000) // 2 second fade out
+          audioManager.stopAmbient(2000)
         }, 3000)
       }
-      // In session mode, play continuously (no timeout)
     }
   },
 
@@ -717,16 +592,16 @@ Hooks.AmbientAudio = {
     })
   },
 
-  async handleStatusChange(status) {
+  handleStatusChange(status) {
     const currentSound = getSavedSound()
 
     // Only play during :active phase
     if (status === 'active') {
       if (currentSound !== 'none') {
-        await audioManager.playAmbient(currentSound)
+        audioManager.playAmbient(currentSound)
       }
     } else {
-      if (audioManager.currentAmbientSource) {
+      if (audioManager.currentAmbientSound) {
         audioManager.stopAmbient(2000)
       }
     }

@@ -547,15 +547,15 @@ defmodule SocialPomodoroWeb.SessionLive do
           {@completion_message}
         </p>
 
-        <SessionParticipantComponents.other_participants_section
-          other_participants={@other_participants}
-          is_break={true}
-        />
-
         <SessionTimerComponents.timer_display
           id="break-timer-display"
           seconds_remaining={@room_state.seconds_remaining}
           label="Break time remaining"
+        />
+
+        <SessionParticipantComponents.other_participants_section
+          other_participants={@other_participants}
+          is_break={true}
         />
       </div>
 
