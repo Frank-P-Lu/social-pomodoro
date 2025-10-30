@@ -505,7 +505,22 @@ defmodule SocialPomodoroWeb.LobbyLive do
 
     <!-- Footer -->
     <div class="bg-gradient-to-b from-base-200 to-base-300 text-center py-4 text-xs opacity-50">
-      <.link navigate="/about" class="link">About</.link>
+      <div class="flex flex-col items-center gap-4">
+        <a
+          href="https://www.producthunt.com/products/focus-with-strangers?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-focus&#0045;with&#0045;strangers"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1032478&theme=dark&t=1761808447590"
+            alt="focus&#0032;with&#0032;strangers - Multiplayer&#0032;pomodoro&#0032;timer | Product Hunt"
+            style="width: 250px; height: 54px;"
+            width="250"
+            height="54"
+          />
+        </a>
+        <.link navigate="/about" class="link">About</.link>
+      </div>
     </div>
 
     <.feedback_modal id="feedback-modal" username={@username}>
