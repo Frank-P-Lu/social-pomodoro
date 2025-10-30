@@ -20,9 +20,11 @@ ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
 
 FROM ${BUILDER_IMAGE} AS builder
 
-# install build dependencies
+# install build dependencies (including Node.js for npm)
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential git \
+  && apt-get install -y --no-install-recommends build-essential git curl \
+  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
   && rm -rf /var/lib/apt/lists/*
 
 # prepare build dir
@@ -40,6 +42,9 @@ COPY mix.exs mix.lock ./
 RUN mix deps.get --only $MIX_ENV
 RUN mkdir config
 
+# copy npm dependencies for esbuild bundling
+COPY package.json package-lock.json ./
+
 # copy compile-time config files before we compile dependencies
 # to ensure any relevant config change will trigger the dependencies
 # to be re-compiled.
@@ -56,6 +61,9 @@ COPY lib lib
 RUN mix compile
 
 COPY assets assets
+
+# install npm dependencies (esbuild will bundle from node_modules)
+RUN npm ci --prefer-offline --no-audit --progress=false
 
 # compile assets
 RUN mix assets.deploy
