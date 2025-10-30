@@ -395,7 +395,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
       <div class="flex-none gap-2 flex">
         <button
           phx-click={SocialPomodoroWeb.CoreComponents.show_modal("feedback-modal")}
-          class="btn btn-secondary btn-dash text-xs md:text-sm"
+          class="btn btn-secondary btn-dash text-xs md:text-sm px-2 md:px-4"
         >
           Give Feedback
         </button>
@@ -441,7 +441,7 @@ defmodule SocialPomodoroWeb.LobbyLive do
                   </p>
 
                   <div class="text-secondary italic text-lg">
-                    No webcam. No chat. Just work
+                    No webcam. No chat. Just work.
                   </div>
                 </div>
               </div>
